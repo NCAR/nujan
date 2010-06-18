@@ -1,11 +1,38 @@
+// The MIT License
+// 
+// Copyright (c) 2009 University Corporation for Atmospheric
+// Research and Massachusetts Institute of Technology Lincoln
+// Laboratory.
+// 
+// Permission is hereby granted, free of charge, to any person
+// obtaining a copy of this software and associated documentation
+// files (the "Software"), to deal in the Software without
+// restriction, including without limitation the rights to use,
+// copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following
+// conditions:
+// 
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
 
-package ncHdfTest;
 
-import ncHdf.NcDimension;
-import ncHdf.NcException;
-import ncHdf.NcFile;
-import ncHdf.NcGroup;
-import ncHdf.NcVariable;
+package nhPkgTest;
+
+import nhPkg.NhDimension;
+import nhPkg.NhException;
+import nhPkg.NhFileWriter;
+import nhPkg.NhGroup;
+import nhPkg.NhVariable;
 
 import hdfnet.HdfException;
 import hdfnet.HdfGroup;
@@ -25,7 +52,6 @@ static void badparms( String msg) {
   prtf("  -bugs         <int>");
   prtf("  -dims         <int,int,...>   or \"-\" if scalar");
   prtf("  -fileVersion  1 / 2");
-  prtf("  -chunked      false / true");
   prtf("  -compress     compression level: 0==none, 1 - 9");
   prtf("  -outFile      <fname>");
   System.exit(1);
@@ -44,12 +70,11 @@ public static void main( String[] args) {
 
 
 static void runit( String[] args)
-throws NcException
+throws NhException
 {
   int bugs = -1;
   int[] dims = null;
   String fileVersionStg = null;
-  String chunkedStg = null;        // xxx chunked not used
   int compressLevel = -1;
   String outFile = null;
 
@@ -70,7 +95,6 @@ throws NcException
       }
     }
     else if (key.equals("-fileVersion")) fileVersionStg = val;
-    else if (key.equals("-chunked")) chunkedStg = val;
     else if (key.equals("-compress")) compressLevel = Integer.parseInt( val);
     else if (key.equals("-outFile")) outFile = val;
     else badparms("unkown parm: " + key);
@@ -79,7 +103,6 @@ throws NcException
   if (bugs < 0) badparms("missing parm: -bugs");
   if (dims == null) badparms("missing parm: -dims");
   if (fileVersionStg == null) badparms("missing parm: -fileVersion");
-  if (chunkedStg == null) badparms("missing parm: -chunked");
   if (compressLevel < 0) badparms("missing parm: -compress");
   if (outFile == null) badparms("missing parm: -outFile");
 
@@ -88,14 +111,8 @@ throws NcException
   else if (fileVersionStg.equals("2")) fileVersion = 2;
   else badparms("unknown fileVersion: " + fileVersionStg);
 
-  boolean useChunked = false;
-  if (chunkedStg.equals("false")) useChunked = false;
-  else if (chunkedStg.equals("true")) useChunked = true;
-  else badparms("unknown chunked: " + chunkedStg);
-
   prtf("TestNetcdfString: bugs: %d", bugs);
   prtf("TestNetcdfString: fileVersion: %s", fileVersion);
-  prtf("TestNetcdfString: chunked: %s", useChunked);
   prtf("TestNetcdfString: compress: %d", compressLevel);
   prtf("TestNetcdfString: outFile: \"%s\"", outFile);
   for (int ii = 0; ii < dims.length; ii++) {
@@ -121,25 +138,23 @@ throws NcException
   }
   else badparms("unknown rank");
 
-  NcFile hfile = new NcFile( outFile, NcFile.OPT_OVERWRITE, fileVersion);
+  NhFileWriter hfile = new NhFileWriter( outFile, NhFileWriter.OPT_OVERWRITE, fileVersion);
   hfile.setDebugLevel( bugs);
 
-  NcGroup rootGroup = hfile.getRootGroup();
+  NhGroup rootGroup = hfile.getRootGroup();
 
   // Add dimensions
-  NcDimension[] ncDims = new NcDimension[rank];
+  NhDimension[] nhDims = new NhDimension[rank];
   for (int ii = 0; ii < rank; ii++) {
-    ncDims[ii] = rootGroup.addDimension(
+    nhDims[ii] = rootGroup.addDimension(
       String.format("dim%02d", ii),
       dims[ii]);
   }
 
-  int stgFieldLen = 0;
-  NcVariable vara = rootGroup.addVariable(
+  NhVariable vara = rootGroup.addVariable(
     "vara",              // varName
-    NcVariable.TP_STRING_VAR,
-    stgFieldLen,
-    ncDims,              // varDims
+    NhVariable.TP_STRING_VAR,
+    nhDims,              // varDims
     fillValue,
     compressLevel);
 
@@ -158,9 +173,9 @@ throws NcException
 
 
 static void throwerr( String msg, Object... args)
-throws NcException
+throws NhException
 {
-  throw new NcException( String.format( msg, args));
+  throw new NhException( String.format( msg, args));
 }
 
 

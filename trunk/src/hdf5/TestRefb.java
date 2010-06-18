@@ -1,7 +1,34 @@
+// The MIT License
+// 
+// Copyright (c) 2009 University Corporation for Atmospheric
+// Research and Massachusetts Institute of Technology Lincoln
+// Laboratory.
+// 
+// Permission is hereby granted, free of charge, to any person
+// obtaining a copy of this software and associated documentation
+// files (the "Software"), to deal in the Software without
+// restriction, including without limitation the rights to use,
+// copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following
+// conditions:
+// 
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
+
 
 package hdfnetTest;
 
-import hdfnet.HdfFile;
+import hdfnet.HdfFileWriter;
 import hdfnet.HdfGroup;
 import hdfnet.HdfException;
 
@@ -57,15 +84,15 @@ throws HdfException
   prtf("TestRefb: outFile: \"%s\"", outFile);
 
   int fileVersion = 1;
-  HdfFile hfile = new HdfFile(
-    outFile, fileVersion, HdfFile.OPT_ALLOW_OVERWRITE);
+  HdfFileWriter hfile = new HdfFileWriter(
+    outFile, fileVersion, HdfFileWriter.OPT_ALLOW_OVERWRITE);
   HdfGroup rootGroup = hfile.getRootGroup();
 
 
   HdfGroup testVar = rootGroup.addVariable(
     "testDs",
     HdfGroup.DTYPE_REFERENCE,  // dtype
-    0,                         // string length, incl null termination
+    0,                         // string length, without null termination
     new int[] {3},             // varDims
     null,                      // fillValue
     false,                     // isChunked

@@ -1,3 +1,30 @@
+// The MIT License
+// 
+// Copyright (c) 2009 University Corporation for Atmospheric
+// Research and Massachusetts Institute of Technology Lincoln
+// Laboratory.
+// 
+// Permission is hereby granted, free of charge, to any person
+// obtaining a copy of this software and associated documentation
+// files (the "Software"), to deal in the Software without
+// restriction, including without limitation the rights to use,
+// copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following
+// conditions:
+// 
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
+
 
 package hdfnet;
 
@@ -83,7 +110,7 @@ int typeFlag;                      // combo of 3 bytes: bits 0-7, 18-5, 16.23
 //   0  if 0, little endian; if 1, big endian
 //   1  value for low padding
 //   2  value for high padding
-//   3  if 1, number is signed 2's complement form
+//   3  if 0 unsigned.  If 1, number is signed 2's complement form.
 //
 // Flags for floating point:
 //   bit0==0 && bit6==0   little endian
@@ -138,19 +165,19 @@ int floatExponBias;                  // exponent bias
 // Class 09: variable length
 
 MsgDataType[] subMsgs;    // sub types for DTYPE_VLEN, DTYPE_COMPOUND
-int stgFieldLen;          // string length for DTYPE_STRING_FIX, incl null term
+int stgFieldLen;          // stg len for DTYPE_STRING_FIX, without null term
 
 
 
 
 
 MsgDataType(
-  int dtype,              // one of HdfGroup.DTYPE*
-  int[] dsubTypes,        // subType for DTYPE_VLEN or DTYPE_COMPOUND
-  String[] subNames,      // member names for DTYPE_COMPOUND
-  int stgFieldLen,        // string length for DTYPE_STRING_FIX, incl null term
-  HdfGroup hdfGroup,      // the owning group
-  HdfFile hdfFile)
+  int dtype,                 // one of HdfGroup.DTYPE*
+  int[] dsubTypes,           // subType for DTYPE_VLEN or DTYPE_COMPOUND
+  String[] subNames,         // member names for DTYPE_COMPOUND
+  int stgFieldLen,           // stg len for DTYPE_STRING_FIX, without null term
+  HdfGroup hdfGroup,         // the owning group
+  HdfFileWriter hdfFile)
 throws HdfException
 {
   super( TP_DATATYPE, hdfGroup, hdfFile);
@@ -158,6 +185,7 @@ throws HdfException
   this.subNames = subNames;
   typeVersion = 1;
   if (hdfFile.bugs >= 5) {
+    prtf("########## MsgDataType: testaa: " + (Object) this);
     prtf("MsgDataType: dtype: " + HdfGroup.dtypeNames[dtype]);
     if (dsubTypes == null) prtf("  dsubTypes: null");
     else {
@@ -165,17 +193,30 @@ throws HdfException
         prtf("  dsubType: " + HdfGroup.dtypeNames[isub]);
       }
     }
+    if (subNames == null) prtf("  subNames: null");
+    else {
+      for (String nm : subNames) {
+        prtf("  subNames: \"" + nm + "\"");
+      }
+    }
   }
 
-  if (dtype == HdfGroup.DTYPE_VLEN
-    || dtype == HdfGroup.DTYPE_COMPOUND)
-  {
+  if (dtype == HdfGroup.DTYPE_VLEN) {
     if (dsubTypes == null || dsubTypes.length == 0)
-      throwerr("missing subType");
+      throwerr("DTYPE_VLEN: missing dsubTypes");
+    if (subNames != null)
+      throwerr("DTYPE_VLEN: subNames not null");
+  }
+  else if (dtype == HdfGroup.DTYPE_COMPOUND) {
+    if (dsubTypes == null || dsubTypes.length == 0)
+      throwerr("DTYPE_COMPOUND: missing dsubTypes");
+    if (subNames == null || subNames.length == 0)
+      throwerr("DTYPE_COMPOUND: missing subNames");
+    if (dsubTypes.length != subNames.length)
+      throwerr("DTYPE_COMPOUND: subTypes len != subNames len");
   }
   else {
-    if (dsubTypes != null)
-      throwerr("subType not allowed");
+    if (dsubTypes != null) throwerr("dsubTypes not null");
   }
 
   if (dtype == HdfGroup.DTYPE_STRING_FIX
@@ -188,7 +229,8 @@ throws HdfException
     if (stgFieldLen != 0) throwerr("Invalid stgFieldLen: must be 0");
   }
 
-  if (dtype == HdfGroup.DTYPE_FIXED08) elementLen = 1;
+  if (dtype == HdfGroup.DTYPE_SFIXED08) elementLen = 1;
+  else if (dtype == HdfGroup.DTYPE_UFIXED08) elementLen = 1;
   else if (dtype == HdfGroup.DTYPE_FIXED16) elementLen = 2;
   else if (dtype == HdfGroup.DTYPE_FIXED32) elementLen = 4;
   else if (dtype == HdfGroup.DTYPE_FIXED64) elementLen = 8;
@@ -197,33 +239,35 @@ throws HdfException
   else if (dtype == HdfGroup.DTYPE_STRING_FIX) elementLen = stgFieldLen;
   else if (dtype == HdfGroup.DTYPE_REFERENCE) {
     // If object ref, len is 8.  If region ref, len is 12.
-    elementLen = HdfFile.OFFSET_SIZE;
+    elementLen = HdfFileWriter.OFFSET_SIZE;
   }
   else if (dtype == HdfGroup.DTYPE_VLEN)
-    elementLen = 2 * HdfFile.OFFSET_SIZE;
+    elementLen = 2 * HdfFileWriter.OFFSET_SIZE;
   else if (dtype == HdfGroup.DTYPE_STRING_VAR)
-    elementLen = 2 * HdfFile.OFFSET_SIZE;
+    elementLen = 2 * HdfFileWriter.OFFSET_SIZE;
   else if (dtype == HdfGroup.DTYPE_COMPOUND) {
     // Here elementLen is the total len of the compound structure:
     //   Reference is long, 8 bytes
     //   Id is fixed32, 4 bytes
-    elementLen = HdfFile.OFFSET_SIZE + 4;
+    elementLen = HdfFileWriter.OFFSET_SIZE + 4;
   }
   else throwerr("unknown dtype: " + dtype);
 
   // Set up the message values
-  if (dtype == HdfGroup.DTYPE_FIXED08
+  if (dtype == HdfGroup.DTYPE_SFIXED08
+    || dtype == HdfGroup.DTYPE_UFIXED08
     || dtype == HdfGroup.DTYPE_FIXED16
     || dtype == HdfGroup.DTYPE_FIXED32
     || dtype == HdfGroup.DTYPE_FIXED64)
   {
     typeClass = TCLS_FIXED;
-    typeFlag = 0;         // bit0==0: little-endian
-    if (dtype != HdfGroup.DTYPE_FIXED08)
-      typeFlag |= 8;      // bit3==1: two's complement
+    typeFlag = 0;                      // bit0==0: little-endian
+    if (dtype != HdfGroup.DTYPE_UFIXED08)
+      typeFlag |= 8;                   // bit3==1: two's complement
 
     fixptBitOffset = 0;
-    if (dtype == HdfGroup.DTYPE_FIXED08) fixptPrecision = 8;
+    if (dtype == HdfGroup.DTYPE_SFIXED08) fixptPrecision = 8;
+    else if (dtype == HdfGroup.DTYPE_UFIXED08) fixptPrecision = 8;
     else if (dtype == HdfGroup.DTYPE_FIXED16) fixptPrecision = 16;
     else if (dtype == HdfGroup.DTYPE_FIXED32) fixptPrecision = 32;
     else if (dtype == HdfGroup.DTYPE_FIXED64) fixptPrecision = 64;
@@ -288,7 +332,7 @@ throws HdfException
 
     subMsgs = new MsgDataType[] {
       new MsgDataType(
-        HdfGroup.DTYPE_FIXED08,           // dtype: one of HdfGroup.DTYPE*
+        HdfGroup.DTYPE_UFIXED08,     // dtype: one of HdfGroup.DTYPE*
         null,               // subSubType
         null,               // member names for DTYPE_COMPOUND
         0,                  // stgFieldLen
@@ -299,8 +343,9 @@ throws HdfException
 
   // General VLEN, not variable length strings
   else if (dtype == HdfGroup.DTYPE_VLEN) {
-    if (dsubTypes == null || dsubTypes.length != 1)
-      throwerr("invalid subType for DTYPE_VLEN");
+    if (dsubTypes == null) throwerr("dsubTypes == null");
+    if (dsubTypes.length != 1)
+      throwerr("invalid len for dsubTypes: " + dsubTypes.length);
     typeClass = TCLS_VLEN;
 
     // Flag bits: see doc above for DTYPE_STRING_VAR
@@ -319,8 +364,9 @@ throws HdfException
   } // if DTYPE_VLEN
 
   else if (dtype == HdfGroup.DTYPE_COMPOUND) {
-    if (dsubTypes == null || dsubTypes.length < 1)
-      throwerr("invalid subType for DTYPE_COMPOUND");
+    if (dsubTypes == null) throwerr("dsubTypes == null");
+    if (dsubTypes.length < 1)
+      throwerr("invalid len for dsubTypes: " + dsubTypes.length);
     typeClass = TCLS_COMPOUND;
     typeFlag = dsubTypes.length;
     subMsgs = new MsgDataType[ dsubTypes.length];
@@ -345,7 +391,8 @@ throws HdfException
 void checkDsubType( int dsubType)
 throws HdfException
 {
-  if (dsubType != HdfGroup.DTYPE_FIXED08
+  if (dsubType != HdfGroup.DTYPE_SFIXED08
+    && dsubType != HdfGroup.DTYPE_UFIXED08
     && dsubType != HdfGroup.DTYPE_FIXED16
     && dsubType != HdfGroup.DTYPE_FIXED32
     && dsubType != HdfGroup.DTYPE_FIXED64
@@ -353,13 +400,14 @@ throws HdfException
     && dsubType != HdfGroup.DTYPE_FLOAT64
     && dsubType != HdfGroup.DTYPE_STRING_FIX
     && dsubType != HdfGroup.DTYPE_REFERENCE)
-    throwerr("invalid dsubType");
+    throwerr("invalid dsubType: " + HdfGroup.dtypeNames[dsubType]);
 }
 
 
 
 public String toString() {
   String res = super.toString();
+  res += "  dtype: " + HdfGroup.dtypeNames[dtype];
   res += "  typeVersion: " + typeVersion;
   res += "  typeClass: " + typeClassNames[typeClass];
   res += "  elementLen: " + elementLen;
@@ -424,6 +472,8 @@ throws HdfException
     int memberOffset = 0;
     for (int isub = 0; isub < subMsgs.length; isub++) {
       MsgDataType subtp = subMsgs[isub];
+    prtf("########## MsgDataType: testaa fmt: " + (Object) this);
+    prtf("########## MsgDataType: subNames: " + subNames);
       String subName = subNames[isub];
       if (hdfFile.bugs >= 5) {
         prtIndent(
@@ -464,7 +514,7 @@ throws HdfException
       if (subtp.dtype == HdfGroup.DTYPE_FIXED32)
         memberOffset += 4;
       else if (subtp.dtype == HdfGroup.DTYPE_REFERENCE)
-        memberOffset += HdfFile.OFFSET_SIZE;
+        memberOffset += HdfFileWriter.OFFSET_SIZE;
       else throwerr("unknown compound subtype: " + subtp.dtype);
     } // for isub
   } // if TCLS_COMPOUND

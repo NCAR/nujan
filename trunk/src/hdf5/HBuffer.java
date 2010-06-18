@@ -1,3 +1,30 @@
+// The MIT License
+// 
+// Copyright (c) 2009 University Corporation for Atmospheric
+// Research and Massachusetts Institute of Technology Lincoln
+// Laboratory.
+// 
+// Permission is hereby granted, free of charge, to any person
+// obtaining a copy of this software and associated documentation
+// files (the "Software"), to deal in the Software without
+// restriction, including without limitation the rights to use,
+// copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following
+// conditions:
+// 
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
+
 
 package hdfnet;
 
@@ -11,29 +38,24 @@ import java.util.zip.Deflater;
 class HBuffer {
 
 
-// xxx use bigger buffer:
-static final int BLEN = 1000;     // approx len of write to channel
+static final int BLEN = 10000;     // approx len of write to channel
 
 
-int bugs;
 private FileChannel outChannel;   // if null, just builds internal bbuf.
 int compressionLevel;
-HdfFile hdfFile;
+HdfFileWriter hdfFile;
 
 private ByteBuffer bbuf;
 Deflater deflater;
 
 
 
-//xxx don't pass in bugs; use hdfFile.bugs
 
 HBuffer(
-  int bugs,
   FileChannel outChannel,         // if null, just builds internal bbuf.
   int compressionLevel,
-  HdfFile hdfFile)
+  HdfFileWriter hdfFile)
 {
-  this.bugs = bugs;
   this.outChannel = outChannel;
   this.compressionLevel = compressionLevel;
   this.hdfFile = hdfFile;
@@ -43,7 +65,7 @@ HBuffer(
   if (compressionLevel > 0) {
     deflater = new Deflater( compressionLevel);
   }
-  if (bugs >= 2) {
+  if (hdfFile.bugs >= 2) {
     prtf("HBuffer: outChannel: %s  compressionLevel: %d",
       outChannel == null ? "no" : "yes",
       compressionLevel);
@@ -61,8 +83,7 @@ public String toString() {
     }
     catch( IOException exc) {
       exc.printStackTrace();
-      res += " pos: " + exc;
-      /// xxx quit?
+      res += " pos: " + exc + "  caught: " + exc;
     }
   }
   res += "  bbuf: " + bbuf;
@@ -97,10 +118,32 @@ throws HdfException
 
 
 
+
+
+byte[] getBufBytes(
+  long startPos,
+  long limPos)
+throws HdfException
+{
+  if (startPos < 0 || startPos >= getPos()) throwerr("invalid startPos");
+  if (limPos <= startPos || limPos > getPos()) throwerr("invalid limPos");
+  int blen = (int) (limPos - startPos);
+  byte[] bytes = new byte[blen];
+  for (int ii = 0; ii < blen; ii++) {
+    bytes[ii] = bbuf.get( (int) startPos + ii);
+  }
+  return bytes;
+}
+
+
+
+
+
+
 void writeChannel( FileChannel chan)
 throws HdfException
 {
-  if (bugs >= 2) {
+  if (hdfFile.bugs >= 2) {
     prtf("writeChannel: bbuf: pos: %d  limit: %d  capacity: %d",
       getPos(), bbuf.limit(), bbuf.capacity());
   }
@@ -123,7 +166,7 @@ throws HdfException
 private void expandBuf( int idelta)
 throws HdfException
 {
-  //if (bugs >= 10) {
+  //if (hdfFile.bugs >= 10) {
   //  prtf("expandBuf: idelta: %d  bbuf: pos: %d  limit: %d  capacity: %d",
   //    idelta, getPos(), bbuf.limit(), bbuf.capacity());
   //}
@@ -132,7 +175,7 @@ throws HdfException
     if (outChannel == null) {
       // Expand bbuf
       int newLen = 100 + 2 * (getPos() + idelta);
-      if (bugs >= 10) {
+      if (hdfFile.bugs >= 10) {
         prtf("expandBuf: expand A: getPos: %d  idelta: %d  newLen: %d",
           getPos(), idelta, newLen);
       }
@@ -148,7 +191,7 @@ throws HdfException
     }
     else {        // else we have outChannel: write it
       // Write bbuf to outChannel
-      if (bugs >= 10) {
+      if (hdfFile.bugs >= 10) {
         prtf("expandBuf: write: getPos: %d  idelta: %d  compressionLevel: %d",
           getPos(), idelta, compressionLevel);
       }
@@ -170,7 +213,7 @@ throws HdfException
       if (idelta > bbuf.capacity()) {
         // Expand bbuf
         int newLen = 100 + 2 * idelta;
-        if (bugs >= 10) {
+        if (hdfFile.bugs >= 10) {
           prtf("expandBuf: expand with outChannel: idelta: %d  newLen: %d",
             idelta, newLen);
         }
@@ -188,7 +231,7 @@ throws HdfException
 void writeCompressedOutput()
 throws IOException, HdfException
 {
-  if (bugs >= 2) {
+  if (hdfFile.bugs >= 2) {
     prtf("writeCompressedOutput.entry:");
     prtf("  bbuf: pos: %d  limit: %d  capacity: %d",
       getPos(), bbuf.limit(), bbuf.capacity());
@@ -211,7 +254,7 @@ throws IOException, HdfException
     cbuf.limit( compLen);
     outChannel.write( cbuf);
   }
-  if (bugs >= 2) {
+  if (hdfFile.bugs >= 2) {
     prtf("writeCompressedOutput.exit:");
     prtf("  outChannel: pos: %d", outChannel.position());
   }
@@ -224,7 +267,7 @@ void flush()
 throws IOException, HdfException
 {
   if (outChannel == null) throwerr("cannot flush null channel");
-  if (bugs >= 2)
+  if (hdfFile.bugs >= 2)
     prtf("flush.entry: outChannel.pos: %d", outChannel.position());
   try {
     if (compressionLevel > 0) {
@@ -241,7 +284,7 @@ throws IOException, HdfException
     throwerr("caught: %s", exc);
   }
   bbuf.clear();
-  if (bugs >= 2)
+  if (hdfFile.bugs >= 2)
     prtf("flush.exit: outChannel.pos: %d", outChannel.position());
 }
 
@@ -286,7 +329,7 @@ throws HdfException
 {
   expandBuf( values.length);
   if (hdfFile.bugs >= 5)
-    printValue( values.length, name, new Byte( (byte) (0xff & values[0])));
+    printValue( values.length, name, values);
   bbuf.put( values);
 }
 
@@ -349,23 +392,18 @@ throws HdfException
 
 
 
-
-byte[] getBufBytes(
-  long startPos,
-  long limPos)
+void putBufBuf(
+  String name,
+  HBuffer inBuf)
 throws HdfException
 {
-  if (startPos < 0 || startPos >= getPos()) throwerr("invalid startPos");
-  if (limPos <= startPos || limPos > getPos()) throwerr("invalid limPos");
-  int blen = (int) (limPos - startPos);
-  byte[] bytes = new byte[blen];
-  for (int ii = 0; ii < blen; ii++) {
-    bytes[ii] = bbuf.get( (int) startPos + ii);
-  }
-  return bytes;
+  int inLen = inBuf.getPos();
+  expandBuf( inLen);
+  byte[] inBytes = inBuf.getBufBytes( 0, inLen);
+  if (hdfFile.bugs >= 5)
+    printValue( inLen, name, inBytes);
+  bbuf.put( inBytes);
 }
-
-
 
 
 
@@ -375,23 +413,47 @@ void printValue(
   int len,
   String name,
   Object value)
+throws HdfException
 {
   if (name != null) {
-    String hexStg = "";
-    if (value instanceof Byte)
-      hexStg = String.format("  hex: 0x%02x", ((Byte) value).byteValue());
-    if (value instanceof Short)
-      hexStg = String.format("  hex: 0x%04x", ((Short) value).shortValue());
-    if (value instanceof Integer)
-      hexStg = String.format("  hex: 0x%08x", ((Integer) value).intValue());
-    if (value instanceof Long)
-      hexStg = String.format("  hex: 0x%016x", ((Long) value).longValue());
+    String decStg = null;
+    StringBuilder hexBuf = new StringBuilder();
+    if (value instanceof Byte) {
+      hexBuf.append( String.format("%02x", 0xff & ((Byte) value).byteValue()));
+      decStg = "" + (0xff & ((Byte) value).byteValue());
+    }
+    else if (value instanceof Short) {
+      hexBuf.append( String.format("%04x",
+        0xffff & ((Short) value).shortValue()));
+      decStg = "" + (0xffff & ((Short) value).shortValue());
+    }
+    else if (value instanceof Integer) {
+      hexBuf.append( String.format("%08x", ((Integer) value).intValue()));
+      decStg = "" + value;
+    }
+    else if (value instanceof Long) {
+      hexBuf.append( String.format("%016x", ((Long) value).longValue()));
+      decStg = "" + value;
+    }
+    else if (value instanceof Float) {
+      decStg = "" + value;
+    }
+    else if (value instanceof Double) {
+      decStg = "" + value;
+    }
+    else if (value instanceof byte[]) {
+      for (byte bb : (byte[]) value) {
+        hexBuf.append( String.format("%02x", 0xff & bb));
+      }
+    }
+    else throwerr("unknown type: " + value.getClass());
 
-    prtf("%s  len: %d%s  dec: %s",
+    String msg = String.format("%s  len: %d",
       hdfFile.formatName( name, bbuf.position()),
-      len,
-      hexStg,
-      value);
+      len);
+    if (hexBuf.length() > 0) msg += "  hex: " + hexBuf.toString();
+    if (decStg != null) msg += "  dec: " + decStg;
+    prtf( msg);
   }
 }
 

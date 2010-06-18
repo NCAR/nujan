@@ -1,3 +1,30 @@
+// The MIT License
+// 
+// Copyright (c) 2009 University Corporation for Atmospheric
+// Research and Massachusetts Institute of Technology Lincoln
+// Laboratory.
+// 
+// Permission is hereby granted, free of charge, to any person
+// obtaining a copy of this software and associated documentation
+// files (the "Software"), to deal in the Software without
+// restriction, including without limitation the rights to use,
+// copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following
+// conditions:
+// 
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
+
 
 package hdfnet;
 
@@ -31,7 +58,7 @@ int colSizeOffset;        // offset of the collectionSize field in dataBuf
 
 
 GlobalHeap(
-  HdfFile hdfFile)
+  HdfFileWriter hdfFile)
 {
   super("GlobalHeap", hdfFile);
   dataBuf = ByteBuffer.allocate( 4096);
@@ -137,7 +164,7 @@ int[] putHeapVlenObject(
   HdfGroup hdfGroup,         // used only for error msgs
   int dtype,                 // should be VLEN
   int dsubType,
-  int stgFieldLen,           // used for strings; includes null term
+  int stgFieldLen,           // used for strings; without null term
   int[] varDims,             // must have one element: nrow
   Object objValue)           // must be short[][] or int[][] or ...
 throws HdfException
@@ -155,7 +182,9 @@ throws HdfException
     Object objRow = ((Object[]) objValue)[irow];
 
     byte[] heapItem = null;
-    if (dsubType == HdfGroup.DTYPE_FIXED08) {
+    if (dsubType == HdfGroup.DTYPE_SFIXED08
+      || dsubType == HdfGroup.DTYPE_UFIXED08)
+    {
       int eleLen = 1;
       byte[] arow = (byte[]) objRow;
       int ncol = arow.length;
@@ -229,11 +258,11 @@ throws HdfException
       tbuf.order( ByteOrder.LITTLE_ENDIAN);
       for (int icol = 0; icol < ncol; icol++) {
         byte[] bytes = Util.encodeString( arow[icol], true, hdfGroup);
-        tbuf.put( Util.padNull( bytes, stgFieldLen));
+        tbuf.put( Util.truncPadNull( bytes, stgFieldLen));
       }
     }
     else if (dsubType == HdfGroup.DTYPE_REFERENCE) {
-      int eleLen = HdfFile.OFFSET_SIZE;
+      int eleLen = HdfFileWriter.OFFSET_SIZE;
       HdfGroup[] arow = (HdfGroup[]) objRow;
       int ncol = arow.length;
       heapItem = new byte[ eleLen * ncol];

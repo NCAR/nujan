@@ -1,3 +1,30 @@
+// The MIT License
+// 
+// Copyright (c) 2009 University Corporation for Atmospheric
+// Research and Massachusetts Institute of Technology Lincoln
+// Laboratory.
+// 
+// Permission is hereby granted, free of charge, to any person
+// obtaining a copy of this software and associated documentation
+// files (the "Software"), to deal in the Software without
+// restriction, including without limitation the rights to use,
+// copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following
+// conditions:
+// 
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
+
 
 package hdfnet;
 
@@ -13,21 +40,23 @@ public class HdfGroup extends BaseBlk {
 
 
 // Overall type summary
-public static final int DTYPE_FIXED08       =  1; //xxx implement everywhere
-public static final int DTYPE_FIXED16       =  2;
-public static final int DTYPE_FIXED32       =  3;
-public static final int DTYPE_FIXED64       =  4;
-public static final int DTYPE_FLOAT32       =  5;
-public static final int DTYPE_FLOAT64       =  6;
-public static final int DTYPE_STRING_FIX    =  7;
-public static final int DTYPE_STRING_VAR    =  8;
-public static final int DTYPE_REFERENCE     =  9;
-public static final int DTYPE_VLEN          = 10;
-public static final int DTYPE_COMPOUND      = 11;
+public static final int DTYPE_SFIXED08      =  1;
+public static final int DTYPE_UFIXED08      =  2;
+public static final int DTYPE_FIXED16       =  3;
+public static final int DTYPE_FIXED32       =  4;
+public static final int DTYPE_FIXED64       =  5;
+public static final int DTYPE_FLOAT32       =  6;
+public static final int DTYPE_FLOAT64       =  7;
+public static final int DTYPE_TEST_CHAR     =  8;  // for internal test only
+public static final int DTYPE_STRING_FIX    =  9;
+public static final int DTYPE_STRING_VAR    = 10;
+public static final int DTYPE_REFERENCE     = 11;
+public static final int DTYPE_VLEN          = 12;
+public static final int DTYPE_COMPOUND      = 13;
 public static final String[] dtypeNames = {
   "UNKNOWN",
-  "FIXED08", "FIXED16", "FIXED32", "FIXED64",
-  "FLOAT32", "FLOAT64",
+  "SFIXED08", "UFIXED08", "FIXED16", "FIXED32", "FIXED64",
+  "FLOAT32", "FLOAT64", "TEST_CHAR",
   "STRING_FIX", "STRING_VAR", "REFERENCE",
   "VLEN", "COMPOUND"};
 
@@ -53,6 +82,7 @@ MsgDataSpace msgDataSpace;
 MsgLayout msgLayout;
 MsgFillValue msgFillValue;
 MsgModTime msgModTime;
+MsgAttrInfo msgAttrInfo;
 MsgFilter msgFilter;
 
 // fileVersion==1 only:
@@ -63,6 +93,7 @@ MsgSymbolTable msgSymbolTable;
 boolean isVariable;               // false: group;  true: represents data
 String groupName;
 HdfGroup parentGroup;
+int stgFieldLen;
 int compressionLevel;
 
 ArrayList<MsgBase> hdrMsgList;
@@ -90,7 +121,7 @@ int linkCreationOrder = 0;
 HdfGroup(
   String groupName,
   HdfGroup parentGroup,        // is null when creating the rootGroup
-  HdfFile hdfFile)
+  HdfFileWriter hdfFile)
 throws HdfException
 {
   super("HdfGroup: " + groupName, hdfFile);
@@ -116,6 +147,10 @@ throws HdfException
     msgSymbolTable = new MsgSymbolTable( btreeNode, localHeap, this, hdfFile);
     hdrMsgList.add( msgSymbolTable);
   }
+  else if (hdfFile.fileVersion == 2) {
+    msgAttrInfo = new MsgAttrInfo( this, hdfFile);
+    hdrMsgList.add( msgAttrInfo);
+  }
 }
 
 
@@ -128,9 +163,10 @@ HdfGroup(
   int dtype,                 // one of DTYPE*
   int[] dsubTypes,           // subType for DTYPE_VLEN
                              // or DTYPE_COMPOUND
+  String[] subNames,         // member names for DTYPE_COMPOUND
 
   int stgFieldLen,           // string length for DTYPE_STRING_FIX.
-                             // Includes null termination.
+                             // Without null termination.
                              // Should be 0 for all other types,
                              // including DTYPE_STRING_VAR.
 
@@ -139,7 +175,7 @@ HdfGroup(
                              // Float, Double, String, etc.
   boolean isChunked,
   int compressionLevel,
-  HdfFile hdfFile)
+  HdfFileWriter hdfFile)
 throws HdfException
 {
   super("HdfGroup: (var) " + groupName, hdfFile);
@@ -147,6 +183,7 @@ throws HdfException
   this.groupName = groupName;
   this.parentGroup = parentGroup;
   this.dtype = dtype;
+  this.stgFieldLen = stgFieldLen;
   this.compressionLevel = compressionLevel;
 
   if (hdfFile.bugs >= 1) {
@@ -164,7 +201,7 @@ throws HdfException
   }
 
   msgDataType = new MsgDataType(
-    dtype, dsubTypes, null, stgFieldLen, this, hdfFile);
+    dtype, dsubTypes, subNames, stgFieldLen, this, hdfFile);
 
   msgDataSpace = new MsgDataSpace( varDims, this, hdfFile);
 
@@ -197,7 +234,19 @@ throws HdfException
       this, hdfFile);
     hdrMsgList.add( msgFilter);
   }
+
+  if (hdfFile.fileVersion == 2) {
+    msgAttrInfo = new MsgAttrInfo( this, hdfFile);
+    hdrMsgList.add( msgAttrInfo);
+  }
 }
+
+
+
+
+
+
+
 
 /**
  * Creates a sub-group of the current group.
@@ -207,7 +256,7 @@ public HdfGroup addGroup(
   String subName)                   // name of new subGroup
 throws HdfException
 {
-  if (! hdfFile.isDefineMode)
+  if (hdfFile.fileStatus != HdfFileWriter.ST_DEFINING)
     throwerr("cannot define after calling endDefine");
   if (isVariable) throwerr("cannot add a group to a variable");
   if (findSubItem( subName) != null)
@@ -232,7 +281,7 @@ public HdfGroup addVariable(
   String varName,
   int dtype,                 // one of DTYPE*
   int stgFieldLen,           // string length for DTYPE_STRING_FIX.
-                             // Includes null termination.
+                             // Without null termination.
                              // Should be 0 for all other types,
                              // including DTYPE_STRING_VAR.
 
@@ -242,7 +291,7 @@ public HdfGroup addVariable(
   int compressionLevel)
 throws HdfException
 {
-  if (! hdfFile.isDefineMode)
+  if (hdfFile.fileStatus != HdfFileWriter.ST_DEFINING)
     throwerr("cannot define after calling endDefine");
   if (isVariable) throwerr("cannot add a variable to a variable");
   if (findSubItem( varName) != null)
@@ -250,11 +299,19 @@ throws HdfException
       + "  a subgroup or variable named \"%s\"",
       groupName, varName);
 
+  int[] dsubTypes = null;
+  String[] subNames = null;
+  if (dtype == HdfGroup.DTYPE_COMPOUND) {
+    dsubTypes = new int[] { HdfGroup.DTYPE_REFERENCE, HdfGroup.DTYPE_FIXED32};
+    subNames = new String[] {"dataset", "dimension"};
+  }
+
   HdfGroup var = new HdfGroup(
     varName,
     this,
     dtype,
-    null,                  // dsubTypes
+    dsubTypes,
+    subNames,
     stgFieldLen,
     varDims,
     fillValue,
@@ -264,8 +321,7 @@ throws HdfException
 
   addSubGroup( var);
   return var;
-}
-
+} // endVariable
 
 
 
@@ -281,27 +337,37 @@ throws HdfException
 
 public void addAttribute(
   String attrName,
+  int attrType,              // one of DTYPE_*
+  int stgFieldLen,
   Object attrValue,
-  boolean isVlen,
-  boolean isCompoundRef)
+  boolean isVlen)
 throws HdfException
 {
+  //xxx del
+  prtf("### HdfGroup.addAttribute: path: \"" + getPath() + "\""
+    + "  name: \"" + attrName + "\""
+    + "  isVlen: " + isVlen
+    + "  val: " + Util.formatObject( attrValue));
+
   if (findAttribute( attrName) != null)
     throwerr("Duplicate attribute.  The group \"%s\" already contains"
       + "  an attribute named \"%s\"",
       getPath(), attrName);
 
   MsgAttribute msgAttr = new MsgAttribute(
-    isVlen,
-    isCompoundRef,
     attrName,
+    attrType,
+    stgFieldLen,
     attrValue,
+    isVlen,
     this,
     hdfFile);
   if (hdfFile.bugs >= 1) {
     prtf("HdfGroup: new attribute: at path: \"" + getPath() + "\""
+      + "  dtype: " + dtypeNames[attrType]
       + "  name: \"" + attrName + "\""
-      + "  type: " + Util.formatDtypeDim( msgAttr.dtype, msgAttr.varDims));
+      + "  type: " + Util.formatDtypeDim( attrType, msgAttr.varDims)
+      + "  isVlen: " + isVlen);
   }
   hdrMsgList.add( msgAttr);
 }
@@ -417,6 +483,22 @@ MsgAttribute findAttribute( String attrName)
 
 
 
+// Return number of attributes.
+
+int getNumAttribute()
+{
+  int ires = 0;
+  for (MsgBase baseMsg : hdrMsgList) {
+    if (baseMsg instanceof MsgAttribute) ires++;
+  }
+  return ires;
+}
+
+
+
+
+
+
 
 
 
@@ -436,7 +518,7 @@ throws HdfException
 void writeDataSub( Object vdata)
 throws HdfException, IOException
 {
-  if (hdfFile.bugs >= 1) prtf("writeData: variable: " + getPath());
+  if (hdfFile.bugs >= 1) prtf("writeDataSub: variable: " + getPath());
   if (hdfFile.bugs >= 2) {
     String tmsg = "writeData entry: group: " + getPath() + "\n"
       + "  specified dtype: " + dtypeNames[ msgDataType.dtype] + "\n"
@@ -447,8 +529,10 @@ throws HdfException, IOException
     }
     prtf( tmsg);
   }
+  //xxxprtf("### HdfGroup.writeDataSub: vdata: " + Util.formatObject( vdata));
 
-  if (hdfFile.isDefineMode) throwerr("must call endDefine first");
+  if (hdfFile.fileStatus != HdfFileWriter.ST_WRITEDATA)
+    throwerr("must call endDefine first");
   if (! isVariable) throwerr("cannot write data to a group");
   if (isWritten) throwerr("variable has already been written: ", getPath());
   isWritten = true;
@@ -473,46 +557,22 @@ throws HdfException, IOException
 
   // Check that dtype and varDims match what the user
   // declared in the earlier addVariable call.
-  if (msgDataType.dtype == DTYPE_STRING_FIX
-    || msgDataType.dtype == DTYPE_STRING_VAR)
-  {
-    if (dataDtype != DTYPE_STRING_FIX)
-      throwerr("type mismatch:\n"
-        + "  declared type: " + dtypeNames[ msgDataType.dtype] + "\n"
-        + "  data type:     " + dtypeNames[ dataDtype] + "\n");
-  }
-  else {
-    if (dataDtype != msgDataType.dtype)
-      throwerr("type mismatch:\n"
-        + "  declared type: " + dtypeNames[ msgDataType.dtype] + "\n"
-        + "  data type:     " + dtypeNames[ dataDtype] + "\n");
-  }
-
-  if (dataVarDims.length != msgDataSpace.rank)
-    throwerr("rank mismatch:\n"
-      + "  declared rank: " + msgDataSpace.rank + "\n"
-      + "  data rank:     " + dataVarDims.length + "\n");
-
-  for (int ii = 0; ii < msgDataSpace.rank; ii++) {
-    if (dataVarDims[ii] != msgDataSpace.varDims[ii])
-      throwerr("data dimension length mismatch for dimension " + ii + "\n"
-        + "  declared dim: " + msgDataSpace.varDims[ii] + "\n"
-        + "  data dim: " + dataVarDims[ii] + "\n");
-  }
+  Util.checkTypeMatch( msgDataType.dtype, dataDtype,
+    msgDataSpace.varDims, dataVarDims);
 
   rawDataAddr = Util.alignLong( 8, hdfFile.eofAddr);
   hdfFile.outChannel.position( rawDataAddr);
 
   // As outbuf fills, it gets written to outChannel.
-  HBuffer outbuf = new HBuffer(
-    hdfFile.bugs, hdfFile.outChannel, compressionLevel, hdfFile);
+  HBuffer outbuf = new HBuffer( hdfFile.outChannel, compressionLevel, hdfFile);
 
 
-  // DTYPE_VLEN is not supported for datasets.  Only for attributes.
+  // xxx future: DTYPE_VLEN is not supported for datasets.
+  // Only for attributes.
+  // However, DTYPE_STRING_VAR is supported for both attrs and datasets.
   //
-  // We could do a scheme like we do below for DTYPE_STRING_VAR,
-  // writing a new gcol and refBuf.
-  // xxx future.
+  // For DTYPE_VLEN we could use a scheme like we do below
+  // for DTYPE_STRING_VAR, writing a new gcol and refBuf.
 
   if (msgDataType.dtype == HdfGroup.DTYPE_VLEN)
     throwerr("DTYPE_VLEN datasets are not supported");
@@ -521,47 +581,71 @@ throws HdfException, IOException
   // Format and the data to outbuf and write to outChannel.
 
   // Special case for DTYPE_STRING_VAR
-  // This doesn't handle compressed - deliberately not implemented.
   //
+  // We don't allow compression of DTYPE_STRING_VAR -
+  // deliberately not implemented.
   // It turns out that HDF5 compresses the references to
   // variable length strings, but not the strings themselves.
   // The strings remain in the global heap GCOL, uncompressed.
 
   if (dtype == DTYPE_STRING_VAR) {
+
     if (compressionLevel > 0)
       throwerr("compression not supported for DTYPE_STRING_VAR");
-    GlobalHeap gcol = new GlobalHeap( hdfFile);
-    HBuffer refBuf = new HBuffer(
-      hdfFile.bugs, null, compressionLevel, hdfFile);
 
+    // Write two areas into fmtBuf:
+    //   1.  A GCOL (global heap) area.
+    //       There is a separate gcol for each DTYPE_STRING_VAR variable.
+    //       The term "global heap" is a misnomer.
+    //   2.  A list of references to the GCOL entries.
+    //       The variables rawDataAddr, rawDataSize refer to this
+    //       list of references.
+
+    // xxx We cannot write an array of strings whose total length
+    // exceeds 2GB, since the GlobalHeap uses a ByteBuffer internally
+    // to hold the entire heap.
+
+    GlobalHeap gcol = new GlobalHeap( hdfFile);
+    HBuffer refBuf = new HBuffer( null, compressionLevel, hdfFile);
     long gcolAddr = hdfFile.outChannel.position();
-    writeVlenStrings( vdata, gcolAddr, gcol, refBuf);
+
+    prtf("########## writeDataSub VAR: call formatRawData.  groupName: " + groupName);
+    formatRawData(
+      dtype,
+      0,               // stgFieldLen for DTYPE_STRING_FIX
+      vdata,
+      null,            // cntr for DTYPE_COMPOUND
+      gcolAddr,        // addr where we will write this gcol
+      gcol,            // output: holds strings
+      refBuf);         // output: holds references to strings
+
     if (hdfFile.bugs >= 2) {
-      prtf("  writeDataSub: STRING_VAR gcol: %s", gcol);
-      prtf("  writeDataSub: STRING_VAR refBuf: %s", refBuf);
+      prtf("  writeDataSub.STRING_VAR: gcol: %s", gcol);
+      prtf("  writeDataSub.STRING_VAR: refBuf: %s", refBuf);
     }
 
-    prtf("  ##### writeDataSub: outbuf A: " + outbuf);
     gcol.formatBuf( 0, outbuf);       // formatPass = 0
-    prtf("  ##### writeDataSub: outbuf B: " + outbuf);
-    outbuf.flush();        // write remaining data to outChannel
-    prtf("  ##### writeDataSub: outbuf C: " + outbuf);
+    outbuf.flush();                   // write remaining data to outChannel
 
     rawDataAddr = Util.alignLong( 8, hdfFile.outChannel.position());
     hdfFile.outChannel.position( rawDataAddr);
 
-    prtf("  ##### writeDataSub: outbuf D: " + outbuf);
     refBuf.writeChannel( hdfFile.outChannel);
-    prtf("  ##### writeDataSub: outbuf E: " + outbuf);
-
     long endPos = hdfFile.outChannel.position();
     rawDataSize = endPos - rawDataAddr;
   }
 
+  else {          // else not DTYPE_STRING_VAR
 
-  else {
-
-    formatRawData( msgDataType.elementLen, vdata, outbuf);
+    prtf("########## writeDataSub OTHR: call formatRawData.  groupName: " + groupName);
+    formatRawData(
+      dtype,
+      stgFieldLen,
+      vdata,
+      new Counter(),
+      -1,               // gcolAddr for DTYPE_STRING_VAR
+      null,             // gcol for DTYPE_STRING_VAR
+      outbuf);
 
     outbuf.flush();        // write remaining data to outChannel
 
@@ -591,38 +675,44 @@ throws HdfException, IOException
   hdfFile.eofAddr = hdfFile.outChannel.position();
   if (hdfFile.bugs >= 2) prtf("writeData: new eofAddr: %d", hdfFile.eofAddr);
 
-} // end writeData
+} // end writeDataSub
 
 
 
 
 
-void writeVlenStrings(
-  Object vdata,         // String or String[] or String[][] or ...
-  long gcolAddr,
-  GlobalHeap gcol,
-  HBuffer outbuf)
-throws HdfException
-{
-  if (vdata == null) throwerr("vdata is null");
 
-  if (vdata instanceof String) {
-    byte[] bytes = Util.encodeString(
-      (String) vdata, false, this);     // addNull = false
-    int gcolIx = gcol.putHeapItem("vlen string data", bytes);
-    outbuf.putBufInt("vlen len", bytes.length);
-    outbuf.putBufLong("vlen gcol addr", gcolAddr);
-    outbuf.putBufInt("vlen gcol ix", gcolIx);
-  }
-  else if (vdata instanceof Object[]) {
-    // Recurse on vector elements
-    Object[] vec = (Object[]) vdata;
-    for (Object obj : vec) {
-      writeVlenStrings( obj, gcolAddr, gcol, outbuf);
-    }
-  }
-  else throwerr("invalid vdata class: " + vdata.getClass());
-} // end writeVlenStrings
+// Recursively write to both gcol, refBuf.
+
+//xxx del:
+///void writeVstrings(
+///  Object vdata,         // String or String[] or String[][] or ...
+///  long gcolAddr,
+///  GlobalHeap gcol,
+///  HBuffer refBuf)
+///throws HdfException
+///{
+///  //xxx if (vdata instanceof Object[]) prtf("  ### writeVstrings: len: "
+///  //xxx   + ((Object[]) vdata).length);
+///  if (vdata == null) throwerr("vdata is null");
+///
+///  if (vdata instanceof String) {
+///    byte[] bytes = Util.encodeString(
+///      (String) vdata, false, this);     // addNull = false
+///    int gcolIx = gcol.putHeapItem("vlen string data", bytes);
+///    refBuf.putBufInt("vlen len", bytes.length);
+///    refBuf.putBufLong("vlen gcol addr", gcolAddr);
+///    refBuf.putBufInt("vlen gcol ix", gcolIx);
+///  }
+///  else if (vdata instanceof Object[]) {
+///    // Recurse on vector elements
+///    Object[] vec = (Object[]) vdata;
+///    for (Object obj : vec) {
+///      writeVstrings( obj, gcolAddr, gcol, refBuf);
+///    }
+///  }
+///  else throwerr("invalid vdata class: " + vdata.getClass());
+///} // end writeVstrings
 
 
 
@@ -733,11 +823,16 @@ throws HdfException
       }
     }
 
-    // There is some needlessly twisted code in the HDF5 H5Odbg.c.
+    // For fileVersion==2 there is some needlessly twisted code
+    // in the HDF5 H5Odbg.c.
     // It requires that the length of the chunklen field
-    // be "appropriate" for the chunk0Len value, so we
-    // cannot always specify that the chunklen field size = 8.
-    // This means we must know chunk0Len before laying out
+    // be "appropriate" for the chunk0Len value, meaning
+    // if  0 <= chunk0Len <= 255 the chunklen field must be
+    // exactly 1 byte, if chunk0Len <= 65535 the field must be
+    // exactly 2 bytes, etc.
+    //
+    // So we cannot always specify that the chunklen field size = 8.
+    // This implies we must know chunk0Len before laying out
     // chunk0 ... as I said, a bit twisted.
     //
     // So we lay out the HdfGroup twice on each formatPass.
@@ -746,23 +841,20 @@ throws HdfException
     // The second layout is for real and uses fmtBuf.
 
     HBuffer tempHbuf = new HBuffer(
-      hdfFile.bugs,
       null,                 // outChannel
       compressionLevel,
       hdfFile);
 
     int svIndent = hdfFile.indent;
     hdfFile.indent += 6;
-    prtIndent("");
-    prtIndent("Start HdfGroup temp layout");
+    if (hdfFile.bugs >= 5) prtIndent("Start HdfGroup temp layout");
 
     // Find chunk0Len
     // Use formatPass = 0 so MsgLayout and MsgLinkit don't call addWork.
     long chunk0Len = 0;
     chunk0Len = layoutVersion2(
       0, groupVersion, chunk0Len, tempHbuf);  // formatPass = 0
-    prtIndent("End HdfGroup temp layout");
-    prtIndent("");
+    if (hdfFile.bugs >= 5) prtIndent("End HdfGroup temp layout");
     hdfFile.indent = svIndent;
 
     // Layout for real
@@ -814,7 +906,8 @@ throws HdfException
 
   fmtBuf.putBufByte("HdfGroup: flags", flag);
 
-  // xxx caution: more year 2038 problems, using a 4 byte date:
+  // xxx Caution: HDF5 has a possible year 2038 problem,
+  // using a 4 byte date, if handled as a signed int.
   if ((flag & 32) != 0) {
     fmtBuf.putBufInt(
       "HdfGroup: accessTime", (int) hdfFile.utcModTimeSec);
@@ -870,7 +963,8 @@ throws HdfException
 
 
 
-// Format the raw data.
+// Format a regular array of raw data.  Not ragged array.
+// If strings, they are all fixed len: they are padded to elementLen.
 //
 // The data, vdata, may be one of:
 //   Byte,      byte[],      [][],  [][][],  etc.
@@ -879,6 +973,7 @@ throws HdfException
 //   Long,      long[],      [][],  [][][],  etc.
 //   Float,     float[],     [][],  [][][],  etc.
 //   Double,    double[],    [][],  [][][],  etc.
+//   //xxxCharacter, char[],      [][],  [][][],  etc.
 //   String,    String[],    [][],  [][][],  etc.
 //   HdfGroup,  HdfGroup[],  [][],  [][][],  etc.  (reference)
 //
@@ -893,17 +988,29 @@ throws HdfException
 // Similarly for HdfGroup[].
 
 void formatRawData(
-  int elementLen,      // used only for string length.
+  int dtp,             // one of DTYPE_*
+  int stgFieldLen,     // used for DTYPE_STRING_FIX
   Object vdata,
+  Counter cntr,        // used for the index of compound types
+  long gcolAddr,       // used for DTYPE_STRING_VAR
+  GlobalHeap gcol,     // used for DTYPE_STRING_VAR
   HBuffer fmtBuf)      // output buffer
 throws HdfException
 {
+//xxx might be better to test on dtp ...
   if (vdata == null) throwerr("vdata is null");
 
   if (vdata instanceof Object[]) {
     Object[] objVec = (Object[]) vdata;
     for (int ii = 0; ii < objVec.length; ii++) {
-      formatRawData( elementLen, objVec[ii], fmtBuf);
+      formatRawData(                               // recursion
+        dtp,
+        stgFieldLen,
+        objVec[ii],
+        cntr,
+        gcolAddr,
+        gcol,
+        fmtBuf);
     }
   }
   else if (vdata instanceof Byte) {
@@ -930,11 +1037,33 @@ throws HdfException
     double aval = ((Double) vdata).doubleValue();
     fmtBuf.putBufDouble("formatRawData", aval);
   }
+
+  //xxxelse if (vdata instanceof Character) {
+  //xxx  char aval = ((Character) vdata).charValue();
+  //xxx  xxx encode
+  //xxx  fmtBuf.putBufByte("formatRawData", encval);
+  //xxx}
+
   else if (vdata instanceof String) {
     String aval = (String) vdata;
-    byte[] bytes = Util.encodeString( aval, true, this);
-    fmtBuf.putBufBytes("formatRawData", Util.padNull( bytes, elementLen));
+    if (dtp == DTYPE_STRING_FIX) {
+      prtf("########## formatRaw: STRING_FIX: \"" + vdata + "\"");
+      byte[] bytes = Util.encodeString( aval, true, this); //xxxshould be false
+      fmtBuf.putBufBytes(
+        "formatRawData", Util.truncPadNull( bytes, stgFieldLen));
+    }
+    else if (dtp == DTYPE_STRING_VAR) {
+      prtf("########## formatRaw: STRING_VAR: \"" + vdata + "\"");
+      byte[] bytes = Util.encodeString(
+        (String) vdata, false, this);     // addNull = false
+      int gcolIx = gcol.putHeapItem("vlen string data", bytes);
+      fmtBuf.putBufInt("vlen len", bytes.length);
+      fmtBuf.putBufLong("vlen gcol addr", gcolAddr);
+      fmtBuf.putBufInt("vlen gcol ix", gcolIx);
+    }
+    else throwerr("dtp mismatch");
   }
+
   else if (vdata instanceof HdfGroup) {
     // For object refs, data is:
     //   addr of group header, 8 bytes.
@@ -947,8 +1076,11 @@ throws HdfException
     //     some sort of info on type, dimension, start and end indices
     long aval = ((HdfGroup) vdata).blkPosition;
     fmtBuf.putBufLong("formatRawData", aval);
+    if (dtp == DTYPE_COMPOUND) {
+      fmtBuf.putBufInt("formatRawData ref ix", cntr.getValue());
+      cntr.increment();
+    }
   }
-
 
   else if (vdata instanceof byte[]) {
     byte[] avec = (byte[]) vdata;
@@ -959,7 +1091,7 @@ throws HdfException
   else if (vdata instanceof short[]) {
     short[] avec = (short[]) vdata;
     for (int ii = 0; ii < avec.length; ii++) {
-      fmtBuf.putBufShort("formatRawData", avec[ii]);
+      fmtBuf.putBufShort("formatRawData", 0xffff & avec[ii]);
     }
   }
   else if (vdata instanceof int[]) {
@@ -986,6 +1118,17 @@ throws HdfException
       fmtBuf.putBufDouble("formatRawData", avec[ii]);
     }
   }
+  else if (vdata instanceof char[]) {
+    // xxx
+    // Normally we would handle character encoding by
+    // calling Util.encodeString.
+    // However the final length is fixed, so we must
+    // do 1 char -> 1 byte encoding.
+    char[] avec = (char[]) vdata;
+    for (int ii = 0; ii < avec.length; ii++) {
+      fmtBuf.putBufByte("formatRawData", 0xff & avec[ii]);
+    }
+  }
   else throwerr("unknown raw data type.  class: " + vdata.getClass());
 } // end formatRawData
 
@@ -993,15 +1136,20 @@ throws HdfException
 
 
 
-
-
-//xxx move to MsgAttribute; pass in hdfFile.mainGlobalHeap as last parm.
+// For irow = 0, < len(vdata):
+//   format to fmtBuf:
+//     len of ele == ncol
+//     blkPosition of mainGlobalHeap
+//     heapIx[irow]
+//
 // Called by MsgAttribute.formatMsgCore.
+
+//xxx del, use formatRaw
 
 void formatVlenRawData(
   int[] heapIxs,
   Object vdata,
-  HBuffer fmtBuf)
+  HBuffer fmtBuf)      // output buffer
 throws HdfException
 {
   Object[] vdataVec = (Object[]) vdata;
@@ -1017,6 +1165,7 @@ throws HdfException
     else if (vrow instanceof long[]) ncol = ((long[]) vrow).length;
     else if (vrow instanceof float[]) ncol = ((float[]) vrow).length;
     else if (vrow instanceof double[]) ncol = ((double[]) vrow).length;
+    else if (vrow instanceof char[]) ncol = ((char[]) vrow).length;
     else throwerr("unknown vlen type");
 
     // Format numVal, global heap ID

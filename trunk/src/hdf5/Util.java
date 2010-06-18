@@ -1,3 +1,30 @@
+// The MIT License
+// 
+// Copyright (c) 2009 University Corporation for Atmospheric
+// Research and Massachusetts Institute of Technology Lincoln
+// Laboratory.
+// 
+// Permission is hereby granted, free of charge, to any person
+// obtaining a copy of this software and associated documentation
+// files (the "Software"), to deal in the Software without
+// restriction, including without limitation the rights to use,
+// copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following
+// conditions:
+// 
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
+
 
 package hdfnet;
 
@@ -8,7 +35,8 @@ import java.util.Arrays;
 
 
 
-class Util {
+
+public class Util {
 
 
 
@@ -23,17 +51,26 @@ static long alignLong( long bound, long val) {
 
 
 // Returns array: [dtype, dimensions]
+// For Strings, we always return DTYPE_STRING_VAR, not STRING_FIX.
+// For Bytes, we always return DTYPE_UFIXED08, not SFIXED08.
 
 static int[] getDtypeAndDims(
   boolean isVlen,
   Object obj)
 throws HdfException
 {
+  //xxxprtf("##### getDtype entry: obj: " + obj + "  cls: " + obj.getClass());
+  if (obj == null) throwerr("obj == null");
+
   // Find rank and varDims
   int rank = 0;
   int[] varDims = new int[1000];
-  while (obj instanceof Object[]) {
+  while (obj instanceof Object[] && ((Object[]) obj).length > 0) {
+    //xxxprtf("##### getDtype loop: obj: " + obj + "  cls: " + obj.getClass());
     Object[] objVec = (Object[]) obj;
+    for (int ii = 0; ii < objVec.length; ii++) {
+      if (objVec[ii] == null) throwerr("objVec[%d] == null", ii);
+    }
     varDims[rank++] = objVec.length;
 
     // Check that arrays are regular (all rows have the same length)
@@ -94,7 +131,7 @@ throws HdfException
 
     // Move to next level of dimensions
     obj = objVec[0];
-  }
+  } // while obj instanceof Object[]
 
   // Finally done penetrating dimensions.
   // Here obj is no longer instanceof Object[].
@@ -106,6 +143,7 @@ throws HdfException
     || obj instanceof Long
     || obj instanceof Float
     || obj instanceof Double
+    || obj instanceof Character
     || obj instanceof String
     || obj instanceof HdfGroup)
   {
@@ -117,6 +155,7 @@ throws HdfException
   else if (obj instanceof long[]) varDims[rank++] = ((long[]) obj).length;
   else if (obj instanceof float[]) varDims[rank++] = ((float[]) obj).length;
   else if (obj instanceof double[]) varDims[rank++] = ((double[]) obj).length;
+  else if (obj instanceof char[]) varDims[rank++] = ((char[]) obj).length;
   else throwerr("unknown obj type.  obj: " + obj
     + "  element class: " + obj.getClass());
 
@@ -125,7 +164,7 @@ throws HdfException
   // Find dtype
   int dtype = -1;
   if (obj instanceof Byte || obj instanceof byte[])
-    dtype = HdfGroup.DTYPE_FIXED08;
+    dtype = HdfGroup.DTYPE_UFIXED08;
   else if (obj instanceof Short || obj instanceof short[])
     dtype = HdfGroup.DTYPE_FIXED16;
   else if (obj instanceof Integer || obj instanceof int[])
@@ -136,7 +175,9 @@ throws HdfException
     dtype = HdfGroup.DTYPE_FLOAT32;
   else if (obj instanceof Double || obj instanceof double[])
     dtype = HdfGroup.DTYPE_FLOAT64;
-  else if (obj instanceof String) dtype = HdfGroup.DTYPE_STRING_FIX;
+  else if (obj instanceof Character || obj instanceof char[])
+    dtype = HdfGroup.DTYPE_STRING_FIX;
+  else if (obj instanceof String) dtype = HdfGroup.DTYPE_STRING_VAR;
   else if (obj instanceof HdfGroup) dtype = HdfGroup.DTYPE_REFERENCE;
   else throwerr("unknown obj type.  obj: " + obj
     + "  element class: " + obj.getClass());
@@ -152,8 +193,70 @@ throws HdfException
 
 
 
+
+
+
+
+
+
+
+static void checkTypeMatch(
+  int specType,               // declared type, one of HdfGroup.DTYPE_*
+  int dataType,               // actual data type, one of HdfGroup.DTYPE_*
+  int[] specDims,
+  int[] dataDims)
+throws HdfException
+{
+  // Check that dtype and varDims match what the user
+  // declared in the earlier addVariable call.
+  if (specType == HdfGroup.DTYPE_STRING_FIX
+    || specType == HdfGroup.DTYPE_STRING_VAR)
+  {
+    if (dataType != HdfGroup.DTYPE_STRING_VAR)
+      throwerr("type mismatch:\n"
+        + "  declared type: " + HdfGroup.dtypeNames[ specType] + "\n"
+        + "  data type:     " + HdfGroup.dtypeNames[ dataType] + "\n");
+  }
+  else if (specType == HdfGroup.DTYPE_SFIXED08
+    || specType == HdfGroup.DTYPE_UFIXED08)
+  {
+    if (dataType != HdfGroup.DTYPE_UFIXED08)
+      throwerr("type mismatch:\n"
+        + "  declared type: " + HdfGroup.dtypeNames[ specType] + "\n"
+        + "  data type:     " + HdfGroup.dtypeNames[ dataType] + "\n");
+  }
+  else if (specType == HdfGroup.DTYPE_COMPOUND
+    || specType == HdfGroup.DTYPE_REFERENCE)
+  {
+    if (dataType != HdfGroup.DTYPE_REFERENCE)
+      throwerr("type mismatch:\n"
+        + "  declared type: " + HdfGroup.dtypeNames[ specType] + "\n"
+        + "  data type:     " + HdfGroup.dtypeNames[ dataType] + "\n");
+  }
+  else {
+    if (dataType != specType)
+      throwerr("type mismatch:\n"
+        + "  declared type: " + HdfGroup.dtypeNames[ specType] + "\n"
+        + "  data type:     " + HdfGroup.dtypeNames[ dataType] + "\n");
+  }
+
+  if (dataDims.length != specDims.length)
+    throwerr("rank mismatch:\n"
+      + "  declared rank: " + specDims.length + "\n"
+      + "  data rank:     " + dataDims.length + "\n");
+
+  for (int ii = 0; ii < specDims.length; ii++) {
+    if (dataDims[ii] != specDims[ii])
+      throwerr("data dimension length mismatch for dimension " + ii + "\n"
+        + "  declared dim: " + specDims[ii] + "\n"
+        + "  data dim: " + dataDims[ii] + "\n");
+  }
+} // end checkTypeMatch
+
+
 // Returns max string len, without null termination,
-// if obj is a String, String[], String[][], etc.
+// if obj is a String, String[], String[][], etc.,
+// or char[], char[][], etc.
 // Returns 0 otherwise.
 
 static int getMaxStgLen(
@@ -162,7 +265,10 @@ throws HdfException
 {
   int maxStgLen = 0;
   if (obj instanceof String) maxStgLen = ((String) obj).length();
-  else if (obj instanceof Object[]) {
+  else if (obj instanceof char[]) {
+    maxStgLen = Math.max( maxStgLen, ((char[]) obj).length);
+  }
+  else if (obj instanceof Object[]) {       // String[] or char[][]
     Object[] objVec = (Object[]) obj;
     for (int ii = 0; ii < objVec.length; ii++) {
       maxStgLen = Math.max( maxStgLen, getMaxStgLen( objVec[ii]));
@@ -196,16 +302,24 @@ throws HdfException
 
 
 
-static byte[] padNull(
+static byte[] truncPadNull(
   byte[] bytes,
   int fieldLen)
 throws HdfException
 {
-  if (bytes.length > fieldLen) {
-    throwerr(
-      "padNull fieldLen exceeded.  fieldLen: %d  bytesLen: %d  bytes: %s",
-      fieldLen, bytes.length, formatBytes( bytes, 0, bytes.length));
-  }
+  // We allow truncation.  Although the page
+  //   http://www.hdfgroup.org/HDF5/doc/H5.user/Datatypes.html
+  // indicates that H5T_STR_NULLTERM is always null terminated,
+  // apparently not during storage.
+  // Perhaps it's always null terminated after retrieval by the
+  // HDF5 software.
+
+  //if (bytes.length > fieldLen) {
+  //  throwerr(
+  //    "padNull fieldLen exceeded.  fieldLen: %d  bytesLen: %d  bytes: %s",
+  //    fieldLen, bytes.length, formatBytes( bytes, 0, bytes.length));
+  //}
+
   byte[] res = Arrays.copyOf( bytes, fieldLen);
   return res;
 }
@@ -249,6 +363,110 @@ static String formatDtypeDim(
 
 
 
+
+public static String formatObject( Object obj) {
+  StringBuilder sbuf = new StringBuilder();
+  if (obj == null) sbuf.append("  (null)");
+  else {
+    sbuf.append("  cls: " + obj.getClass().getName() + "\n");
+    formatObjectSub( obj, 0, sbuf);
+    sbuf.append("\n");
+  }
+  return sbuf.toString();
+}
+
+
+
+static void formatObjectSub(
+  Object obj,
+  int indent,
+  StringBuilder sbuf)
+{
+  if (obj == null)
+    sbuf.append( String.format( "%s(null)\n", mkIndent( indent)));
+  else if (obj instanceof String) {
+    sbuf.append( String.format("%s(%s) \"%s\"\n",
+      mkIndent(indent), obj.getClass().getName(), obj));
+  }
+  else if (obj instanceof byte[]) {
+    sbuf.append( mkIndent( indent) + "(bytes)");
+    byte[] vals = (byte[]) obj;
+    for (int ii = 0; ii < vals.length; ii++) {
+      sbuf.append("  " + vals[ii]);
+    }
+    sbuf.append("\n");
+  }
+  else if (obj instanceof short[]) {
+    sbuf.append( mkIndent( indent) + "(shorts)");
+    short[] vals = (short[]) obj;
+    for (int ii = 0; ii < vals.length; ii++) {
+      sbuf.append("  " + vals[ii]);
+    }
+    sbuf.append("\n");
+  }
+  else if (obj instanceof int[]) {
+    sbuf.append( mkIndent( indent) + "(ints)");
+    int[] vals = (int[]) obj;
+    for (int ii = 0; ii < vals.length; ii++) {
+      sbuf.append("  " + vals[ii]);
+    }
+    sbuf.append("\n");
+  }
+  else if (obj instanceof long[]) {
+    sbuf.append( mkIndent( indent) + "(longs)");
+    long[] vals = (long[]) obj;
+    for (int ii = 0; ii < vals.length; ii++) {
+      sbuf.append("  " + vals[ii]);
+    }
+    sbuf.append("\n");
+  }
+  else if (obj instanceof float[]) {
+    sbuf.append( mkIndent( indent) + "(floats)");
+    float[] vals = (float[]) obj;
+    for (int ii = 0; ii < vals.length; ii++) {
+      sbuf.append("  " + vals[ii]);
+    }
+    sbuf.append("\n");
+  }
+  else if (obj instanceof double[]) {
+    sbuf.append( mkIndent( indent) + "(doubles)");
+    double[] vals = (double[]) obj;
+    for (int ii = 0; ii < vals.length; ii++) {
+      sbuf.append("  " + vals[ii]);
+    }
+    sbuf.append("\n");
+  }
+  else if (obj instanceof char[]) {
+    sbuf.append( mkIndent( indent) + "(chars)");
+    char[] vals = (char[]) obj;
+    for (int ii = 0; ii < vals.length; ii++) {
+      sbuf.append("  " + vals[ii]);
+    }
+    sbuf.append("\n");
+  }
+  else if (obj instanceof Object[]) {
+    Object[] vals = (Object[]) obj;
+    for (int ii = 0; ii < vals.length; ii++) {
+      sbuf.append( String.format( "%s%d  cls: %s:\n",
+        mkIndent( indent), ii, obj.getClass().getName()));
+      formatObjectSub( vals[ii], indent + 1, sbuf);
+    }
+  }
+  else {
+    sbuf.append( String.format("%s(%s) %s\n",
+      mkIndent(indent), obj.getClass().getName(), obj));
+  }
+}
+
+
+
+static String mkIndent( int indent) {
+  String res = "";
+  for (int ii = 0; ii < indent; ii++) {
+    res += "  ";
+  }
+  return res;
+}
 
 
 
