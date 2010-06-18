@@ -418,7 +418,7 @@ testCustomNetcdf: testflagcls
 	java -cp tdcls hdfnetTest.TestCustomNetcdf -bugs 10 -outFile tempb.h5
 	ls -l tempb.h5
 	h5dump -p tempb.h5
-	java -cp /d1/steves/ftp/netcdfJava/netcdfAll-4.1.jar \
+	java -cp /d1/steves/ftp/netcdfJava/tda/cdm/target/netcdf-4.1.jar:/d1/steves/ftp/netcdfJava/netcdfAll-4.1.jar \
 	  ucar.nc2.NCdumpW tempb.h5 -vall -c
 
 
@@ -446,7 +446,7 @@ testcompile:
 	    BaseBlk.java \
 	    BtreeNode.java \
 	    GlobalHeap.java \
-	    HdfFile.java \
+	    HdfFileWriter.java \
 	    HdfGroup.java \
 	    LocalHeap.java \
 	    MsgAttribute.java \

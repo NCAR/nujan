@@ -1,19 +1,49 @@
+// The MIT License
+// 
+// Copyright (c) 2009 University Corporation for Atmospheric
+// Research and Massachusetts Institute of Technology Lincoln
+// Laboratory.
+// 
+// Permission is hereby granted, free of charge, to any person
+// obtaining a copy of this software and associated documentation
+// files (the "Software"), to deal in the Software without
+// restriction, including without limitation the rights to use,
+// copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following
+// conditions:
+// 
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
 
-package ncHdfTest;
 
-import ncHdf.NcDimension;
-import ncHdf.NcException;
-import ncHdf.NcFile;
-import ncHdf.NcGroup;
-import ncHdf.NcVariable;
+package nhPkgTest;
+
+import java.util.Arrays;
+
+import nhPkg.NhDimension;
+import nhPkg.NhException;
+import nhPkg.NhFileWriter;
+import nhPkg.NhGroup;
+import nhPkg.NhVariable;
 
 import hdfnet.HdfException;
 import hdfnet.HdfGroup;
+import hdfnet.Util;
 
 import hdfnetTest.TestData;
 
 
-// Test short / int / long / float / double / string<n>,
+// Test byte / ubyte / short / int / long / float / double / char / vstring,
 // with any number of dimensions.
 
 
@@ -24,12 +54,9 @@ static void badparms( String msg) {
   prtf("Error: %s", msg);
   prtf("parms:");
   prtf("  -bugs         <int>");
-  prtf("  -nctype       short / int / long / float / double / string<n>");
-  prtf("                  where n is max string len,");
-  prtf("                  including null termination");
+  prtf("  -nhType       byte / ubyte / short / int / long / float / double / char / vstring");
   prtf("  -dims         <int,int,...>   or \"0\" if a scalar");
   prtf("  -fileVersion  1 / 2");
-  prtf("  -chunked      false / true");
   prtf("  -compress     compression level: 0==none, 1 - 9");
   prtf("  -outFile      <fname>");
   System.exit(1);
@@ -48,15 +75,13 @@ public static void main( String[] args) {
 
 
 static void runit( String[] args)
-throws NcException
+throws NhException
 {
   int bugs = -1;
   String typeStg = null;
-  int nctype = -1;
-  int stgFieldLen = 0;
+  int nhType = -1;
   int[] dims = null;
   String fileVersionStg = null;
-  String chunkedStg = null;      // xxx chunked not used
   int compressLevel = -1;
   String outFile = null;
 
@@ -65,23 +90,18 @@ throws NcException
     String key = args[iarg];
     String val = args[iarg+1];
     if (key.equals("-bugs")) bugs = Integer.parseInt( val);
-    else if (key.equals("-nctype")) {
+    else if (key.equals("-nhType")) {
       typeStg = val;
-      if (val.equals("byte")) nctype = NcVariable.TP_BYTE;
-      else if (val.equals("short")) nctype = NcVariable.TP_SHORT;
-      else if (val.equals("int")) nctype = NcVariable.TP_INT;
-      else if (val.equals("long")) nctype = NcVariable.TP_LONG;
-      else if (val.equals("float")) nctype = NcVariable.TP_FLOAT;
-      else if (val.equals("double")) nctype = NcVariable.TP_DOUBLE;
-      else if (val.startsWith("string")) {
-        if (val.length() <= 6)
-          badparms("must spec stgFieldLen after \"string\"");
-        nctype = NcVariable.TP_STRING_FIX;
-        stgFieldLen = Integer.parseInt( val.substring(6));
-        typeStg = val.substring(0,6);
-      }
-      else if (val.equals("vstring")) nctype = NcVariable.TP_STRING_VAR;
-      else badparms("unknown nctype A: " + val);
+      if (val.equals("sbyte")) nhType = NhVariable.TP_SBYTE;
+      else if (val.equals("ubyte")) nhType = NhVariable.TP_UBYTE;
+      else if (val.equals("short")) nhType = NhVariable.TP_SHORT;
+      else if (val.equals("int")) nhType = NhVariable.TP_INT;
+      else if (val.equals("long")) nhType = NhVariable.TP_LONG;
+      else if (val.equals("float")) nhType = NhVariable.TP_FLOAT;
+      else if (val.equals("double")) nhType = NhVariable.TP_DOUBLE;
+      else if (val.equals("char")) nhType = NhVariable.TP_CHAR;
+      else if (val.equals("vstring")) nhType = NhVariable.TP_STRING_VAR;
+      else badparms("unknown nhType: " + val);
     }
     else if (key.equals("-dims")) {
       if (val.equals("0")) dims = new int[0];
@@ -95,17 +115,15 @@ throws NcException
       }
     }
     else if (key.equals("-fileVersion")) fileVersionStg = val;
-    else if (key.equals("-chunked")) chunkedStg = val;
     else if (key.equals("-compress")) compressLevel = Integer.parseInt( val);
     else if (key.equals("-outFile")) outFile = val;
     else badparms("unkown parm: " + key);
   }
 
   if (bugs < 0) badparms("missing parm: -bugs");
-  if (typeStg == null || nctype < 0) badparms("missing parm: -nctype");
+  if (typeStg == null || nhType < 0) badparms("missing parm: -nhType");
   if (dims == null) badparms("missing parm: -dims");
   if (fileVersionStg == null) badparms("missing parm: -fileVersion");
-  if (chunkedStg == null) badparms("missing parm: -chunked");
   if (compressLevel < 0) badparms("missing parm: -compress");
   if (outFile == null) badparms("missing parm: -outFile");
 
@@ -114,69 +132,136 @@ throws NcException
   else if (fileVersionStg.equals("2")) fileVersion = 2;
   else badparms("unknown fileVersion: " + fileVersionStg);
 
-  boolean useChunked = false;
-  if (chunkedStg.equals("false")) useChunked = false;
-  else if (chunkedStg.equals("true")) useChunked = true;
-  else badparms("unknown chunked: " + chunkedStg);
-
   prtf("TestNetcdfa: bugs: %d", bugs);
   prtf("TestNetcdfa: typeStg: \"%s\"", typeStg);
-  prtf("TestNetcdfa: nctype: \"%s\"", NcVariable.ncTypeNames[nctype]);
-  prtf("TestNetcdfa: stgFieldLen: %d", stgFieldLen);
+  prtf("TestNetcdfa: nhType: \"%s\"", NhVariable.nhTypeNames[nhType]);
   prtf("TestNetcdfa: rank: %d", dims.length);
   for (int idim : dims) {
     prtf("  TestNetcdfa: dim: %d", idim);
   }
   prtf("TestNetcdfa: fileVersion: %s", fileVersion);
-  prtf("TestNetcdfa: chunked: %s", useChunked);
   prtf("TestNetcdfa: compress: %d", compressLevel);
   prtf("TestNetcdfa: outFile: \"%s\"", outFile);
 
-  NcFile hfile = new NcFile( outFile, NcFile.OPT_OVERWRITE, fileVersion);
+  NhFileWriter hfile = new NhFileWriter( outFile, NhFileWriter.OPT_OVERWRITE, fileVersion);
   hfile.setDebugLevel( bugs);
 
-  NcGroup rootGroup = hfile.getRootGroup();
+  NhGroup rootGroup = hfile.getRootGroup();
 
   // Create test data and fill value.
-  Object[] testData = TestData.genNcData( typeStg, dims);
-  Object vdata = testData[0];
-  Object fillValue = testData[1];
-  prtf("  ######### vdata: " + vdata);
-  prtf("  ######### fillValue: " + fillValue);
+  int dtype = 0;
+  int stgFieldLen = 0;
+  if (nhType == NhVariable.TP_SBYTE) dtype = HdfGroup.DTYPE_SFIXED08;
+  else if (nhType == NhVariable.TP_UBYTE) dtype = HdfGroup.DTYPE_UFIXED08;
+  else if (nhType == NhVariable.TP_SHORT) dtype = HdfGroup.DTYPE_FIXED16;
+  else if (nhType == NhVariable.TP_INT) dtype = HdfGroup.DTYPE_FIXED32;
+  else if (nhType == NhVariable.TP_LONG) dtype = HdfGroup.DTYPE_FIXED64;
+  else if (nhType == NhVariable.TP_FLOAT) dtype = HdfGroup.DTYPE_FLOAT32;
+  else if (nhType == NhVariable.TP_DOUBLE) dtype = HdfGroup.DTYPE_FLOAT64;
+  else if (nhType == NhVariable.TP_CHAR) dtype = HdfGroup.DTYPE_TEST_CHAR;
+  else if (nhType == NhVariable.TP_STRING_VAR)
+    dtype = HdfGroup.DTYPE_STRING_VAR;
+  else throwerr("unknown nhType: " + NhVariable.nhTypeNames[nhType]);
 
-  NcGroup alpha1 = rootGroup.addGroup("alpha1");
-  NcGroup alpha2 = rootGroup.addGroup("alpha2");
-  NcGroup alpha3 = rootGroup.addGroup("alpha3");
+  Object vdata = null;
+  Object fillValue = null;
+  try {
+    vdata = TestData.genHdfData(
+      dtype,
+      stgFieldLen,
+      null,           // refGroup
+      dims,
+      0);             // ival, origin 0.
+
+    fillValue = TestData.genFillValue(
+      dtype,
+      0);             // stgFieldLen xxx
+  }
+  catch( HdfException exc) {
+    exc.printStackTrace();
+    throwerr("caught: " + exc);
+  }
+
+  // Netcdf doesn't support fill values for Strings or scalars.
+  if (nhType == NhVariable.TP_STRING_VAR) fillValue = null;
+  if (dims.length == 0) fillValue = null;
+
+  NhGroup alpha1 = rootGroup.addGroup("alpha1");
+  NhGroup alpha2 = rootGroup.addGroup("alpha2");
+  NhGroup alpha3 = rootGroup.addGroup("alpha3");
 
   int rank = dims.length;
-  NcDimension[] ncDims = new NcDimension[rank];
+  NhDimension[] nhDims = new NhDimension[rank];
   for (int ii = 0; ii < rank; ii++) {
-    ncDims[ii] = rootGroup.addDimension(
+    nhDims[ii] = rootGroup.addDimension(
       String.format("dim%02d", ii),
       dims[ii]);
   }
 
   int numAttr = 3;
-  // NetCDF attributes all have rank == 1.
+  // NetCDF attributes all have rank == 1, or be a simple String.
+  // For nhType == TP_CHAR, must have isVlen = false.
   if (rank == 1) {
     for (int ii = 0; ii < numAttr; ii++) {
       rootGroup.addAttribute(
         String.format("globAttr%04d", ii),   // attrName
-        vdata);
+        nhType,
+        vdata,
+        false);          // isVlen
+    }
+    if (numAttr > 0) {
+      rootGroup.addAttribute(
+        "globTextAttr",
+        NhVariable.TP_STRING_VAR,
+        "globTextValue",
+        false);          // isVlen
     }
   }
 
+  //xxxrootGroup.addAttribute(
+  //xxx  "testattra",
+  //xxx  NhVariable.TP_STRING_VAR,
+  //xxx  "testValuea",
+  //xxx  false);          // isVlen
+
+//  //xxx:
+//      rootGroup.addAttribute(
+//        String.format("testattra"),
+//        vdata,
+//        true,       // isUnsigned     xxx must be true
+//        false,      // isVlen
+//        false);     // isVstring      xxx must be false
+
+// Definitely weird.
+//
+// String valued attributes must be encoded with isVstring=false.
+// If a String valued attribute is encoded as isVstring=true,
+// ncdump fails:
+//   ncdump: tempa.nc: Can't open HDF5 attribute
+// Even though h5dump reads it just fine.
+//
+// But if the attr value is an array of String, it should be
+// encoded as isVstring=true.  If it's encoded as isVstring=false,
+// then ncdump may look for null termination.  Example:
+//       string testVar0000:varAttr0000 = "0", "1a", "2ab?\177" ;
+//                                                   * should be "2ab".
+//
+// One alternative would be to store add null term to all the
+// fixed len strings, but that increases the storage len and
+// the Unidata reader then returns the incremented length.
+ 
+
 
   int numVar = 2;
-  NcVariable[] testVars = new NcVariable[ numVar];
-  for (int ii = 0; ii < numVar; ii++) {
-    testVars[ii] = testDefineVariable(
+  NhVariable[] testVars = new NhVariable[ numVar];
+  for (int ivar = 0; ivar < numVar; ivar++) {
+    testVars[ivar] = testDefineVariable(
       numAttr,
       alpha2,                            // parentGroup
-      String.format("testVar%04d", ii),  // varName
-      nctype,
-      stgFieldLen,
-      ncDims,
+      ivar,
+      String.format("testVar%04d", ivar),  // varName
+      nhType,
+      nhDims,
       compressLevel,
       vdata,
       fillValue);
@@ -199,53 +284,50 @@ throws NcException
 
 
 
-static NcVariable testDefineVariable(
+static NhVariable testDefineVariable(
   int numAttr,
-  NcGroup parentGroup,
+  NhGroup parentGroup,
+  int ivar,
   String varName,
-  int nctype,
-  int stgFieldLen,        // string length, incl null termination
-  NcDimension[] ncDims,   // varDims
+  int nhType,
+  NhDimension[] nhDims,   // varDims
   int compressLevel,      // compression level: 0==none, 1 - 9
   Object vdata,
   Object fillValue)
-throws NcException
+throws NhException
 {
-  int rank = ncDims.length;
+  int rank = nhDims.length;
 
-  NcVariable vara = parentGroup.addVariable(
+  NhVariable vara = parentGroup.addVariable(
     varName,             // varName
-    nctype,              // nctype
-    stgFieldLen,
-    ncDims,              // varDims
+    nhType,              // nhType
+    nhDims,              // varDims
     fillValue,
     compressLevel);
 
-  //xxx del if (nctype == NcVariable.TP_STRING) {
-  //xxx del   vara = parentGroup.addStringVariable(
-  //xxx del     varName,             // varName
-  //xxx del     stgFieldLen,         // string length, incl null termination
-  //xxx del     ncDims,              // varDims
-  //xxx del     fillValue,
-  //xxx del     compressLevel);
-  //xxx del }
-  //xxx del else {
-  //xxx del   vara = parentGroup.addNumericVariable(
-  //xxx del     varName,             // varName
-  //xxx del     nctype,              // nctype
-  //xxx del     ncDims,              // varDims
-  //xxx del     fillValue,
-  //xxx del     compressLevel);
-  //xxx del }
-
-  // NetCDF attributes all have rank == 1.
-  if (rank == 1) {
+  // NetCDF attributes must have rank == 1, or be a simple String.
+  if (ivar == 0 && rank == 1) {
     for (int ii = 0; ii < numAttr; ii++) {
       vara.addAttribute(
         String.format("varAttr%04d", ii),   // attrName
-        vdata);
+        nhType,
+        vdata,
+        false);          // isVlen
+    }
+    if (numAttr > 0) {
+      vara.addAttribute(
+        "varaTextAttr",
+        NhVariable.TP_STRING_VAR,
+        "varaTextValue",
+        false);          // isVlen
     }
   }
+  //xxx
+  //xxxvara.addAttribute(
+  //xxx  "testattra",
+  //xxx  nhType,
+  //xxx  vdata,
+  //xxx  false);          // isVlen
 
   prtf("TestNetcdfa: parentGroup: %s", parentGroup);
   prtf("TestNetcdfa: vara: %s", vara);
@@ -257,9 +339,9 @@ throws NcException
 
 
 static void throwerr( String msg, Object... args)
-throws NcException
+throws NhException
 {
-  throw new NcException( String.format( msg, args));
+  throw new NhException( String.format( msg, args));
 }
 
 

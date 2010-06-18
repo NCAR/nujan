@@ -1,7 +1,34 @@
+// The MIT License
+// 
+// Copyright (c) 2009 University Corporation for Atmospheric
+// Research and Massachusetts Institute of Technology Lincoln
+// Laboratory.
+// 
+// Permission is hereby granted, free of charge, to any person
+// obtaining a copy of this software and associated documentation
+// files (the "Software"), to deal in the Software without
+// restriction, including without limitation the rights to use,
+// copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following
+// conditions:
+// 
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
+
 
 package hdfnetTest;
 
-import hdfnet.HdfFile;
+import hdfnet.HdfFileWriter;
 import hdfnet.HdfGroup;
 import hdfnet.HdfException;
 
@@ -18,15 +45,15 @@ static void badparms( String msg) {
   prtf("Error: %s", msg);
   prtf("parms:");
   prtf("  -bugs         <int>");
-  prtf("  -dtype        one of: fixed08/16/32/64");
+  prtf("  -dtype        one of: fixed08 ufixed08 fixed16/32/64");
   prtf("                        float32/64");
   prtf("                        stringN vstring");
-  prtf("                           where N is the max string len including");
+  prtf("                           where N is the max string len without");
   prtf("                           null termination");
-  prtf("                        reference");
+  prtf("                        reference compound");
   prtf("  -dims         <int,int,...>   or \"0\" if scalar");
   prtf("  -fileVersion  1 / 2");
-  prtf("  -chunked      false / true");
+  prtf("  -chunked      contig / chunked");
   prtf("  -compress     compression level: 0==none, 1 - 9");
   prtf("  -outFile      <fname>");
   System.exit(1);
@@ -44,11 +71,8 @@ public static void main( String[] args) {
 }
 
 
-//xxx: testall.sh: also test fixed08
 
-//xxx also test vstring
 
-//xxx array might not fit in memory
 
 static void runit( String[] args)
 throws HdfException
@@ -68,7 +92,8 @@ throws HdfException
     String val = args[iarg+1];
     if (key.equals("-bugs")) bugs = Integer.parseInt( val);
     else if (key.equals("-dtype")) {
-      if (val.equals("fixed08")) dtype = HdfGroup.DTYPE_FIXED08;
+      if (val.equals("sfixed08")) dtype = HdfGroup.DTYPE_SFIXED08;
+      else if (val.equals("ufixed08")) dtype = HdfGroup.DTYPE_UFIXED08;
       else if (val.equals("fixed16")) dtype = HdfGroup.DTYPE_FIXED16;
       else if (val.equals("fixed32")) dtype = HdfGroup.DTYPE_FIXED32;
       else if (val.equals("fixed64")) dtype = HdfGroup.DTYPE_FIXED64;
@@ -82,7 +107,8 @@ throws HdfException
       }
       else if (val.equals("vstring")) dtype = HdfGroup.DTYPE_STRING_VAR;
       else if (val.equals("reference")) dtype = HdfGroup.DTYPE_REFERENCE;
-      else badparms("unknown dtype A: " + val);
+      else if (val.equals("compound")) dtype = HdfGroup.DTYPE_COMPOUND;
+      else badparms("unknown dtype: " + val);
     }
     else if (key.equals("-dims")) {
       if (val.equals("0")) dims = new int[0];
@@ -116,8 +142,8 @@ throws HdfException
   else badparms("unknown fileVersion: " + fileVersionStg);
 
   boolean useChunked = false;
-  if (chunkedStg.equals("false")) useChunked = false;
-  else if (chunkedStg.equals("true")) useChunked = true;
+  if (chunkedStg.equals("contig")) useChunked = false;
+  else if (chunkedStg.equals("chunked")) useChunked = true;
   else badparms("unknown chunked: " + chunkedStg);
 
   prtf("Testa: bugs: %d", bugs);
@@ -132,22 +158,27 @@ throws HdfException
   prtf("Testa: compress: %d", compressLevel);
   prtf("Testa: outFile: \"%s\"", outFile);
 
-  HdfFile hfile = new HdfFile(
-    outFile, fileVersion, HdfFile.OPT_ALLOW_OVERWRITE);
+  HdfFileWriter hfile = new HdfFileWriter(
+    outFile, fileVersion, HdfFileWriter.OPT_ALLOW_OVERWRITE);
   hfile.setDebugLevel( bugs);
   HdfGroup rootGroup = hfile.getRootGroup();
 
-  Object[] testData = TestData.genHdfData( dtype, dims, rootGroup);
-  Object vdata = testData[0];
-  Object fillValue = testData[1];
+  Object vdata = TestData.genHdfData( dtype, stgFieldLen, rootGroup, dims, 0);
+  //xxxvdata = new String[] {"aaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbb"}; //xxx
+  //xxxvdata = "aaaaaaaaaa"; //xxx
+
+  Object fillValue = TestData.genFillValue( dtype, stgFieldLen);
 
   if (bugs >= 1) {
-    if (fillValue instanceof String)
-      prtf("Testa: fillValue: class: %s  value: \"%s\"",
-        fillValue.getClass().getName(), fillValue);
+    String msg = "Testa: fillValue: ";
+    if (fillValue == null) msg += "null";
+    else if (fillValue instanceof String)
+      msg += String.format("\"%s\"  class: String", fillValue);
     else
-      prtf("Testa: fillValue: class: %s  value: %s",
-        fillValue.getClass().getName(), fillValue);
+      msg += String.format("%s  class: %s",
+        fillValue,
+        fillValue.getClass().getName());
+    prtf( msg);
   }
 
   HdfGroup alpha1 = rootGroup.addGroup("alpha1");
@@ -156,12 +187,13 @@ throws HdfException
 
   int numVar = 2;
   HdfGroup[] testVars = new HdfGroup[ numVar];
-  for (int ii = 0; ii < numVar; ii++) {
-    testVars[ii] = testDefineVariable(
+  for (int ivar = 0; ivar < numVar; ivar++) {
+    testVars[ivar] = testDefineVariable(
       useChunked,
       compressLevel,
-      alpha2,                            // parentGroup
-      String.format("testVar%04d", ii),  // varName
+      alpha2,                              // parentGroup
+      ivar,
+      String.format("testVar%04d", ivar),  // varName
       dtype,
       stgFieldLen,
       dims,
@@ -171,8 +203,8 @@ throws HdfException
 
   hfile.endDefine();
 
-  for (int ii = 0; ii < numVar; ii++) {
-    testVars[ii].writeData( vdata);
+  for (int ivar = 0; ivar < numVar; ivar++) {
+    testVars[ivar].writeData( vdata);
   }
 
   hfile.close();
@@ -191,9 +223,10 @@ static HdfGroup testDefineVariable(
   boolean useChunked,
   int compressLevel,
   HdfGroup parentGroup,
+  int ivar,
   String varName,
   int dtype,
-  int stgFieldLen,        // string length, incl null termination
+  int stgFieldLen,        // string length, without null termination
   int[] dims,             // varDims
   Object vdata,
   Object fillValue)
@@ -204,25 +237,40 @@ throws HdfException
   HdfGroup vara = parentGroup.addVariable(
     varName,                   // varName
     dtype,                     // dtype
-    stgFieldLen,               // string length, incl null termination
+    stgFieldLen,               // string length, without null termination
     dims,                      // varDims
     fillValue,
     useChunked,                // isChunked
     compressLevel);            // compressionLevel
 
   int numAttr = 2;
-  for (int ii = 0; ii < numAttr; ii++) {
-    vara.addAttribute(
-      String.format("testAttr%04d", ii),   // attrName
-      vdata,
-      false,         // isVlen
-      false);        // isCompoundRef
+  if (ivar == 0) {
+    for (int ii = 0; ii < numAttr; ii++) {
+      vara.addAttribute(
+        String.format("testAttr%04d", ii),   // attrName
+        dtype,
+        stgFieldLen,
+        vdata,
+        false);          // isVlen
+    }
   }
 
   // If 2 dimensions, add VLEN attribute.
-  if (rank == 2) {
+  // But vlen not allowed for DTYPE_STRING_VAR.
+  // We cannot use either STRING_VAR or STRING_FIX for a
+  // VLEN attr since the MsgAttribute call to
+  //     Util.getDtypeAndDims( isVlen, attrValue);
+  // will always return STRING_VAR for a string attrValue.
+
+  if (rank == 2
+    && dtype != HdfGroup.DTYPE_STRING_FIX
+    && dtype != HdfGroup.DTYPE_STRING_VAR
+    && dtype != HdfGroup.DTYPE_COMPOUND)
+  {
     Object vlenData = null;
-    if (dtype == HdfGroup.DTYPE_FIXED08) {
+    if (dtype == HdfGroup.DTYPE_SFIXED08
+      || dtype == HdfGroup.DTYPE_UFIXED08)
+    {
       vlenData = new byte[][] {
         { (byte) 111, (byte) 112, (byte) 113 },
         { (byte) 111, (byte) 112 },
@@ -258,39 +306,41 @@ throws HdfException
         { 111, 112 },
         { 111, 112, 113, 114 }};
     }
-    else if (dtype == HdfGroup.DTYPE_STRING_FIX
-      || dtype == HdfGroup.DTYPE_STRING_VAR)
-    {
-      vlenData = new String[][] {
-        { "111uuu", "112", "113" },
-        { "111", "112uuu" },
-        { "111", "112", "113", "114uuu" }};
-    }
+
+    //xxx else if (dtype == HdfGroup.DTYPE_STRING_FIX) {
+    //xxx   vlenData = new String[][] {
+    //xxx     { "111uuu", "112", "113" },
+    //xxx     { "111", "112uuu" },
+    //xxx     { "111", "112", "113", "114uuu" }};
+    //xxx }
+
     else if (dtype == HdfGroup.DTYPE_REFERENCE) {
       vlenData = new HdfGroup[][] {
         { vara, vara, vara },
         { vara, vara },
         { vara, vara, vara, vara }};
     }
-    else badparms("unknown dtype C: " + dtype);
+    else badparms("unknown dtype: " + dtype);
 
     vara.addAttribute(
       "vlenAttr",
+      dtype,
+      stgFieldLen,
       vlenData,
-      true,            // isVlen
-      false);          // isCompoundRef
-  }
+      true);           // isVlen
+  } // if rank == 2 and not STRING_*
 
   // If rank 1 reference, test COMPOUND.
-  if (rank == 1 && dtype == HdfGroup.DTYPE_REFERENCE) {
+  if (rank == 1 && dtype == HdfGroup.DTYPE_COMPOUND) {
     vara.addAttribute(
       "compoundAttr",
+      dtype,
+      stgFieldLen,
       new HdfGroup[] {
         vara,
         vara,
         vara},
-      false,           // isVlen
-      true);           // isCompoundRef
+      false);          // isVlen
   }
 
   prtf("Testa: parentGroup: %s", parentGroup);

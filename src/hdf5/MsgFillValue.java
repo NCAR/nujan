@@ -1,3 +1,30 @@
+// The MIT License
+// 
+// Copyright (c) 2009 University Corporation for Atmospheric
+// Research and Massachusetts Institute of Technology Lincoln
+// Laboratory.
+// 
+// Permission is hereby granted, free of charge, to any person
+// obtaining a copy of this software and associated documentation
+// files (the "Software"), to deal in the Software without
+// restriction, including without limitation the rights to use,
+// copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following
+// conditions:
+// 
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
+
 
 package hdfnet;
 
@@ -52,7 +79,7 @@ MsgFillValue(
                                   // Float, Double, String, etc.
   int elementLen,                 // element length of the fillValue
   HdfGroup hdfGroup,              // the owning group
-  HdfFile hdfFile)
+  HdfFileWriter hdfFile)
 throws HdfException
 {
   super( TP_FILL_VALUE, hdfGroup, hdfFile);
@@ -80,7 +107,9 @@ throws HdfException
     ByteBuffer tbuf = ByteBuffer.wrap( fillBytes);
     tbuf.order( ByteOrder.LITTLE_ENDIAN);
 
-    if (dtype == HdfGroup.DTYPE_FIXED08) {
+    if (dtype == HdfGroup.DTYPE_SFIXED08
+      || dtype == HdfGroup.DTYPE_UFIXED08)
+    {
       if (! (fillValue instanceof Byte))
         throwerr("fill type mismatch.  Expected: Byte.  Found: "
           + fillValue.getClass());
@@ -121,7 +150,7 @@ throws HdfException
         throwerr("fill type mismatch.  Expected: String.  Found: "
           + fillValue.getClass());
       byte[] bytes = Util.encodeString( (String) fillValue, true, hdfGroup);
-      tbuf.put( Util.padNull( bytes, elementLen));
+      tbuf.put( Util.truncPadNull( bytes, elementLen));
     }
     else if (dtype == HdfGroup.DTYPE_STRING_VAR) {
       // We will fill the fillBytes later, in formatMsgCore below,
@@ -131,7 +160,7 @@ throws HdfException
       if (! (fillValue instanceof String))
         throwerr("fill type mismatch.  Expected: String.  Found: "
           + fillValue.getClass());
-      if (elementLen != 4 + HdfFile.OFFSET_SIZE + 4)
+      if (elementLen != 4 + HdfFileWriter.OFFSET_SIZE + 4)
         throwerr("invalid elementLen for fillValue");
     }
     else throwerr("unknown class for fillValue: "
