@@ -35,20 +35,96 @@ import hdfnet.HdfFileWriter;
 import hdfnet.HdfGroup;
 
 
+//xxx redo example
+/**
+ * Represents an open NetCDF4 (HDF5) output file.
+ *
+ * Typical use:
+ * <pre>
+ * 
+ *   int fileVersion = 2;        // either 1 or 2 (2 is recommended).
+ *   NhFileWriter hfile = new NhFileWriter(
+ *     outFile, NhFileWriter.OPT_OVERWRITE, fileVersion);
+ * 
+ *   NhGroup rootGroup = hfile.getRootGroup();
+ * 
+ *   int rank = 2;             // 2 dimensional data: x, y
+ *   NhDimension[] nhDims = new NhDimension[ rank];
+ *   nhDims[0] = rootGroup.addDimension( "xdim", 3);
+ *   nhDims[1] = rootGroup.addDimension( "ydim", 4);
+ * 
+ *   rootGroup.addAttribute(
+ *     "someName",
+ *     NhVariable.TP_STRING_VAR,
+ *     "some long comment");
+ * 
+ *   Double fillValue = new Double( -999999);
+ *   int compressLevel = 0;        // compression level: 0==none, 1 - 9
+ * 
+ *   NhVariable humidityVar = rootGroup.addVariable(
+ *     "humidity",                 // varName
+ *     NhVariable.TP_DOUBLE,       // nhType
+ *     nhDims,                     // varDims
+ *     fillValue,
+ *     compressLevel);
+ * 
+ *   humidityVar.addAttribute(
+ *     "someUnits",
+ *     NhVariable.TP_STRING_VAR,
+ *     "milliKiloGrams per megaMicroGram");
+ * 
+ *   humidityVar.addAttribute(
+ *     "someIndices",
+ *     NhVariable.TP_INT,
+ *     new int[] { 1, 2, 3, 5, 7, 13, 17});
+ * 
+ *   hfile.endDefine();
+ * 
+ *   // The data type must match that declared in addVariable above.
+ *   // The data shape must correspond to xdim, ydim.
+ *   double[][] testData = {
+ *     { 11, 12, 13, 14},
+ *     { 21, 22, 23, 24},
+ *     { 31, 32, 33, 34}
+ *   };
+ * 
+ *   humidityVar.writeData( testData);
+ *   hfile.close();
+ *
+ * </pre>
+ */
+
+
 public class NhFileWriter {
 
 
 
-// Bit flags for optFlag
+/**
+ * Specify allow overwrite of existing files for the
+ * optFlag parameter in the constructor.
+ */
+
 public static final int OPT_OVERWRITE = 1;
 
 
 
 // Define constants for fileStatus
-static final int ST_DEFINING  = 1;
-static final int ST_WRITEDATA = 2;
-static final int ST_CLOSED    = 3;
-static final String[] statusNames = {
+/**
+  * Before endDefine: the client may define groups, variables, and attributes.
+  */
+public static final int ST_DEFINING  = 1;
+/**
+  * After endDefine: the client may call writeData.
+  */
+public static final int ST_WRITEDATA = 2;
+/**
+  * After close: no further operations are possible.
+  */
+public static final int ST_CLOSED    = 3;
+/**
+  * Names of the ST_ status codes.
+  */
+public static final String[] statusNames = {
   "UNKNOWN", "DEFINING", "WRITEDATA", "CLOSED"};
 
 
@@ -65,7 +141,16 @@ int bugs;
 
 
 
-
+/**
+ * Creates a new NetCDF4 (HDF5) output file.
+ * Defaults are:
+ * <ul>
+ *   <li> optFlag = 0 &nbsp;&nbsp;&nbsp;  Don't overwrite existing files
+ *   <li> fileVersion = 2    (Recommended)
+ * </ul>
+ *
+ * @param path Name or path of the file to create.
+ */
 
 public NhFileWriter(
   String path)
@@ -76,6 +161,16 @@ throws NhException
 
 
 
+/**
+ * Creates a new NetCDF4 (HDF5) output file.
+ * Defaults are:
+ * <ul>
+ *   <li> fileVersion = 2    (Recommended)
+ * </ul>
+ *
+ * @param path Name or path of the file to create.
+ * @param optFlag 0 or the bitwise "or" of OPT_* flags.
+ */
 
 public NhFileWriter(
   String path,
@@ -87,6 +182,15 @@ throws NhException
 
 
 
+
+/**
+ * Creates a new NetCDF4 (HDF5) output file.
+ *
+ * @param path Name or path of the file to create.
+ * @param optFlag 0 or the bitwise "or" of OPT_* flags.
+ * @param fileVersion The output file HDF structure version, 1 or 2.
+ *                   (2 is recommended).
+ */
 
 public NhFileWriter(
   String path,
@@ -125,44 +229,84 @@ public String toString() {
 
 
 
+/**
+ * Sets the verbosity of debug messages sent to stdout.
+ * Recommended: 0, 1, or 2.
+ */
 public void setDebugLevel( int bugs) {
   this.bugs = bugs;
-  //xxx hdfFile.setDebugLevel( level);
 }
 
 
+
+/**
+ * Sets the verbosity of debug messages sent to stdout
+ * by the underlying HDF5 library.
+ * Recommended: 0.
+ */
+
+public void setHdfDebugLevel( int bugs) {
+  hdfFile.setDebugLevel( bugs);
+}
+
+
+/**
+ * Returns the full path name for this file.
+ */
 
 public String getPath() {
   return path;
 }
 
 
+/**
+ * Returns the optFlag parameter specified in the constructor.
+ */
+
 public int getOptFlag() {
   return optFlag;
 }
 
+
+/**
+ * Returns the fileVersion parameter specified in the constructor.
+ */
 
 public int getFileVersion() {
   return fileVersion;
 }
 
 
+/**
+ * Returns the current file status, one of the ST_* constants.
+ */
+
 public int getStatus() {
   return fileStatus;
 }
 
+
+/**
+ * Returns the root group, which is created in the constructor.
+ */
 
 public NhGroup getRootGroup() {
   return rootGroup;
 }
 
 
+/**
+ * Ends the definition mode.  After calling endDefine,
+ * the client may not create new groups, variables, or attributes.
+ * After calling endDefine, the client may only call writeData
+ * and close.
+ */
 
 public void endDefine()
 throws NhException
 {
   if (bugs >= 1) {
-    prtf("endDefine: path: \"" + path + "\"\n");
+    prtf("NhFileWriter.endDefine: path: \"" + path + "\"\n");
   }
   if (fileStatus != ST_DEFINING) throwerr("already called endDefine");
   fileStatus = ST_WRITEDATA;
@@ -205,6 +349,7 @@ throws NhException
             "%s%10d\0",
             "This is a netCDF dimension but not a netCDF variable.",
             dim.dimLen);
+
         }
 
         else {     // else dim has a matching coordinate variable.
@@ -226,19 +371,33 @@ throws NhException
           nameAttrValue,              // attrValue
           false);                     // isVlen
 
+
+
         // Add the back-reference attrs to the hdf5 variable.
         // My, what silly architecture you have, Hdf!
+        //
+        // Oh, and skip the back refs if dimName == varName.
 
+        NhVariable[] nhRefVars = new NhVariable[ dim.refList.size()];
         HdfGroup[] hdfRefVars = new HdfGroup[ dim.refList.size()];
         for (int ii = 0; ii < hdfRefVars.length; ii++) {
-          hdfRefVars[ii] = dim.refList.get(ii).hdfVar;
+          nhRefVars[ii] = dim.refList.get(ii);
+          hdfRefVars[ii] = nhRefVars[ii].hdfVar;
         }
-        dim.hdfDimVar.addAttribute(
-          "REFERENCE_LIST",           // attrName
-          HdfGroup.DTYPE_COMPOUND,    // attrType
-          0,                          // stgFieldLen
-          hdfRefVars,                 // attrValue
-          false);                     // isVlen
+        if (nhRefVars.length == 0
+          || nhRefVars.length == 1
+            && nhRefVars[0].varName.equals( dim.dimName))
+        {
+          prtf("xxx skip REFERENCE_LIST for NhDimension: %s", dim);
+        }
+        else {
+          dim.hdfDimVar.addAttribute(
+            "REFERENCE_LIST",           // attrName
+            HdfGroup.DTYPE_COMPOUND,    // attrType
+            0,                          // stgFieldLen
+            hdfRefVars,                 // attrValue
+            false);                     // isVlen
+        }
       }
       catch( HdfException exc) {
         exc.printStackTrace();
@@ -256,22 +415,34 @@ throws NhException
       // Create matrix of dimension variables, one dimVar per row,
       // so we can make vlen DIMENSION_LIST.
       HdfGroup[][] dimVarMat = new HdfGroup[nhvar.rank][1];
+      NhDimension coordDim = null;
       for (int ii = 0; ii < nhvar.rank; ii++) {
-        dimVarMat[ii][0] = nhvar.nhDims[ii].hdfDimVar;
+        NhDimension dim = nhvar.nhDims[ii];
+        if (dim.coordVar != null) coordDim = dim;
+        dimVarMat[ii][0] = dim.hdfDimVar;
       }
 
-      try {
-        nhvar.hdfVar.addAttribute(
-          "DIMENSION_LIST",           // attrName
-          HdfGroup.DTYPE_REFERENCE,   // attrType
-          0,                          // stgFieldLen
-          dimVarMat,                  // attrValue
-          true);                      // isVlen
+      // If only one dim, and it's the matching coord var, skip it.
+      if (dimVarMat.length == 1
+        && coordDim != null
+        && coordDim.dimName.equals( nhvar.varName))
+      {
+        prtf("xxx skip DIMENSION_LIST for coord var: %s", nhvar);
       }
-      catch( HdfException exc) {
-        exc.printStackTrace();
-        throwerr("caught: " + exc);
-      }
+      else {       // else not coord var
+        try {
+          nhvar.hdfVar.addAttribute(
+            "DIMENSION_LIST",           // attrName
+            HdfGroup.DTYPE_REFERENCE,   // attrType
+            0,                          // stgFieldLen
+            dimVarMat,                  // attrValue
+            true);                      // isVlen
+        }
+        catch( HdfException exc) {
+          exc.printStackTrace();
+          throwerr("caught: " + exc);
+        }
+      } // else not coord var
     }
   } // for each nhvar
 
@@ -335,11 +506,16 @@ throws NhException
 
 
 
+/**
+ * Closes the file.  After calling close no further
+ * operations are possible.
+ */
+
 public void close()
 throws NhException
 {
   if (bugs >= 1) {
-    prtf("close: path: \"" + path + "\"\n");
+    prtf("NhFileWriter.close: path: \"" + path + "\"\n");
   }
 
   if (fileStatus == ST_DEFINING)

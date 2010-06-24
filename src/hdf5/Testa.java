@@ -164,8 +164,6 @@ throws HdfException
   HdfGroup rootGroup = hfile.getRootGroup();
 
   Object vdata = TestData.genHdfData( dtype, stgFieldLen, rootGroup, dims, 0);
-  //xxxvdata = new String[] {"aaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbb"}; //xxx
-  //xxxvdata = "aaaaaaaaaa"; //xxx
 
   Object fillValue = TestData.genFillValue( dtype, stgFieldLen);
 
@@ -200,6 +198,9 @@ throws HdfException
       vdata,
       fillValue);
   }
+
+  prtf("Testa: rootGroup: %s", rootGroup);
+  prtf("Testa: alpha2: %s", alpha2);
 
   hfile.endDefine();
 
@@ -259,7 +260,7 @@ throws HdfException
   // But vlen not allowed for DTYPE_STRING_VAR.
   // We cannot use either STRING_VAR or STRING_FIX for a
   // VLEN attr since the MsgAttribute call to
-  //     Util.getDtypeAndDims( isVlen, attrValue);
+  //     HdfUtil.getDtypeAndDims( isVlen, attrValue);
   // will always return STRING_VAR for a string attrValue.
 
   if (rank == 2
@@ -307,13 +308,6 @@ throws HdfException
         { 111, 112, 113, 114 }};
     }
 
-    //xxx else if (dtype == HdfGroup.DTYPE_STRING_FIX) {
-    //xxx   vlenData = new String[][] {
-    //xxx     { "111uuu", "112", "113" },
-    //xxx     { "111", "112uuu" },
-    //xxx     { "111", "112", "113", "114uuu" }};
-    //xxx }
-
     else if (dtype == HdfGroup.DTYPE_REFERENCE) {
       vlenData = new HdfGroup[][] {
         { vara, vara, vara },
@@ -343,8 +337,7 @@ throws HdfException
       false);          // isVlen
   }
 
-  prtf("Testa: parentGroup: %s", parentGroup);
-  prtf("Testa: vara: %s", vara);
+  prtf("Testa: defined vara: %s", vara);
   return vara;
 
 } // end testDefineVariable

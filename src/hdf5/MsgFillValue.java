@@ -112,45 +112,45 @@ throws HdfException
     {
       if (! (fillValue instanceof Byte))
         throwerr("fill type mismatch.  Expected: Byte.  Found: "
-          + fillValue.getClass());
+          + fillValue.getClass() + "  for group: " + hdfGroup.getPath());
       tbuf.put( ((Byte) fillValue).byteValue());
     }
     else if (dtype == HdfGroup.DTYPE_FIXED16) {
       if (! (fillValue instanceof Short))
         throwerr("fill type mismatch.  Expected: Short.  Found: "
-          + fillValue.getClass());
+          + fillValue.getClass() + "  for group: " + hdfGroup.getPath());
       tbuf.putShort( ((Short) fillValue).shortValue());
     }
     else if (dtype == HdfGroup.DTYPE_FIXED32) {
       if (! (fillValue instanceof Integer))
         throwerr("fill type mismatch.  Expected: Integer.  Found: "
-          + fillValue.getClass());
+          + fillValue.getClass() + "  for group: " + hdfGroup.getPath());
       tbuf.putInt( ((Integer) fillValue).intValue());
     }
     else if (dtype == HdfGroup.DTYPE_FIXED64) {
       if (! (fillValue instanceof Long))
         throwerr("fill type mismatch.  Expected: Long.  Found: "
-          + fillValue.getClass());
+          + fillValue.getClass() + "  for group: " + hdfGroup.getPath());
       tbuf.putLong( ((Long) fillValue).longValue());
     }
     else if (dtype == HdfGroup.DTYPE_FLOAT32) {
       if (! (fillValue instanceof Float))
         throwerr("fill type mismatch.  Expected: Float.  Found: "
-          + fillValue.getClass());
+          + fillValue.getClass() + "  for group: " + hdfGroup.getPath());
       tbuf.putFloat( ((Float) fillValue).floatValue());
     }
     else if (dtype == HdfGroup.DTYPE_FLOAT64) {
       if (! (fillValue instanceof Double))
         throwerr("fill type mismatch.  Expected: Double.  Found: "
-          + fillValue.getClass());
+          + fillValue.getClass() + "  for group: " + hdfGroup.getPath());
       tbuf.putDouble( ((Double) fillValue).doubleValue());
     }
     else if (dtype == HdfGroup.DTYPE_STRING_FIX) {
       if (! (fillValue instanceof String))
         throwerr("fill type mismatch.  Expected: String.  Found: "
-          + fillValue.getClass());
-      byte[] bytes = Util.encodeString( (String) fillValue, true, hdfGroup);
-      tbuf.put( Util.truncPadNull( bytes, elementLen));
+          + fillValue.getClass() + "  for group: " + hdfGroup.getPath());
+      byte[] bytes = HdfUtil.encodeString( (String) fillValue, true, hdfGroup);
+      tbuf.put( HdfUtil.truncPadNull( bytes, elementLen));
     }
     else if (dtype == HdfGroup.DTYPE_STRING_VAR) {
       // We will fill the fillBytes later, in formatMsgCore below,
@@ -159,12 +159,13 @@ throws HdfException
 
       if (! (fillValue instanceof String))
         throwerr("fill type mismatch.  Expected: String.  Found: "
-          + fillValue.getClass());
+          + fillValue.getClass() + "  for group: " + hdfGroup.getPath());
       if (elementLen != 4 + HdfFileWriter.OFFSET_SIZE + 4)
         throwerr("invalid elementLen for fillValue");
     }
-    else throwerr("unknown class for fillValue: "
-      + fillValue.getClass() + "  dtype: " + dtype);
+    else throwerr("unknown dtype for fillValue."
+      + "  dtype: " + dtype
+      + "  for group: " + hdfGroup.getPath());
   }
 }
 
@@ -197,7 +198,7 @@ throws HdfException
     fmtBuf.putBufInt("MsgFillValue: elementLen", elementLen);
 
     if (dtype == HdfGroup.DTYPE_STRING_VAR) {
-      byte[] bytes = Util.encodeString( (String) fillValue, false, hdfGroup);
+      byte[] bytes = HdfUtil.encodeString( (String) fillValue, false, hdfGroup);
       int heapIx = hdfFile.mainGlobalHeap.putHeapItem("fillValue", bytes);
       fmtBuf.putBufInt("MsgFillValue: vstring len", bytes.length);
       fmtBuf.putBufLong(

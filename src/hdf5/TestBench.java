@@ -26,7 +26,7 @@
 // OTHER DEALINGS IN THE SOFTWARE.
 
 
-package hdfnet;
+package hdfnetTest;
 
 import java.nio.charset.Charset;
 import java.util.SortedMap;

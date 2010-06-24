@@ -35,6 +35,7 @@ class MsgDataType extends MsgBase {
 
 
 int dtype;                 // one of HdfGroup.DTYPE*
+int[] dsubTypes;           // subType for DTYPE_VLEN or DTYPE_COMPOUND
 String[] subNames;         // member names for DTYPE_COMPOUND
 
 
@@ -182,24 +183,10 @@ throws HdfException
 {
   super( TP_DATATYPE, hdfGroup, hdfFile);
   this.dtype = dtype;
+  this.dsubTypes = dsubTypes;
   this.subNames = subNames;
   typeVersion = 1;
-  if (hdfFile.bugs >= 5) {
-    prtf("########## MsgDataType: testaa: " + (Object) this);
-    prtf("MsgDataType: dtype: " + HdfGroup.dtypeNames[dtype]);
-    if (dsubTypes == null) prtf("  dsubTypes: null");
-    else {
-      for (int isub : dsubTypes) {
-        prtf("  dsubType: " + HdfGroup.dtypeNames[isub]);
-      }
-    }
-    if (subNames == null) prtf("  subNames: null");
-    else {
-      for (String nm : subNames) {
-        prtf("  subNames: \"" + nm + "\"");
-      }
-    }
-  }
+  if (hdfFile.bugs >= 5) prtf("MsgDataType: " + this);
 
   if (dtype == HdfGroup.DTYPE_VLEN) {
     if (dsubTypes == null || dsubTypes.length == 0)
@@ -223,7 +210,8 @@ throws HdfException
     || dtype == HdfGroup.DTYPE_VLEN
        && dsubTypes[0] == HdfGroup.DTYPE_STRING_FIX)
   {
-    if (stgFieldLen <= 0) throwerr("Invalid stgFieldLen: must be > 0");
+    if (stgFieldLen <= 0)
+      throwerr("Invalid stgFieldLen for DTYPE_STRING_FIX: must be > 0");
   }
   else {
     if (stgFieldLen != 0) throwerr("Invalid stgFieldLen: must be 0");
@@ -406,11 +394,27 @@ throws HdfException
 
 
 public String toString() {
-  String res = super.toString();
-  res += "  dtype: " + HdfGroup.dtypeNames[dtype];
-  res += "  typeVersion: " + typeVersion;
-  res += "  typeClass: " + typeClassNames[typeClass];
-  res += "  elementLen: " + elementLen;
+  String res = "dtype: " + HdfGroup.dtypeNames[dtype];
+  if (dsubTypes != null) {
+    res += "  dsubTypes: (";
+    for (int isub : dsubTypes) {
+      res += " " + HdfGroup.dtypeNames[isub];
+    }
+    res += ")";
+  }
+  if (subNames != null) {
+    res += "  subNames: (";
+    for (String nm : subNames) {
+      res += " \"" + nm + "\"";
+    }
+    res += ")";
+  }
+  if (hdfFile.bugs >= 10) {
+    res += "  " + super.toString();
+    res += "  typeVersion: " + typeVersion;
+    res += "  typeClass: " + typeClassNames[typeClass];
+    res += "  elementLen: " + elementLen;
+  }
   return res;
 }
 
@@ -472,8 +476,6 @@ throws HdfException
     int memberOffset = 0;
     for (int isub = 0; isub < subMsgs.length; isub++) {
       MsgDataType subtp = subMsgs[isub];
-    prtf("########## MsgDataType: testaa fmt: " + (Object) this);
-    prtf("########## MsgDataType: subNames: " + subNames);
       String subName = subNames[isub];
       if (hdfFile.bugs >= 5) {
         prtIndent(
@@ -486,7 +488,7 @@ throws HdfException
           subName);
       }
 
-      byte[] bytes = Util.encodeString( subName, true, hdfGroup);
+      byte[] bytes = HdfUtil.encodeString( subName, true, hdfGroup);
       int subFieldLen = bytes.length;       // includes null term
       fmtBuf.putBufBytes( "cmpnd member name", bytes);
 

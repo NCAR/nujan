@@ -76,24 +76,22 @@ public String toString() {
 
 int putHeapItem(
   String msg,
-  byte[] item)                 // must include null termination
-                               // xxx stgnullterm: change this?
+  byte[] item)                 // without null termination
 throws HdfException
 {
-  if (item == null || item.length == 0 || item[item.length-1] != 0)
-    throwerr("invalid item");
+  if (item == null) throwerr("invalid item");
 
   int toffset = getHeapOffsetSub( item);
   if (toffset >= 0) {        // found it
     if (hdfFile.bugs >= 5)
       prtf("putHeapString: FOUND: msg: %s:  offset: %d  item: %s",
-        msg, toffset, Util.formatBytes( item, 0, item.length));
+        msg, toffset, HdfUtil.formatBytes( item, 0, item.length));
   }
   else {
     toffset = curHeapLen;
     if (hdfFile.bugs >= 5)
       prtf("putHeapString: CREATE: msg: %s:  offset: %d  item: %s",
-        msg, toffset, Util.formatBytes( item, 0, item.length));
+        msg, toffset, HdfUtil.formatBytes( item, 0, item.length));
 
     itemList.add( Arrays.copyOf( item, item.length));
     offsetList.add( new Integer( toffset));
@@ -131,7 +129,7 @@ throws HdfException
   int ires = getHeapOffsetSub( item);
   if (ires < 0)
     throwerr("getHeapOffset: item not found: %s",
-      Util.formatBytes( item, 0, item.length));
+      HdfUtil.formatBytes( item, 0, item.length));
   return ires;
 }
 

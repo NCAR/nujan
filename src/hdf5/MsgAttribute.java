@@ -47,7 +47,8 @@ MsgDataType msgDataType;
 MsgDataSpace msgDataSpace;
 
 int dataDtype;
-int[] varDims;
+int[] attrDims;
+int[] dsubTypes = null;
 
 
 
@@ -71,30 +72,27 @@ throws HdfException
 
   //xxx if we are passed an empty array, Object[],
   // for example for the reflist for an unused dimension,
-  // there is no way to find the type.
+  // there is no way to find the dataDype.
 
-  // Find dtype and varDims
-  int[] dtypeAndDims = Util.getDtypeAndDims( isVlen, attrValue);
+  // Find dtype and attrDims
+  int[] dtypeAndDims = HdfUtil.getDtypeAndDims( isVlen, attrValue);
   dataDtype = dtypeAndDims[0];
-  varDims = Arrays.copyOfRange( dtypeAndDims, 1, dtypeAndDims.length);
+  attrDims = Arrays.copyOfRange( dtypeAndDims, 1, dtypeAndDims.length);
 
-  // Check that the dataDtype and varDims match what the user declared.
-  Util.checkTypeMatch( attrType, dataDtype, varDims, varDims);
+  // Check that the dataDtype and attrDims match what the user declared.
+  HdfUtil.checkTypeMatch( getPath(), attrType, dataDtype, attrDims, attrDims);
 
-  int[] dsubTypes = null;
   String[] memberNames = null;
   if (isVlen) {
     if (attrType == HdfGroup.DTYPE_COMPOUND)
       throwerr("Attribute cannot be both isVlen and DTYPE_COMPOUND."
         + "  attribute named \"%s\"", attrName);
-    if (varDims.length != 2)
+    if (attrDims.length != 2)
       throwerr("cannot have VLEN attribute with num dims != 2");
     dsubTypes = new int[] { attrType};
     attrType = HdfGroup.DTYPE_VLEN;
   }
   else if (attrType == HdfGroup.DTYPE_COMPOUND) {
-    //xxx del HdfGroup[] attrRefs = getAttrRefs( attrValue);
-    //xxx del varDims = new int[] { attrRefs.length};
     dsubTypes = new int[] { HdfGroup.DTYPE_REFERENCE, HdfGroup.DTYPE_FIXED32};
     memberNames = new String[] {"dataset", "dimension"};
   }
@@ -103,44 +101,20 @@ throws HdfException
   // without null termination, if attrValue is a
   // String, String[], String[][], etc.
   // Returns 0 otherwise.
-  if (attrType == HdfGroup.DTYPE_STRING_FIX && stgFieldLen == 0)
-    stgFieldLen = Util.getMaxStgLen( attrValue);
-  prtf("### MsgAttribute: stgFieldLen: " + stgFieldLen);
-  prtf("### MsgAttribute: attrType: " + attrType);
-  prtf("### MsgAttribute: attrValue: " + attrValue + "  cls: " + attrValue.getClass());
-  prtf("### MsgAttribute: attrValue: " + Util.formatObject(attrValue));
-
-  if (hdfFile.bugs >= 2) {
-    String tmsg = "MsgAttribute: attrName: \"" + attrName + "\"\n"
-      + "  attrType: " + HdfGroup.dtypeNames[attrType] + "\n"
-      + "  stgFieldLen: " + stgFieldLen + "\n"
-      + "  attrValue object: " + attrValue + "\n"
-      + "  attrValue class: " + attrValue.getClass() + "\n"
-      + "  attrValue dataDtype: " + HdfGroup.dtypeNames[ dataDtype] + "\n";
-    tmsg +=  "  dsubTypes:";
-    if (dsubTypes == null) tmsg += " (null)\n";
-    else {
-      for (int ii = 0; ii < dsubTypes.length; ii++) {
-        tmsg += " " + HdfGroup.dtypeNames[ dsubTypes[ii]];
-      }
-      tmsg +=  "\n";
-    }
-    tmsg += "  attrValue stgFieldLen: " + stgFieldLen + "\n"
-      + "  attrValue rank: " + varDims.length + "\n"
-      + "  attrValue dims:";
-    for (int ii = 0; ii < varDims.length; ii++) {
-      tmsg += " " + varDims[ii];
-    }
-    tmsg +=  "\n";
-    prtf( tmsg);
+  if (attrType == HdfGroup.DTYPE_STRING_FIX && stgFieldLen == 0) {
+    stgFieldLen = HdfUtil.getMaxStgLen( attrValue);
+    // The HDF5 C API complains "unknown datatype" if stgFieldLen = 0
+    // for a fixed len string.
+    if (stgFieldLen == 0) stgFieldLen = 1;
   }
+  if (hdfFile.bugs >= 2) prtf("MsgAttribute: " + this);
 
   // Handle vlen dims.
   // Although we are given a two dimensional array,
   // internally HDF5 handles it as a one dimensional array.
   if (isVlen) {
-    if (varDims.length != 2) throwerr("wrong num dimensions for vlen");
-    varDims = Arrays.copyOfRange( varDims, 0, 1);
+    if (attrDims.length != 2) throwerr("wrong num dimensions for vlen");
+    attrDims = Arrays.copyOfRange( attrDims, 0, 1);
   }
 
   // Create the MsgDataType
@@ -154,7 +128,7 @@ throws HdfException
 
   // Create the MsgDataSpace
   msgDataSpace = new MsgDataSpace(
-    varDims,
+    attrDims,
     hdfGroup,
     hdfFile);
 
@@ -168,32 +142,50 @@ throws HdfException
 
 
 public String toString() {
-  String res = super.toString();
-  res += "  attrName: \"" + attrName + "\"";
+  String res = "  attr path: \"" + getPath() + "\"\n"
+    + "  type: " + HdfUtil.formatDtypeDim( attrType, attrDims) + "\n"
+    + "  stgFieldLen: " + stgFieldLen + "\n"
+    + "  attrValue: dataDtype: " + HdfGroup.dtypeNames[ dataDtype]
+    + "  class: " + attrValue.getClass() + "\n";
+  if (dsubTypes != null) {
+    res +=  "  dsubTypes:";
+    for (int ii = 0; ii < dsubTypes.length; ii++) {
+      res += " " + HdfGroup.dtypeNames[ dsubTypes[ii]];
+    }
+    res +=  "\n";
+  }
+  if (hdfFile.bugs >= 10) {
+    res += "  " + super.toString() + "\n";
+  }
   return res;
 }
 
 
 
-//xxx getPath: get full path to the attr
+
+
+String getPath()
+{
+  String nm = hdfGroup.getPath();
+  nm += "/" + attrName;
+  return nm;
+}
+
+
+
 
 
 // Format everything after the message header
 void formatMsgCore( int formatPass, HBuffer fmtBuf)
 throws HdfException
 {
-  //xxx del
-  //prtf("### MsgAttribute.formatMsgCore: name: " + attrName
-  //  + "  dtype: " + HdfGroup.dtypeNames[dtype]
-  //  + "  isVlen: " + isVlen
-  //  + "  value: " + Util.formatObject( attrValue));
-  byte[] nameBytes = Util.encodeString( attrName, false, hdfGroup);
+  byte[] nameBytes = HdfUtil.encodeString( attrName, false, hdfGroup);
   if (hdfFile.fileVersion == 1) {
     fmtBuf.putBufByte("MsgAttribute: attrVersion", 1);
     fmtBuf.putBufByte("MsgAttribute: reserved", 0);
+    // Name must have null termination
     fmtBuf.putBufShort(
       "MsgAttribute: nameSize", nameBytes.length + 1);   // +1 for null term
-      // xxx stgnullterm
     fmtBuf.putBufShort(
       "MsgAttribute: dataTypeSize", msgDataType.hdrMsgSize);
     fmtBuf.putBufShort(
@@ -201,7 +193,6 @@ throws HdfException
 
     fmtBuf.putBufBytes("MsgAttribute: attr name", nameBytes);
     fmtBuf.putBufByte("MsgAttribute: attr name null term", 0);
-      // xxx stgnullterm
     fmtBuf.alignPos( "attr align", 8);
   }
   if (hdfFile.fileVersion == 2) {
@@ -212,9 +203,9 @@ throws HdfException
     //   1  dataspace is shared
     fmtBuf.putBufByte("MsgAttribute: flag", 0);
 
+    // Name must have null termination
     fmtBuf.putBufShort(
       "MsgAttribute: nameSize", nameBytes.length + 1);   // +1 for null term
-      // xxx stgnullterm
     fmtBuf.putBufShort(
       "MsgAttribute: dataTypeSize", msgDataType.hdrMsgSize);
     fmtBuf.putBufShort(
@@ -223,7 +214,6 @@ throws HdfException
 
     fmtBuf.putBufBytes("MsgAttribute: attr name", nameBytes);
     fmtBuf.putBufByte("MsgAttribute: attr name null term", 0);
-      // xxx stgnullterm
   }
 
   msgDataType.formatNakedMsg( formatPass, fmtBuf);
@@ -239,7 +229,7 @@ throws HdfException
       msgDataType.dtype,
       msgDataType.subMsgs[0].dtype,
       msgDataType.subMsgs[0].elementLen,    // stgLen, without null term
-      varDims,
+      attrDims,
       attrValue);
     if (hdfFile.bugs >= 2) {
       String tmsg = "MsgAttribute vlen: attrName: \"" + attrName + "\"\n"
@@ -258,7 +248,6 @@ throws HdfException
     // Vlen: format the globalHeap references to hdfFile.bbuf
     int compressionLevel = 0;      // cannot compress heap objects
     HBuffer refBuf = new HBuffer( null, compressionLevel, hdfFile);
-    prtf("########## MsgAttribute VAR: call formatRawData.  attrName: " + attrName);
     hdfGroup.formatRawData(
       attrType,
       stgFieldLen,
@@ -267,18 +256,11 @@ throws HdfException
       hdfFile.mainGlobalHeap.blkPosition,  // gcolAddr for DTYPE_STRING_VAR
       hdfFile.mainGlobalHeap,              // gcol for DTYPE_STRING_VAR
       refBuf);
-    //xxx del:
-    ///hdfGroup.writeVstrings(
-    ///  attrValue,
-    ///  hdfFile.mainGlobalHeap.blkPosition,
-    ///  hdfFile.mainGlobalHeap,
-    ///  refBuf);
     fmtBuf.putBufBuf("STRING_VAR refs", refBuf);    // write out references
   } // if DTYPE_STRING_VAR
 
   else {
     // Raw data: format the raw data to fmtBuf
-    prtf("########## MsgAttribute OTHR: call formatRawData.  attrName: " + attrName);
     hdfGroup.formatRawData(
       attrType,
       stgFieldLen,

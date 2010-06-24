@@ -34,6 +34,10 @@ import hdfnet.HdfException;
 import hdfnet.HdfGroup;
 
 
+/**
+ * Represents one dimension for a NhVariable.
+ */
+
 public class NhDimension {
 
 String dimName;
@@ -61,41 +65,6 @@ throws NhException
   this.dimName = dimName;
   this.dimLen = dimLen;
   this.parentGroup = parentGroup;
-
-//xxx del:
-///  try {
-///    hdfVar = parentGroup.hdfGroup.addVariable(
-///      dimName,                   // varName
-///      HdfGroup.DTYPE_FLOAT32,    // dtype
-///      0,                         // string length, incl null termination
-///      new int[] {dimLen},        // varDims
-///      null,                      // fillValue
-///      false,                     // isChunked
-///      0);                        // compressionLevel
-///
-///    hdfVar.addAttribute(
-///      "CLASS",              // attrName
-///      "DIMENSION_SCALE",    // attrValue
-///      false,                // isVlen
-///      false);               // isCompoundRef
-///
-///
-///    // netcdf-4.0.1/libsrc4/nc4hdf.c:
-///    //   #define DIM_WITHOUT_VARIABLE "This is a netCDF dimension but not a netCDF variable."
-///    //   sprintf(dimscale_wo_var, "%s%10d", DIM_WITHOUT_VARIABLE, dim->len);
-///
-///    String dimTitle = "This is a netCDF dimension but not a netCDF variable.";
-///    hdfVar.addAttribute(
-///      "NAME",               // attrName
-///      String.format("%s%10d", dimTitle, dimLen),      // attrValue
-///      false,                // isVlen
-///      false);               // isCompoundRef
-///  }
-///  catch( HdfException exc) {
-///    exc.printStackTrace();
-///    throwerr("caught: " + exc);
-///  }
-
 } // end constructor
 
 
@@ -109,10 +78,18 @@ public String toString() {
 
 
 
+/**
+ * Returns the name of this dimension.
+ */
+
 public String getName() {
   return dimName;
 }
 
+
+/**
+ * Returns the numeric length of this dimension.
+ */
 
 public int getLength() {
   return dimLen;

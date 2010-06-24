@@ -127,7 +127,7 @@ throws Exception
   prtIndent( indent, "Group: shortName: " + inGroup.getShortName());
 
   for (Attribute attr : inGroup.getAttributes()) {
-    prtIndent( indent, "attr: %s", attr);
+    printAttr( "global", attr, indent);
   }
 
   for (Dimension dim : inGroup.getDimensions()) {
@@ -146,19 +146,8 @@ throws Exception
     }
     prtIndent( indent, "isScalar: %s", var.isScalar());
     prtIndent( indent, "isVariableLength: %s", var.isVariableLength());
-    Attribute fillAttr = var.findAttribute("_fillValue");
-    prtIndent( indent, "fillAttr: %s", fillAttr);
     for (Attribute attr : var.getAttributes()) {
-      prtIndent( indent, "attr: %s", attr);
-      prtIndent( indent + 1, "attr.getDataType(): %s", attr.getDataType());
-      prtIndent( indent + 1, "attr.isUnsigned(): %s", attr.isUnsigned());
-      prtIndent( indent + 1, "attr.isString(): %s", attr.isString());
-      prtIndent( indent + 1, "attr.getLength(): %d", attr.getLength());
-      prtIndent( indent + 1, "attr.getStringValue(): %s",
-        attr.getStringValue());
-      prtIndent( indent + 1, "attr value:");
-      Array arr = attr.getValues();
-      printArray( indent + 2, arr);
+      printAttr( "var " + var.getShortName(), attr, indent);
     }
     Array arr = var.read();
     prtIndent( indent, "data:");
@@ -173,6 +162,26 @@ throws Exception
 
 
 
+
+static void printAttr(
+  String tag,
+  Attribute attr,
+  int indent)
+throws Exception
+{
+  prtIndent( indent, "Attr for: %s  getName: \"%s\"",
+    tag, attr.getName());
+  prtIndent( indent + 1, "attr.getDataType(): %s", attr.getDataType());
+  prtIndent( indent + 1, "attr.isUnsigned(): %s", attr.isUnsigned());
+  prtIndent( indent + 1, "attr.isString(): %s", attr.isString());
+  prtIndent( indent + 1, "attr.getLength(): %d", attr.getLength());
+  prtIndent( indent + 1, "attr.getStringValue(): %s",
+    attr.getStringValue());
+  prtIndent( indent + 1, "attr value:");
+  Array arr = attr.getValues();
+  printArray( indent + 2, arr);
+  prtIndent( indent + 1, "attr.toString: %s", attr);
+}
 
 
 static void printArray( int indent, Array arr)
@@ -217,11 +226,15 @@ static void printArray( int indent, Array arr)
     }
   }
 
-  if (arr.getElementType() != "".getClass()) {      // if not String
+  Class eleType = arr.getElementType();
+  if (eleType != "".getClass()) {      // if not String
     prtIndent( indent, "arr.copyTo1DJavaArray() type: %s",
       arr.copyTo1DJavaArray().getClass());
-    prtIndent( indent, "arr.copyToNDJavaArray() type: %s",
-      arr.copyToNDJavaArray().getClass());
+    // Netcdf Array.copyToNDJavaArray dies on primitives of rank 0.
+    if (! (arr.getRank() == 0 && eleType.isPrimitive())) {
+      prtIndent( indent, "arr.copyToNDJavaArray() type: %s",
+        arr.copyToNDJavaArray().getClass());
+    }
   }
 }
 

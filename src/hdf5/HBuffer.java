@@ -65,7 +65,7 @@ HBuffer(
   if (compressionLevel > 0) {
     deflater = new Deflater( compressionLevel);
   }
-  if (hdfFile.bugs >= 2) {
+  if (hdfFile.bugs >= 5) {
     prtf("HBuffer: outChannel: %s  compressionLevel: %d",
       outChannel == null ? "no" : "yes",
       compressionLevel);
@@ -143,7 +143,7 @@ throws HdfException
 void writeChannel( FileChannel chan)
 throws HdfException
 {
-  if (hdfFile.bugs >= 2) {
+  if (hdfFile.bugs >= 5) {
     prtf("writeChannel: bbuf: pos: %d  limit: %d  capacity: %d",
       getPos(), bbuf.limit(), bbuf.capacity());
   }
@@ -231,7 +231,7 @@ throws HdfException
 void writeCompressedOutput()
 throws IOException, HdfException
 {
-  if (hdfFile.bugs >= 2) {
+  if (hdfFile.bugs >= 5) {
     prtf("writeCompressedOutput.entry:");
     prtf("  bbuf: pos: %d  limit: %d  capacity: %d",
       getPos(), bbuf.limit(), bbuf.capacity());
@@ -254,7 +254,7 @@ throws IOException, HdfException
     cbuf.limit( compLen);
     outChannel.write( cbuf);
   }
-  if (hdfFile.bugs >= 2) {
+  if (hdfFile.bugs >= 5) {
     prtf("writeCompressedOutput.exit:");
     prtf("  outChannel: pos: %d", outChannel.position());
   }
@@ -267,7 +267,7 @@ void flush()
 throws IOException, HdfException
 {
   if (outChannel == null) throwerr("cannot flush null channel");
-  if (hdfFile.bugs >= 2)
+  if (hdfFile.bugs >= 5)
     prtf("flush.entry: outChannel.pos: %d", outChannel.position());
   try {
     if (compressionLevel > 0) {
@@ -284,7 +284,7 @@ throws IOException, HdfException
     throwerr("caught: %s", exc);
   }
   bbuf.clear();
-  if (hdfFile.bugs >= 2)
+  if (hdfFile.bugs >= 5)
     prtf("flush.exit: outChannel.pos: %d", outChannel.position());
 }
 
@@ -455,7 +455,7 @@ throws HdfException
     if (decStg != null) msg += "  dec: " + decStg;
     prtf( msg);
   }
-}
+} // end printValue
 
 
 

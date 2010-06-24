@@ -81,8 +81,7 @@ int numKid;                // num children of this node
 final byte[] lowKey = new byte[5];
 
 final byte[] highKey = new byte[] {
-  (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff,
-  (byte) 0};  // null termination
+  (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff};
 
 
 

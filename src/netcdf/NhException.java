@@ -29,6 +29,10 @@
 package nhPkg;
 
 
+/**
+ * Represents most Exceptions in this package.  Simply extends Exception.
+ */
+
 public class NhException extends Exception {
 
 public NhException( String msg) {

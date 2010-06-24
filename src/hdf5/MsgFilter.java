@@ -94,7 +94,7 @@ throws HdfException
 
   // Single filter description
   String name = filtNames[ filterId];
-  byte[] bytes = Util.encodeString( name, true, hdfGroup);
+  byte[] bytes = HdfUtil.encodeString( name, true, hdfGroup);
   int encLen = bytes.length;        // includes null termination
 
   fmtBuf.putBufShort("MsgFilter: filterId", filterId);
