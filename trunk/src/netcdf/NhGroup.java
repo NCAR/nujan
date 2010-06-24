@@ -33,29 +33,18 @@ import java.util.regex.Pattern;
 
 import hdfnet.HdfException;
 import hdfnet.HdfGroup;
-import hdfnet.Util;
+import hdfnet.HdfUtil;
 
+
+
+/**
+ * Represents a NetCDF4 (HDF5) group.
+ * Groups may be arbitrarily nested.
+ * For typical use see {@link NhFileWriter}.
+ * @see NhFileWriter
+ */
 
 public class NhGroup {
-
-// xxx
-//   Test:
-//     dim lat = 5
-//     var lat(3)
-//     or var lat( lat, lon)  ???
-// 
-// addDim:
-//   insure no ancestor var with same name: err "define dims before vars"
-// 
-// xxx
-
-
-
-
-
-
-
-
 
 
 String groupName;
@@ -104,15 +93,28 @@ public String toString() {
 
 
 
-public String getName() { return groupName; }
-
+/**
+ * Returns the parent of this NhGroup.
+ */
 public NhGroup getParentGroup() { return parentGroup; }
 
+/**
+ * Returns the open file containing this NhGroup.
+ */
 public NhFileWriter getFileWriter() { return nhFile; }
 
 
 
+/**
+ * Returns the name of this NhGroup.
+ */
 
+public String getName() { return groupName; }
+
+
+/**
+ * Returns the full path, from the root group, of this NhGroup.
+ */
 
 public String getPath() {
   String res = "";
@@ -126,6 +128,9 @@ public String getPath() {
 
 
 
+/**
+ * Returns the direct children of this NhGroup.
+ */
 
 public NhGroup[] getSubGroups() {
   return subGroupList.toArray( new NhGroup[0]);
@@ -133,11 +138,23 @@ public NhGroup[] getSubGroups() {
 
 
 
+/**
+ * Returns the dimensions defined in this group.
+ * Does not return dimensions defined in other ancestor
+ * or descendent groups.
+ */
+
 public NhDimension[] getDimensions() {
   return dimensionList.toArray( new NhDimension[0]);
 }
 
 
+
+/**
+ * Returns the variables defined in this group.
+ * Does not return variables defined in other ancestor
+ * or descendent groups.
+ */
 
 public NhVariable[] getVariables() {
   return variableList.toArray( new NhVariable[0]);
@@ -145,7 +162,13 @@ public NhVariable[] getVariables() {
 
 
 
-// Returns null if not found.
+/**
+ * Returns the child subGroup having the specified name.
+ * Does not search descendents other than direct children.
+ *
+ * @param  nm   The name of the child group.
+ * @return The matching child group, or null if no match found.
+ */
 
 public NhGroup findSubGroup( String nm) {
   NhGroup res = null;
@@ -160,7 +183,13 @@ public NhGroup findSubGroup( String nm) {
 
 
 
-// Returns null if not found.
+/**
+ * Returns the variable having the specified name.
+ * Does not search children or ancestors.
+ *
+ * @param  nm   The name of the variable.
+ * @return The matching variable, or null if no match found.
+ */
 
 public NhVariable findVariable( String nm) {
   NhVariable res = null;
@@ -174,8 +203,13 @@ public NhVariable findVariable( String nm) {
 }
 
 
-// Find Dimension, searching within this group only.
-// Returns null if not found.
+/**
+ * Returns the dimension having the specified name.
+ * Does not search children or ancestors.
+ *
+ * @param  nm   The name of the dimension.
+ * @return The matching dimension, or null if no match found.
+ */
 
 public NhDimension findLocalDimension( String nm) {
   NhDimension res = null;
@@ -191,8 +225,14 @@ public NhDimension findLocalDimension( String nm) {
 
 
 
-// Find Dimension, searching all ancestors.
-// Returns null if not found.
+/**
+ * Returns the dimension having the specified name.
+ * Searches first this group, then each ancestor in turn.
+ * Does not search children.
+ *
+ * @param  nm   The name of the dimension.
+ * @return The matching dimension, or null if no match found.
+ */
 
 public NhDimension findAncestorDimension( String nm) {
   NhDimension res = null;
@@ -211,8 +251,11 @@ public NhDimension findAncestorDimension( String nm) {
 
 
 
-
-
+/**
+ * Adds a subGroup to this group.
+ * @param subName The name of the new subGroup.
+ * @return The newly created subGroup.
+ */
 
 public NhGroup addGroup(
   String subName)
@@ -234,6 +277,15 @@ throws NhException
 }
 
 
+
+
+/**
+ * Adds a dimension to this group.
+ * @param dimName The name of the new dimension.
+ * @param dimLen The length of the new dimension.
+ * @return The newly created dimension.
+ */
+
 public NhDimension addDimension(
   String dimName,
   int dimLen)
@@ -254,6 +306,35 @@ throws NhException
 
 
 
+
+/**
+ * Adds a variable to this group (HDF5 calls it a variable a "dataset").
+ * <p>
+ * Legal types of fillValue:
+ * <table border="1" align="center">
+ *   <tr><th> nhType          </th><th> Java class of fillValue </th></tr>
+ *   <tr><td> TP_SBYTE        </td><td> Byte                    </td></tr>
+ *   <tr><td> TP_UBYTE        </td><td> Byte                    </td></tr>
+ *   <tr><td> TP_SHORT        </td><td> Short                   </td></tr>
+ *   <tr><td> TP_INT          </td><td> Integer                 </td></tr>
+ *   <tr><td> TP_LONG         </td><td> Long                    </td></tr>
+ *   <tr><td> TP_FLOAT        </td><td> Float                   </td></tr>
+ *   <tr><td> TP_DOUBLE       </td><td> Double                  </td></tr>
+ *   <tr><td> TP_CHAR         </td><td> Character               </td></tr>
+ *   <tr><td> TP_STRING_VAR   </td><td> String                  </td></tr>
+ * </table>
+ *
+ * @param varName The name of the new variable.
+ * @param nhType The type of the new variable: one of NhVariable.TP_*.
+ * @param nhDims The dimensions of the data array for the variable.
+ *    A scalar variable is represented by nhDims = new int[0].
+ * @param fillValue The fill value.  The type must agree with nhType
+ *    as shown in the table above.
+ * @param compressionLevel  Desired level of compression.  0 is no
+ *    compression; 1 through 9 are increasing compression.
+ *    Scalar data (nhDims == new int[0]) must have compressionLevel = 0.
+ * @return The newly created dimension.
+ */
 
 public NhVariable addVariable(
   String varName,
@@ -305,23 +386,52 @@ throws NhException
 
 
 
+/**
+ * Adds an attribute to this group.
+ * Although HDF5 supports attributes of any dimsionality, 0, 1, 2, ...,
+ * the NetCDF data model only supports attributes that
+ * are a String or a 1 dimensional
+ * array of: String, byte, short, int, long, float, or double.
+ * <p>
+ * Legal types of attrValue:
+ * <table border="1" align="center">
+ *   <tr><th> atType          </th><th> Java class of attrValue   </th></tr>
+ *   <tr><td> TP_SBYTE        </td><td> byte[]                    </td></tr>
+ *   <tr><td> TP_UBYTE        </td><td> byte[]                    </td></tr>
+ *   <tr><td> TP_SHORT        </td><td> short[]                   </td></tr>
+ *   <tr><td> TP_INT          </td><td> int[]                     </td></tr>
+ *   <tr><td> TP_LONG         </td><td> long[]                    </td></tr>
+ *   <tr><td> TP_FLOAT        </td><td> float[]                   </td></tr>
+ *   <tr><td> TP_DOUBLE       </td><td> double[]                  </td></tr>
+ *   <tr><td> TP_CHAR         </td><td> char[]                    </td></tr>
+ *   <tr><td> TP_STRING_VAR   </td><td> String                    </td></tr>
+ *   <tr><td> TP_STRING_VAR   </td><td> String[]                  </td></tr>
+ * </table>
+ *
+ * @param attrName The name of the new attribute.
+ * @param atType The type of the new variable: one of NhVariable.TP_*.
+ * @param attrValue The value of the new attribute.
+ */
+
 // Although HDF5 supports attributes of any dimsionality, 0, 1, 2, ...,
 // the NetCDF data model only supports 1 dimensional arrays and strings.
 
 public void addAttribute(
   String attrName,
   int atType,                // one of NhVariable.TP_*
-  Object attrValue,
-  boolean isVlen)
+  Object attrValue)
 throws NhException
 {
   if (nhFile.bugs >= 1) {
     prtf("NhGroup.addAttribute: grp: \"" + groupName + "\""
-      + "  attrName: \"" + attrName + "\""
-      + "  atType: " + NhVariable.nhTypeNames[atType]
-      + "  value: " + Util.formatObject( attrValue));
+      + "  nm: \"" + attrName + "\""
+      + "  type: " + NhVariable.nhTypeNames[atType]);
+  }
+  if (nhFile.bugs >= 10) {
+    prtf("  attrValue: " + HdfUtil.formatObject( attrValue));
   }
   checkName( attrName, "attribute in group \"" + groupName + "\"");
+
   attrValue = NhVariable.getAttrValue(
     attrName,
     attrValue, 
@@ -337,8 +447,9 @@ throws NhException
     && NhVariable.testScalar( attrValue))
     dtype = HdfGroup.DTYPE_STRING_FIX;
 
+  // If attrType==DTYPE_STRING_FIX and stgFieldLen==0,
+  // MsgAttribute will find the max stg len in attrValue.
   int stgFieldLen = 0;     // max string len for STRING_FIX, without null term
-  if (atType == NhVariable.TP_CHAR) stgFieldLen = 1;
 
   try {
     hdfGroup.addAttribute(
@@ -346,7 +457,7 @@ throws NhException
       dtype,
       stgFieldLen,
       attrValue,
-      isVlen);
+      false);              // isVlen
   }
   catch( HdfException exc) {
     exc.printStackTrace();

@@ -76,7 +76,7 @@ throws HdfException
 {
   long heapOffset = localHeap.putHeapItem(
     "subGroupName",
-    Util.encodeString( subGroup.groupName, true, subGroup));
+    HdfUtil.encodeString( subGroup.groupName, false, subGroup));
   SymTabEntry entry = new SymTabEntry( heapOffset, subGroup, hdfFile);
   entryList.add( entry);
 

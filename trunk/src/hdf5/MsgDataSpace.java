@@ -65,19 +65,24 @@ MsgDataSpace(
   this.rank = varDims.length;
   this.varDims = Arrays.copyOf( varDims, varDims.length);
   this.dimMaxSizes = this.varDims;
+  if (hdfFile.bugs >= 5) prtf("MsgDataSpace: " + this);
 }
 
 
 public String toString() {
-  String res = super.toString();
-  res += "  rank: " + rank;
-  res += "  varDims:";
+  String res = "rank: " + rank;
+  res += "  dims: (";
   for (long ilen : varDims) {
     res += " " + ilen;
   }
-  res += "  dimMaxSizes:";
-  for (long ilen : dimMaxSizes) {
-    res += " " + ilen;
+  res += ")";
+  if (hdfFile.bugs >= 10) {
+    res += "  dimMaxSizes: (";
+    for (long ilen : dimMaxSizes) {
+      res += " " + ilen;
+    }
+    res += ")";
+    res += "  " + super.toString();
   }
   return res;
 }

@@ -36,11 +36,9 @@ import nhPkg.NhFileWriter;
 import nhPkg.NhGroup;
 import nhPkg.NhVariable;
 
-import hdfnet.HdfException;
-import hdfnet.HdfGroup;
-import hdfnet.Util;
-
-import hdfnetTest.TestData;
+import hdfnet.HdfException;      // used for sample data generation
+import hdfnet.HdfGroup;          // used for sample data generation
+import hdfnetTest.TestData;      // used for sample data generation
 
 
 // Test byte / ubyte / short / int / long / float / double / char / vstring,
@@ -145,6 +143,7 @@ throws NhException
 
   NhFileWriter hfile = new NhFileWriter( outFile, NhFileWriter.OPT_OVERWRITE, fileVersion);
   hfile.setDebugLevel( bugs);
+  hfile.setHdfDebugLevel( bugs);
 
   NhGroup rootGroup = hfile.getRootGroup();
 
@@ -175,7 +174,7 @@ throws NhException
 
     fillValue = TestData.genFillValue(
       dtype,
-      0);             // stgFieldLen xxx
+      0);             // stgFieldLen.  If 0 and FIXED, MsgAttribute calcs it.
   }
   catch( HdfException exc) {
     exc.printStackTrace();
@@ -201,38 +200,23 @@ throws NhException
   int numAttr = 3;
   // NetCDF attributes all have rank == 1, or be a simple String.
   // For nhType == TP_CHAR, must have isVlen = false.
-  if (rank == 1) {
+  if (rank <= 1) {
     for (int ii = 0; ii < numAttr; ii++) {
       rootGroup.addAttribute(
         String.format("globAttr%04d", ii),   // attrName
         nhType,
-        vdata,
-        false);          // isVlen
+        vdata);
     }
     if (numAttr > 0) {
       rootGroup.addAttribute(
         "globTextAttr",
         NhVariable.TP_STRING_VAR,
-        "globTextValue",
-        false);          // isVlen
+        "globTextValue");
     }
   }
 
-  //xxxrootGroup.addAttribute(
-  //xxx  "testattra",
-  //xxx  NhVariable.TP_STRING_VAR,
-  //xxx  "testValuea",
-  //xxx  false);          // isVlen
 
-//  //xxx:
-//      rootGroup.addAttribute(
-//        String.format("testattra"),
-//        vdata,
-//        true,       // isUnsigned     xxx must be true
-//        false,      // isVlen
-//        false);     // isVstring      xxx must be false
-
-// Definitely weird.
+// xxx Definitely weird.
 //
 // String valued attributes must be encoded with isVstring=false.
 // If a String valued attribute is encoded as isVstring=true,
@@ -278,6 +262,55 @@ throws NhException
 
 
 
+// Weird.  For chars ...
+// For a variable, netcdf stores array of string len 1.
+// For an attribute, netcdf stores array of signed byte,
+//   for both nc_put_attr_schar / uchar / ubyte.
+//
+//    call:                 parm:      ncdump
+//
+//    nc_def_var NC_CHAR 3  "abcdef..."      vara = "abc" ;
+//
+//    nc_put_attr_schar     "abc"      :sattrNamea = 97b, 98b, 99b ;
+//    nc_put_attr_uchar     "abc"      :sattrNamea = 97b, 98b, 99b ;
+//    nc_put_attr_ubyte     "abc"      :sattrNamea = 97b, 98b, 99b ;
+//
+//    
+//       DATASET "vara" {
+//          DATATYPE  H5T_STRING {
+//                STRSIZE 1;
+//                STRPAD H5T_STR_NULLTERM;
+//                CSET H5T_CSET_ASCII;
+//                CTYPE H5T_C_S1;
+//             }
+//          DATASPACE  SIMPLE { ( 3 ) / ( 3 ) }
+//          DATA {
+//          (0): "a", "b", "c"
+//          }
+// 
+//
+//       ATTRIBUTE "attrSchar" {
+//          DATATYPE  H5T_STD_I8LE
+//          DATASPACE  SIMPLE { ( 3 ) / ( 3 ) }
+//          DATA {
+//          (0): 97, 98, 99
+//          }
+//       }
+//       ATTRIBUTE "attrUbyte" {
+//          DATATYPE  H5T_STD_I8LE
+//          DATASPACE  SIMPLE { ( 3 ) / ( 3 ) }
+//          DATA {
+//          (0): 97, 98, 99
+//          }
+//       }
+//       ATTRIBUTE "attrUchar" {
+//          DATATYPE  H5T_STD_I8LE
+//          DATASPACE  SIMPLE { ( 3 ) / ( 3 ) }
+//          DATA {
+//          (0): 97, 98, 99
+//          }
+//       }
+
 
 
 
@@ -306,28 +339,20 @@ throws NhException
     compressLevel);
 
   // NetCDF attributes must have rank == 1, or be a simple String.
-  if (ivar == 0 && rank == 1) {
+  if (ivar == 0 && rank <= 1) {
     for (int ii = 0; ii < numAttr; ii++) {
       vara.addAttribute(
         String.format("varAttr%04d", ii),   // attrName
         nhType,
-        vdata,
-        false);          // isVlen
+        vdata);
     }
     if (numAttr > 0) {
       vara.addAttribute(
         "varaTextAttr",
         NhVariable.TP_STRING_VAR,
-        "varaTextValue",
-        false);          // isVlen
+        "varaTextValue");
     }
   }
-  //xxx
-  //xxxvara.addAttribute(
-  //xxx  "testattra",
-  //xxx  nhType,
-  //xxx  vdata,
-  //xxx  false);          // isVlen
 
   prtf("TestNetcdfa: parentGroup: %s", parentGroup);
   prtf("TestNetcdfa: vara: %s", vara);

@@ -188,7 +188,7 @@ throws HdfException
 
   if (hdfFile.bugs >= 1) {
     prtf("HdfGroup: new dataset at path: \"" + getPath() + "\""
-      + "  type: " + Util.formatDtypeDim( dtype, varDims));
+      + "  type: " + HdfUtil.formatDtypeDim( dtype, varDims));
   }
 
   if (varDims.length == 0) {
@@ -343,17 +343,22 @@ public void addAttribute(
   boolean isVlen)
 throws HdfException
 {
-  //xxx del
-  prtf("### HdfGroup.addAttribute: path: \"" + getPath() + "\""
-    + "  name: \"" + attrName + "\""
-    + "  isVlen: " + isVlen
-    + "  val: " + Util.formatObject( attrValue));
-
+  if (hdfFile.bugs >= 1) {
+    prtf("HdfGroup.addAttribute: \"" + getPath() + "/" + attrName + "\""
+      + "  cls: " + attrValue.getClass().getName());
+  }
+  if (hdfFile.bugs >= 5) {
+    prtf("  attr isVlen: " + isVlen);
+    prtf("  attrValue cls: " + attrValue.getClass().getName());
+    prtf("  attrValue: " + HdfUtil.formatObject( attrValue));
+  }
   if (findAttribute( attrName) != null)
     throwerr("Duplicate attribute.  The group \"%s\" already contains"
       + "  an attribute named \"%s\"",
       getPath(), attrName);
 
+  // If attrType==DTYPE_STRING_FIX and stgFieldLen==0,
+  // MsgAttribute will find the max stg len in attrValue.
   MsgAttribute msgAttr = new MsgAttribute(
     attrName,
     attrType,
@@ -362,14 +367,14 @@ throws HdfException
     isVlen,
     this,
     hdfFile);
-  if (hdfFile.bugs >= 1) {
-    prtf("HdfGroup: new attribute: at path: \"" + getPath() + "\""
-      + "  dtype: " + dtypeNames[attrType]
-      + "  name: \"" + attrName + "\""
-      + "  type: " + Util.formatDtypeDim( attrType, msgAttr.varDims)
+  hdrMsgList.add( msgAttr);
+  if (hdfFile.bugs >= 5) {
+    prtf("HdfGroup.addAttribute: added: \"" + getPath() + "\"\n"
+      + "  dtype: " + dtypeNames[attrType] + "\n"
+      + "  name: \"" + attrName + "\"\n"
+      + "  type: " + HdfUtil.formatDtypeDim( attrType, msgAttr.attrDims) + "\n"
       + "  isVlen: " + isVlen);
   }
-  hdrMsgList.add( msgAttr);
 }
 
 
@@ -380,17 +385,25 @@ throws HdfException
 
 
 public String toString() {
-  String res = super.toString();
+  String res = "HdfGroup: " + getPath()
+    + "  isVariable: " + isVariable + "\n"
+    + "  blkPosition: " + blkPosition + "\n";
   if (isVariable) {
-    res += "  (variable)\n"
-      + "  dtype: " + dtypeNames[ dtype] + "\n"
+    res += "  dtype: " + dtypeNames[ dtype] + "\n"
       + "  msgDataType: " + msgDataType + "\n"
       + "  msgDataSpace: " + msgDataSpace;
   }
   else {
-    res += "  (group)"
-      + "  subGroupList len: " + subGroupList.size()
-      + "  subVariableList len: " + subVariableList.size();
+    res += "  subGroupList: (";
+    for (HdfGroup grp : subGroupList) {
+      res += " " + grp.groupName;
+    }
+    res += ")";
+    res += "  subVariableList: (";
+    for (HdfGroup grp : subVariableList) {
+      res += " " + grp.groupName;
+    }
+    res += ")";
   }
   return res;
 }
@@ -518,18 +531,12 @@ throws HdfException
 void writeDataSub( Object vdata)
 throws HdfException, IOException
 {
-  if (hdfFile.bugs >= 1) prtf("writeDataSub: variable: " + getPath());
-  if (hdfFile.bugs >= 2) {
-    String tmsg = "writeData entry: group: " + getPath() + "\n"
-      + "  specified dtype: " + dtypeNames[ msgDataType.dtype] + "\n"
-      + "  specified rank: " + msgDataSpace.rank + "\n"
-      + "  specified dims:";
-    for (int ii = 0; ii < msgDataSpace.varDims.length; ii++) {
-      tmsg += " " + msgDataSpace.varDims[ii];
-    }
-    prtf( tmsg);
+  if (hdfFile.bugs >= 1) {
+    prtf("HdfGroup.writeData entry: group: " + getPath() + "\n"
+      + "  specified type: "
+      + HdfUtil.formatDtypeDim( dtype, msgDataSpace.varDims) + "\n"
+      + "  eofAddr: %d", hdfFile.eofAddr);
   }
-  //xxxprtf("### HdfGroup.writeDataSub: vdata: " + Util.formatObject( vdata));
 
   if (hdfFile.fileStatus != HdfFileWriter.ST_WRITEDATA)
     throwerr("must call endDefine first");
@@ -538,29 +545,26 @@ throws HdfException, IOException
   isWritten = true;
 
   // Find dtype and varDims of vdata
-  int[] dataInfo = Util.getDtypeAndDims( isVlen, vdata);
+  int[] dataInfo = HdfUtil.getDtypeAndDims( isVlen, vdata);
   int dataDtype = dataInfo[0];
   int[] dataVarDims = Arrays.copyOfRange( dataInfo, 1, dataInfo.length);
 
-  if (hdfFile.bugs >= 2) {
-    String tmsg = "writeData: actual data:" + "\n"
+  if (hdfFile.bugs >= 1) {
+    prtf("writeData: actual data:" + "\n"
       + "  vdata object: " + vdata + "\n"
       + "  vdata class: " + vdata.getClass() + "\n"
       + "  vdata dtype: " + dtypeNames[ dataDtype] + "\n"
       + "  vdata rank: " + dataVarDims.length + "\n"
-      + "  vdata dims:";
-    for (int ii = 0; ii < dataVarDims.length; ii++) {
-      tmsg += " " + dataVarDims[ii];
-    }
-    prtf( tmsg);
+      + "  vdata type and dims: "
+      + HdfUtil.formatDtypeDim( dataDtype, dataVarDims));
   }
 
   // Check that dtype and varDims match what the user
   // declared in the earlier addVariable call.
-  Util.checkTypeMatch( msgDataType.dtype, dataDtype,
+  HdfUtil.checkTypeMatch( getPath(), msgDataType.dtype, dataDtype,
     msgDataSpace.varDims, dataVarDims);
 
-  rawDataAddr = Util.alignLong( 8, hdfFile.eofAddr);
+  rawDataAddr = HdfUtil.alignLong( 8, hdfFile.eofAddr);
   hdfFile.outChannel.position( rawDataAddr);
 
   // As outbuf fills, it gets written to outChannel.
@@ -609,7 +613,6 @@ throws HdfException, IOException
     HBuffer refBuf = new HBuffer( null, compressionLevel, hdfFile);
     long gcolAddr = hdfFile.outChannel.position();
 
-    prtf("########## writeDataSub VAR: call formatRawData.  groupName: " + groupName);
     formatRawData(
       dtype,
       0,               // stgFieldLen for DTYPE_STRING_FIX
@@ -619,7 +622,7 @@ throws HdfException, IOException
       gcol,            // output: holds strings
       refBuf);         // output: holds references to strings
 
-    if (hdfFile.bugs >= 2) {
+    if (hdfFile.bugs >= 5) {
       prtf("  writeDataSub.STRING_VAR: gcol: %s", gcol);
       prtf("  writeDataSub.STRING_VAR: refBuf: %s", refBuf);
     }
@@ -627,7 +630,7 @@ throws HdfException, IOException
     gcol.formatBuf( 0, outbuf);       // formatPass = 0
     outbuf.flush();                   // write remaining data to outChannel
 
-    rawDataAddr = Util.alignLong( 8, hdfFile.outChannel.position());
+    rawDataAddr = HdfUtil.alignLong( 8, hdfFile.outChannel.position());
     hdfFile.outChannel.position( rawDataAddr);
 
     refBuf.writeChannel( hdfFile.outChannel);
@@ -636,8 +639,6 @@ throws HdfException, IOException
   }
 
   else {          // else not DTYPE_STRING_VAR
-
-    prtf("########## writeDataSub OTHR: call formatRawData.  groupName: " + groupName);
     formatRawData(
       dtype,
       stgFieldLen,
@@ -656,7 +657,7 @@ throws HdfException, IOException
     //   rawDataSize = msgDataType.elementLen;
     //   for (int ii = 0; ii < msgDataSpace.varDims.length; ii++) {
     //     long isize = msgDataSpace.varDims[ii];
-    //     if (hdfFile.bugs >= 2) prtf("  dimension %d len: %d", ii, isize);
+    //     if (hdfFile.bugs >= 5) prtf("  dimension %d len: %d", ii, isize);
     //     rawDataSize *= isize;
     //   }
     //
@@ -665,7 +666,7 @@ throws HdfException, IOException
 
     rawDataSize = endPos - rawDataAddr;
 
-    if (hdfFile.bugs >= 2) {
+    if (hdfFile.bugs >= 5) {
       prtf("writeData: rawDataAddr: %d  endPos: %d  rawDataSize: %d",
         rawDataAddr, endPos, rawDataSize);
       prtf("writeData: old eofAddr: %d", hdfFile.eofAddr);
@@ -673,46 +674,14 @@ throws HdfException, IOException
   }
 
   hdfFile.eofAddr = hdfFile.outChannel.position();
-  if (hdfFile.bugs >= 2) prtf("writeData: new eofAddr: %d", hdfFile.eofAddr);
+  if (hdfFile.bugs >= 2)
+    prtf("writeData.end: new eofAddr: %d", hdfFile.eofAddr);
 
 } // end writeDataSub
 
 
 
 
-
-
-// Recursively write to both gcol, refBuf.
-
-//xxx del:
-///void writeVstrings(
-///  Object vdata,         // String or String[] or String[][] or ...
-///  long gcolAddr,
-///  GlobalHeap gcol,
-///  HBuffer refBuf)
-///throws HdfException
-///{
-///  //xxx if (vdata instanceof Object[]) prtf("  ### writeVstrings: len: "
-///  //xxx   + ((Object[]) vdata).length);
-///  if (vdata == null) throwerr("vdata is null");
-///
-///  if (vdata instanceof String) {
-///    byte[] bytes = Util.encodeString(
-///      (String) vdata, false, this);     // addNull = false
-///    int gcolIx = gcol.putHeapItem("vlen string data", bytes);
-///    refBuf.putBufInt("vlen len", bytes.length);
-///    refBuf.putBufLong("vlen gcol addr", gcolAddr);
-///    refBuf.putBufInt("vlen gcol ix", gcolIx);
-///  }
-///  else if (vdata instanceof Object[]) {
-///    // Recurse on vector elements
-///    Object[] vec = (Object[]) vdata;
-///    for (Object obj : vec) {
-///      writeVstrings( obj, gcolAddr, gcol, refBuf);
-///    }
-///  }
-///  else throwerr("invalid vdata class: " + vdata.getClass());
-///} // end writeVstrings
 
 
 
@@ -973,7 +942,7 @@ throws HdfException
 //   Long,      long[],      [][],  [][][],  etc.
 //   Float,     float[],     [][],  [][][],  etc.
 //   Double,    double[],    [][],  [][][],  etc.
-//   //xxxCharacter, char[],      [][],  [][][],  etc.
+//   Character, char[],      [][],  [][][],  etc.
 //   String,    String[],    [][],  [][][],  etc.
 //   HdfGroup,  HdfGroup[],  [][],  [][][],  etc.  (reference)
 //
@@ -997,7 +966,9 @@ void formatRawData(
   HBuffer fmtBuf)      // output buffer
 throws HdfException
 {
-//xxx might be better to test on dtp ...
+
+// xxx someday we might validate dtp inside each case clause.
+
   if (vdata == null) throwerr("vdata is null");
 
   if (vdata instanceof Object[]) {
@@ -1038,23 +1009,23 @@ throws HdfException
     fmtBuf.putBufDouble("formatRawData", aval);
   }
 
-  //xxxelse if (vdata instanceof Character) {
-  //xxx  char aval = ((Character) vdata).charValue();
-  //xxx  xxx encode
-  //xxx  fmtBuf.putBufByte("formatRawData", encval);
-  //xxx}
+  else if (vdata instanceof Character) {
+    // xxx Normally we would handle character encoding by
+    // calling HdfUtil.encodeString.
+    // However the final length is fixed, so we must
+    // do 1 char -> 1 byte encoding.
+    fmtBuf.putBufByte("formatRawData", ((Character) vdata).charValue());
+  }
 
   else if (vdata instanceof String) {
     String aval = (String) vdata;
     if (dtp == DTYPE_STRING_FIX) {
-      prtf("########## formatRaw: STRING_FIX: \"" + vdata + "\"");
-      byte[] bytes = Util.encodeString( aval, true, this); //xxxshould be false
+      byte[] bytes = HdfUtil.encodeString( aval, false, this);
       fmtBuf.putBufBytes(
-        "formatRawData", Util.truncPadNull( bytes, stgFieldLen));
+        "formatRawData", HdfUtil.truncPadNull( bytes, stgFieldLen));
     }
     else if (dtp == DTYPE_STRING_VAR) {
-      prtf("########## formatRaw: STRING_VAR: \"" + vdata + "\"");
-      byte[] bytes = Util.encodeString(
+      byte[] bytes = HdfUtil.encodeString(
         (String) vdata, false, this);     // addNull = false
       int gcolIx = gcol.putHeapItem("vlen string data", bytes);
       fmtBuf.putBufInt("vlen len", bytes.length);
@@ -1119,9 +1090,8 @@ throws HdfException
     }
   }
   else if (vdata instanceof char[]) {
-    // xxx
-    // Normally we would handle character encoding by
-    // calling Util.encodeString.
+    // xxx Normally we would handle character encoding by
+    // calling HdfUtil.encodeString.
     // However the final length is fixed, so we must
     // do 1 char -> 1 byte encoding.
     char[] avec = (char[]) vdata;
@@ -1143,8 +1113,6 @@ throws HdfException
 //     heapIx[irow]
 //
 // Called by MsgAttribute.formatMsgCore.
-
-//xxx del, use formatRaw
 
 void formatVlenRawData(
   int[] heapIxs,

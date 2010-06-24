@@ -41,7 +41,6 @@ import java.util.ArrayList;
 public class HdfFileWriter extends BaseBlk {
 
 
-//xxx makefile: handle 7 dims.  testall too.
 
 // Bit flags for optFlag
 public static final int OPT_ALLOW_OVERWRITE = 1;
@@ -168,7 +167,7 @@ throws HdfException
   rootGroup = new HdfGroup( rootName, null, this);
   if (fileVersion == 1) {
     int grpOffset = rootGroup.localHeap.putHeapItem("rootName",
-      Util.encodeString( rootName, true, null));
+      HdfUtil.encodeString( rootName, false, null));  //xxx all enc: no null term
     symTabEntry = new SymTabEntry(
       grpOffset,
       rootGroup,
@@ -230,6 +229,9 @@ public void setDebugLevel( int debugLevel) {
 public void endDefine()
 throws HdfException
 {
+  if (bugs >= 1) {
+    prtf("HdfFileWriter.endDefine: filePath: \"" + filePath + "\"\n");
+  }
   if (fileStatus != ST_DEFINING) throwerr("already called endDefine");
   fileStatus = ST_WRITEDATA;
 
@@ -242,7 +244,8 @@ throws HdfException
   if (bugs >= 2)
     prtf("\nendDefine: start pass 1: mainBuf pos: %d", mainBuf.getPos());
 
-  if (bugs >= 1) prtf("reset debug level for formatPass 1");
+  if (bugs >= 2)
+    prtf("HdfFileWriter.endDefine: set bugs = 0 for formatPass 1");
   bugs = 0;
   formatBufAll( 1);           // formatPass = 1
 
@@ -272,6 +275,9 @@ throws HdfException
 public void close()
 throws HdfException
 {
+  if (bugs >= 1) {
+    prtf("HdfFileWriter.close: filePath: \"" + filePath + "\"\n");
+  }
   if (fileStatus == ST_DEFINING)
     throwerr("must call endDefine before calling close");
   else if (fileStatus == ST_CLOSED) throwerr("file is already closed");
@@ -446,7 +452,7 @@ throws HdfException
 
 void addWork( String msg, BaseBlk blk) {
   workList.add( blk);
-  if (bugs >= 2) prtIndent(
+  if (bugs >= 5) prtIndent(
     "addWork: %s added: %s  pos 0x%x  new list len: %d",
     msg, blk.blkName, blk.blkPosition, workList.size());
 }

@@ -36,7 +36,7 @@ import java.util.Arrays;
 
 
 
-public class Util {
+public class HdfUtil {
 
 
 
@@ -52,6 +52,7 @@ static long alignLong( long bound, long val) {
 
 // Returns array: [dtype, dimensions]
 // For Strings, we always return DTYPE_STRING_VAR, not STRING_FIX.
+// For chars we always return DTYPE_STRING_FIX.
 // For Bytes, we always return DTYPE_UFIXED08, not SFIXED08.
 
 static int[] getDtypeAndDims(
@@ -59,14 +60,12 @@ static int[] getDtypeAndDims(
   Object obj)
 throws HdfException
 {
-  //xxxprtf("##### getDtype entry: obj: " + obj + "  cls: " + obj.getClass());
   if (obj == null) throwerr("obj == null");
 
   // Find rank and varDims
   int rank = 0;
   int[] varDims = new int[1000];
   while (obj instanceof Object[] && ((Object[]) obj).length > 0) {
-    //xxxprtf("##### getDtype loop: obj: " + obj + "  cls: " + obj.getClass());
     Object[] objVec = (Object[]) obj;
     for (int ii = 0; ii < objVec.length; ii++) {
       if (objVec[ii] == null) throwerr("objVec[%d] == null", ii);
@@ -201,6 +200,7 @@ throws HdfException
 
 
 static void checkTypeMatch(
+  String msg,
   int specType,               // declared type, one of HdfGroup.DTYPE_*
   int dataType,               // actual data type, one of HdfGroup.DTYPE_*
   int[] specDims,
@@ -212,8 +212,9 @@ throws HdfException
   if (specType == HdfGroup.DTYPE_STRING_FIX
     || specType == HdfGroup.DTYPE_STRING_VAR)
   {
-    if (dataType != HdfGroup.DTYPE_STRING_VAR)
-      throwerr("type mismatch:\n"
+    if (dataType != HdfGroup.DTYPE_STRING_FIX
+      && dataType != HdfGroup.DTYPE_STRING_VAR)
+      throwerr("type mismatch for: " + msg + "\n"
         + "  declared type: " + HdfGroup.dtypeNames[ specType] + "\n"
         + "  data type:     " + HdfGroup.dtypeNames[ dataType] + "\n");
   }
@@ -221,7 +222,7 @@ throws HdfException
     || specType == HdfGroup.DTYPE_UFIXED08)
   {
     if (dataType != HdfGroup.DTYPE_UFIXED08)
-      throwerr("type mismatch:\n"
+      throwerr("type mismatch for: " + msg + "\n"
         + "  declared type: " + HdfGroup.dtypeNames[ specType] + "\n"
         + "  data type:     " + HdfGroup.dtypeNames[ dataType] + "\n");
   }
@@ -229,29 +230,37 @@ throws HdfException
     || specType == HdfGroup.DTYPE_REFERENCE)
   {
     if (dataType != HdfGroup.DTYPE_REFERENCE)
-      throwerr("type mismatch:\n"
+      throwerr("type mismatch for: " + msg + "\n"
         + "  declared type: " + HdfGroup.dtypeNames[ specType] + "\n"
         + "  data type:     " + HdfGroup.dtypeNames[ dataType] + "\n");
   }
   else {
     if (dataType != specType)
-      throwerr("type mismatch:\n"
+      throwerr("type mismatch for: " + msg + "\n"
         + "  declared type: " + HdfGroup.dtypeNames[ specType] + "\n"
         + "  data type:     " + HdfGroup.dtypeNames[ dataType] + "\n");
   }
 
   if (dataDims.length != specDims.length)
-    throwerr("rank mismatch:\n"
+    throwerr("type mismatch for: " + msg + "\n"
       + "  declared rank: " + specDims.length + "\n"
       + "  data rank:     " + dataDims.length + "\n");
 
   for (int ii = 0; ii < specDims.length; ii++) {
     if (dataDims[ii] != specDims[ii])
-      throwerr("data dimension length mismatch for dimension " + ii + "\n"
+      throwerr("type mismatch for: " + msg + "\n"
+        + "  data dimension length mismatch for dimension " + ii + "\n"
         + "  declared dim: " + specDims[ii] + "\n"
         + "  data dim: " + dataDims[ii] + "\n");
   }
 } // end checkTypeMatch
+
+
+
+
+
+
+
 
 
 // Returns max string len, without null termination,
@@ -259,7 +268,7 @@ throws HdfException
 // or char[], char[][], etc.
 // Returns 0 otherwise.
 
-static int getMaxStgLen(
+public static int getMaxStgLen(
   Object obj)
 throws HdfException
 {
@@ -369,8 +378,7 @@ public static String formatObject( Object obj) {
   if (obj == null) sbuf.append("  (null)");
   else {
     sbuf.append("  cls: " + obj.getClass().getName() + "\n");
-    formatObjectSub( obj, 0, sbuf);
-    sbuf.append("\n");
+    formatObjectSub( obj, 2, sbuf);
   }
   return sbuf.toString();
 }

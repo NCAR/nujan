@@ -47,14 +47,15 @@ import nhPkg.NhFileWriter;
 import nhPkg.NhGroup;
 import nhPkg.NhVariable;
 
-import hdfnet.Util;     /// rename this to HdfUtil  xxx
+import hdfnet.HdfUtil;
 
 
-// Copy a general netcdf file.
-//
-// Uses the unidata netcdf library:
-// http://www.unidata.ucar.edu/software/netcdf-java/
-
+/**
+ * Command line tool to copy a NetCDF4 file (that uses HDF5 format).
+ *
+ * Uses the Unidata NetCDF4 Java reader from:<br>
+ * http://www.unidata.ucar.edu/software/netcdf-java/
+ */
 
 public class NhCopy {
 
@@ -131,6 +132,8 @@ throws NhException
     inCdf = NetcdfFile.open( inFile);
     outCdf = new NhFileWriter( outFile);
     outCdf.setDebugLevel( bugs);
+    outCdf.setHdfDebugLevel( bugs);
+
     Group inGroup = inCdf.getRootGroup();
     NhGroup outGroup = outCdf.getRootGroup();
 
@@ -177,6 +180,8 @@ throws NhException
   } // if pass == 1
 
   for (Variable var : inGroup.getVariables()) {
+    if (bugs >= 2) prtf("NhCopy testaa 1: pass: "
+      + pass + "  var: " + var.getName());
     if (pass == 1) copyVarDef( compressionLevel, var, outGroup, bugs);
     else copyData( var, outGroup, bugs);
   }
@@ -237,17 +242,6 @@ throws NhException
 
   prtf("NhCopy.copyVarDef: nhType: " + NhVariable.nhTypeNames[nhType]);
 
-  //xxxboolean isUnsigned = inVar.isUnsigned();
-  //xxxif ((nhType == NhVariable.TP_CHAR || nhType == NhVariable.TP_STRING_VAR)
-  //xxx  && ! isUnsigned)
-  //xxx{
-  //xxx  if (bugs >= 1) prtf("copyVarDef: var \"%s\" type is %s but is signed."
-  //xxx    + "  Forcing unsigned.",
-  //xxx    inVar.getName(),
-  //xxx    NhVariable.nhTypeNames[nhType]);
-  //xxx  isUnsigned = true;
-  //xxx}
-
   // Make a list of our matching dimensions.
   ArrayList<NhDimension> nhDimList = new ArrayList<NhDimension>();
   for (Dimension dim : inVar.getDimensions()) {
@@ -280,13 +274,73 @@ throws NhException
     fillValue = getAttrValue( fillAttr, bugs);
 
     // Unfortunately NetCDF stores type "char" as HDF5 strings of length 1,
-    // but returns a fill value as a Byte.
+    // but returns a fill value as a Byte or byte[].
     // In this case, convert Byte to String.
     if (nhType == NhVariable.TP_CHAR) {
-      if (! (fillValue instanceof Byte))
-        throwerr("unexpected fillValue class: " + fillValue.getClass());
-      byte[] bytes = new byte[] { ((Byte) fillValue).byteValue() };
-      fillValue = new String( bytes);   // stg len = 1
+      if (fillValue instanceof Byte) {
+        byte[] bytes = new byte[] { ((Byte) fillValue).byteValue() };
+        fillValue = new String( bytes);   // stg len = 1
+      }
+      else if (fillValue instanceof byte[]) {
+        byte[] bytes = (byte[]) fillValue;
+        if (bytes.length != 1)
+          throwerr("unexpected fillValue class: " + fillValue.getClass());
+        fillValue = new String( bytes);   // stg len = 1
+      }
+      else throwerr("unexpected fillValue class: " + fillValue.getClass());
+    }
+
+    // Sometimes NetCDF returns a 1-dim array for fillValue,
+    // but we need a scalar
+    if (fillValue instanceof byte[]) {
+      byte[] vals = (byte[]) fillValue;
+      if (vals.length != 1)
+        throwerr("invalid fillValue for inVar: " + inVar);
+      fillValue = new Byte( vals[0]);
+    }
+    else if (fillValue instanceof short[]) {
+      short[] vals = (short[]) fillValue;
+      if (vals.length != 1)
+        throwerr("invalid fillValue for inVar: " + inVar);
+      fillValue = new Short( vals[0]);
+    }
+    else if (fillValue instanceof int[]) {
+      int[] vals = (int[]) fillValue;
+      if (vals.length != 1)
+        throwerr("invalid fillValue for inVar: " + inVar);
+      fillValue = new Integer( vals[0]);
+    }
+    else if (fillValue instanceof long[]) {
+      long[] vals = (long[]) fillValue;
+      if (vals.length != 1)
+        throwerr("invalid fillValue for inVar: " + inVar);
+      fillValue = new Long( vals[0]);
+    }
+    else if (fillValue instanceof float[]) {
+      float[] vals = (float[]) fillValue;
+      if (vals.length != 1)
+        throwerr("invalid fillValue for inVar: " + inVar);
+      fillValue = new Float( vals[0]);
+    }
+    else if (fillValue instanceof double[]) {
+      double[] vals = (double[]) fillValue;
+      if (vals.length != 1)
+        throwerr("invalid fillValue for inVar: " + inVar);
+      fillValue = new Double( vals[0]);
+    }
+    else if (fillValue instanceof char[]) {
+      char[] vals = (char[]) fillValue;
+      if (vals.length != 1)
+        throwerr("invalid fillValue for inVar: " + inVar);
+      fillValue = new Character( vals[0]);
+    }
+    else if (fillValue instanceof Object[]) {
+      Object[] vals = (Object[]) fillValue;
+      if (vals.length != 1)
+        throwerr("invalid fillValue for inVar: " + inVar);
+      fillValue = vals[0];
+      if (fillValue instanceof Object[])
+        throwerr("invalid fillValue for inVar: " + inVar);
     }
   }
 
@@ -334,10 +388,25 @@ throws NhException
   //
   //   "_Unsigned", for unsigned byte or other unsigned data.
   //
-  // We copy neither of these generated attributes.
+  // Others:
+  //   "_CoordinateAxes"
+  //   "_CoordinateAxisType"
+  //   "_CoordinateModelRunDate"
+  //   "_CoordinateZisLayer"
+  //   "_CoordinateZisPositive"
+  //   "_Netcdf4Dimid"
+
+  // We omit all of these artificial attributes.
+  // According to Unidata:
+  //    Subject: [netCDFJava #BYC-698785]: synthetic attributes
+  //    Date: Mon, 21 Jun 2010 16:03:54 -0600
+  //    Attributes beginning with  underscore are supposed to
+  //    be reserved for Unidata use only and can be recognized
+  //    by that underscore.
   //
   // We use the _FillValue attribute, if specified, to set
   // the HDF5 variable's fillValue message in copyVarDef, above.
+  // But we don't create a new attribute for it.
   //
   // We ignore the _lastModified attribute, and the HDF5 software
   // sets all variable's modTime message to the current time.
@@ -354,14 +423,10 @@ throws NhException
   //    } ... } ... }
 
   String atName = attr.getName();
-  if (atName.equals("_FillValue"))
-    prtf("ignoring \"%s\" _FillValue attr: %s", outName, attr);
-  else if (atName.equals("_lastModified"))
-    prtf("ignoring \"%s\" _lastModified attr: %s", outName, attr);
-  else if (atName.equals("_Unsigned"))
-    prtf("ignoring \"%s\" _Unsigned attr: %s", outName, attr);
-  else if (atName.equals("_Netcdf4Dimid"))
-    prtf("ignoring \"%s\" _Netcdf4Dimid attr: %s", outName, attr);
+
+  if (atName.startsWith("_"))
+    prtf("ignoring \"%s\" attr: %s", outName, attr);
+
   else {
 
     DataType tp = attr.getDataType();
@@ -382,43 +447,19 @@ throws NhException
 
     Object attrValue = getAttrValue( attr, bugs);
 
-    //xxxboolean isUnsigned = attr.isUnsigned();
-    //xxxif (attr.isString() && ! isUnsigned) {
-    //xxx  if (bugs >= 1)
-    //xxx    prtf("copyAttribute: attr \"%s\" type is stg but is signed."
-    //xxx      + "  Forcing unsigned.",
-    //xxx      attr.getName());
-    //xxx  isUnsigned = true;
-    //xxx}
-
-//xxx    if (attrValue instanceof Byte)
-//xxx      attrValue = new byte[] { ((Byte) attrValue).byteValue() };
-//xxx    else if (attrValue instanceof Short)
-//xxx      attrValue = new short[] { ((Short) attrValue).shortValue() };
-//xxx    else if (attrValue instanceof Integer)
-//xxx      attrValue = new int[] { ((Integer) attrValue).intValue() };
-//xxx    else if (attrValue instanceof Long)
-//xxx      attrValue = new long[] { ((Long) attrValue).longValue() };
-//xxx    else if (attrValue instanceof Float)
-//xxx      attrValue = new float[] { ((Float) attrValue).floatValue() };
-//xxx    else if (attrValue instanceof Double)
-//xxx      attrValue = new double[] { ((Double) attrValue).doubleValue() };
-
     if (outObj instanceof NhGroup) {
       NhGroup outGrp = (NhGroup) outObj;
       outGrp.addAttribute(
         atName,
         nhType,
-        attrValue,
-        false);          // isVlen
+        attrValue);
     }
     else if (outObj instanceof NhVariable) {
       NhVariable outVar = (NhVariable) outObj;
       outVar.addAttribute(
         atName,
         nhType,
-        attrValue,
-        false);          // isVlen
+        attrValue);
     }
     else throwerr("invalid outObj: " + outObj);
   } // if not "_lastModified"
@@ -539,122 +580,12 @@ throws NhException
 
   // Special case for Strings.
   if (eleType == "".getClass()) {        // if Strings
-    int rank = arr.getRank();
-    int[] shape = arr.getShape();
+    resObj = decodeStringArray( arr, bugs);
+  }
 
-    Index index = arr.getIndex();
-    if (rank == 0) resObj = arr.getObject( 0);
-    else if (rank == 1) {
-      String[] stgs = new String[shape[0]];
-      for (int ia = 0; ia < shape[0]; ia++) {
-        index.set( ia);
-        stgs[ia] = (String) arr.getObject( index);
-      }
-      resObj = stgs;
-    }
-    else if (rank == 2) {
-      String[][] stgs = new String[shape[0]][shape[1]];
-      for (int ia = 0; ia < shape[0]; ia++) {
-        for (int ib = 0; ib < shape[1]; ib++) {
-          index.set( ia, ib);
-          stgs[ia][ib] = (String) arr.getObject( index);
-          //stgs[ia][ib] = (String) arr.getObject( ia * shape[1] + ib);
-        }
-      }
-      resObj = stgs;
-    }
-    else if (rank == 3) {
-      String[][][] stgs = new String[shape[0]][shape[1]][shape[2]];
-      for (int ia = 0; ia < shape[0]; ia++) {
-        for (int ib = 0; ib < shape[1]; ib++) {
-          for (int ic = 0; ic < shape[2]; ic++) {
-            index.set( ia, ib, ic);
-            stgs[ia][ib][ic] = (String) arr.getObject( index);
-          }
-        }
-      }
-      resObj = stgs;
-    }
-    else if (rank == 4) {
-      String[][][][] stgs = new String[shape[0]][shape[1]][shape[2]][shape[3]];
-      for (int ia = 0; ia < shape[0]; ia++) {
-        for (int ib = 0; ib < shape[1]; ib++) {
-          for (int ic = 0; ic < shape[2]; ic++) {
-            for (int id = 0; id < shape[3]; id++) {
-              index.set( ia, ib, ic, id);
-              stgs[ia][ib][ic][id] = (String) arr.getObject( index);
-            }
-          }
-        }
-      }
-      resObj = stgs;
-    }
-    else if (rank == 5) {
-      String[][][][][] stgs = new String[shape[0]][shape[1]][shape[2]]
-        [shape[3]][shape[4]];
-      for (int ia = 0; ia < shape[0]; ia++) {
-        for (int ib = 0; ib < shape[1]; ib++) {
-          for (int ic = 0; ic < shape[2]; ic++) {
-            for (int id = 0; id < shape[3]; id++) {
-              for (int ie = 0; ie < shape[4]; ie++) {
-                index.set( ia, ib, ic, id, ie);
-                stgs[ia][ib][ic][id][ie] = (String) arr.getObject( index);
-              }
-            }
-          }
-        }
-      }
-      resObj = stgs;
-    }
-    else if (rank == 6) {
-      String[][][][][][] stgs = new String[shape[0]][shape[1]][shape[2]]
-        [shape[3]][shape[4]][shape[5]];
-      for (int ia = 0; ia < shape[0]; ia++) {
-        for (int ib = 0; ib < shape[1]; ib++) {
-          for (int ic = 0; ic < shape[2]; ic++) {
-            for (int id = 0; id < shape[3]; id++) {
-              for (int ie = 0; ie < shape[4]; ie++) {
-                for (int ig = 0; ig < shape[5]; ig++) {
-                  index.set( ia, ib, ic, id, ie, ig);
-                  stgs[ia][ib][ic][id][ie][ig]
-                    = (String) arr.getObject( index);
-                }
-              }
-            }
-          }
-        }
-      }
-      resObj = stgs;
-    }
-    else if (rank == 7) {
-      String[][][][][][][] stgs = new String[shape[0]][shape[1]][shape[2]]
-        [shape[3]][shape[4]][shape[5]][shape[6]];
-      for (int ia = 0; ia < shape[0]; ia++) {
-        for (int ib = 0; ib < shape[1]; ib++) {
-          for (int ic = 0; ic < shape[2]; ic++) {
-            for (int id = 0; id < shape[3]; id++) {
-              for (int ie = 0; ie < shape[4]; ie++) {
-                for (int ig = 0; ig < shape[5]; ig++) {
-                  for (int ih = 0; ih < shape[6]; ih++) {
-                    index.set( ia, ib, ic, id, ie, ig, ih);
-                    stgs[ia][ib][ic][id][ie][ig][ih]
-                      = (String) arr.getObject( index);
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-      resObj = stgs;
-    }
-    else throwerr("unknown rank");
-  } // if special case for Strings
-
-  // Special case for scalar data
-  else if (arr.getRank() == 0
-    || arr.getRank() == 1 && arr.getShape()[0] == 1)
-  {
+  // Special case for scalar data of primitives.
+  // Netcdf Array.copyToNDJavaArray dies on primitives of rank 0.
+  else if (arr.getRank() == 0 && arr.getElementType().isPrimitive()) {
     Class cls = arr.getElementType();
     if (cls == Byte.TYPE) resObj = new Byte( arr.getByte( 0));
     else if (cls == Short.TYPE) resObj = new Short( arr.getShort( 0));
@@ -671,7 +602,136 @@ throws NhException
     resObj = arr.copyToNDJavaArray();
   }
   return resObj;
-}
+} // end decodeArray
+
+
+
+
+
+
+static Object decodeStringArray( Array arr, int bugs)
+throws NhException
+{
+  Class eleType = arr.getElementType();
+  if (eleType != "".getClass())        // if not Strings
+    throwerr("bad type for decodeStringArray");
+
+  Object resObj = null;
+  int rank = arr.getRank();
+  int[] shape = arr.getShape();
+
+  Index index = arr.getIndex();
+  if (rank == 0) resObj = arr.getObject( 0);
+  else if (rank == 1) {
+    String[] stgs = new String[shape[0]];
+    for (int ia = 0; ia < shape[0]; ia++) {
+      index.set( ia);
+      stgs[ia] = (String) arr.getObject( index);
+    }
+    resObj = stgs;
+  }
+  else if (rank == 2) {
+    String[][] stgs = new String[shape[0]][shape[1]];
+    for (int ia = 0; ia < shape[0]; ia++) {
+      for (int ib = 0; ib < shape[1]; ib++) {
+        index.set( ia, ib);
+        stgs[ia][ib] = (String) arr.getObject( index);
+        //stgs[ia][ib] = (String) arr.getObject( ia * shape[1] + ib);
+      }
+    }
+    resObj = stgs;
+  }
+  else if (rank == 3) {
+    String[][][] stgs = new String[shape[0]][shape[1]][shape[2]];
+    for (int ia = 0; ia < shape[0]; ia++) {
+      for (int ib = 0; ib < shape[1]; ib++) {
+        for (int ic = 0; ic < shape[2]; ic++) {
+          index.set( ia, ib, ic);
+          stgs[ia][ib][ic] = (String) arr.getObject( index);
+        }
+      }
+    }
+    resObj = stgs;
+  }
+  else if (rank == 4) {
+    String[][][][] stgs = new String[shape[0]][shape[1]][shape[2]][shape[3]];
+    for (int ia = 0; ia < shape[0]; ia++) {
+      for (int ib = 0; ib < shape[1]; ib++) {
+        for (int ic = 0; ic < shape[2]; ic++) {
+          for (int id = 0; id < shape[3]; id++) {
+            index.set( ia, ib, ic, id);
+            stgs[ia][ib][ic][id] = (String) arr.getObject( index);
+          }
+        }
+      }
+    }
+    resObj = stgs;
+  }
+  else if (rank == 5) {
+    String[][][][][] stgs = new String[shape[0]][shape[1]][shape[2]]
+      [shape[3]][shape[4]];
+    for (int ia = 0; ia < shape[0]; ia++) {
+      for (int ib = 0; ib < shape[1]; ib++) {
+        for (int ic = 0; ic < shape[2]; ic++) {
+          for (int id = 0; id < shape[3]; id++) {
+            for (int ie = 0; ie < shape[4]; ie++) {
+              index.set( ia, ib, ic, id, ie);
+              stgs[ia][ib][ic][id][ie] = (String) arr.getObject( index);
+            }
+          }
+        }
+      }
+    }
+    resObj = stgs;
+  }
+  else if (rank == 6) {
+    String[][][][][][] stgs = new String[shape[0]][shape[1]][shape[2]]
+      [shape[3]][shape[4]][shape[5]];
+    for (int ia = 0; ia < shape[0]; ia++) {
+      for (int ib = 0; ib < shape[1]; ib++) {
+        for (int ic = 0; ic < shape[2]; ic++) {
+          for (int id = 0; id < shape[3]; id++) {
+            for (int ie = 0; ie < shape[4]; ie++) {
+              for (int ig = 0; ig < shape[5]; ig++) {
+                index.set( ia, ib, ic, id, ie, ig);
+                stgs[ia][ib][ic][id][ie][ig]
+                  = (String) arr.getObject( index);
+              }
+            }
+          }
+        }
+      }
+    }
+    resObj = stgs;
+  }
+  else if (rank == 7) {
+    String[][][][][][][] stgs = new String[shape[0]][shape[1]][shape[2]]
+      [shape[3]][shape[4]][shape[5]][shape[6]];
+    for (int ia = 0; ia < shape[0]; ia++) {
+      for (int ib = 0; ib < shape[1]; ib++) {
+        for (int ic = 0; ic < shape[2]; ic++) {
+          for (int id = 0; id < shape[3]; id++) {
+            for (int ie = 0; ie < shape[4]; ie++) {
+              for (int ig = 0; ig < shape[5]; ig++) {
+                for (int ih = 0; ih < shape[6]; ih++) {
+                  index.set( ia, ib, ic, id, ie, ig, ih);
+                  stgs[ia][ib][ic][id][ie][ig][ih]
+                    = (String) arr.getObject( index);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    resObj = stgs;
+  }
+  else throwerr("unknown rank");
+
+  return resObj;
+} // end decodeStringArray
+
+
 
 
 

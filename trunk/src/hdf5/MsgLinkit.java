@@ -89,7 +89,7 @@ throws HdfException
   fmtBuf.putBufByte("MsgLinkit: linkFlag", linkFlag);
   fmtBuf.putBufLong("MsgLinkit: linkOrder", linkOrder);
 
-  byte[] nameEnc = Util.encodeString(
+  byte[] nameEnc = HdfUtil.encodeString(
     linkGroup.groupName, false, hdfGroup);  // no null term
   fmtBuf.putBufLong("MsgLinkit: linkName len", nameEnc.length);
   fmtBuf.putBufBytes("MsgLinkit: linkName", nameEnc);

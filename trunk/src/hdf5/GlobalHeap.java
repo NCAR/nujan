@@ -81,7 +81,7 @@ void clear() {
   dataBuf.putShort( (short) 0);          // reserved
   colSizeOffset = dataBuf.position();    // save offset for expand
   dataBuf.putLong( dataBuf.capacity());  // collectionSize
-  if (hdfFile.bugs >= 1) {
+  if (hdfFile.bugs >= 10) {
     prtIndent("GlobalHeap.clear: capacity: %d", dataBuf.capacity());
   }
 }
@@ -112,7 +112,7 @@ int putHeapItem(
   // Have extra space for the final free space entry.
   int needLen = dataBuf.position() + 100 + item.length;
   if (needLen > dataBuf.capacity()) {
-    if (hdfFile.bugs >= 1)
+    if (hdfFile.bugs >= 5)
       prtIndent("GlobalHeap.putHeapItem: expand gcol. needLen: " + needLen
         + "  capacity: " + dataBuf.capacity()
         + "  numItem: " + numItem);
@@ -137,7 +137,7 @@ int putHeapItem(
   dataBuf.put( item);                    // write item's bytes
 
   // Align end to next mult of 8
-  long alignPos = Util.alignLong( 8, dataBuf.position());
+  long alignPos = HdfUtil.alignLong( 8, dataBuf.position());
   while (dataBuf.position() < alignPos) {
     dataBuf.put( (byte) 0);
   }
@@ -257,8 +257,8 @@ throws HdfException
       ByteBuffer tbuf = ByteBuffer.wrap( heapItem);
       tbuf.order( ByteOrder.LITTLE_ENDIAN);
       for (int icol = 0; icol < ncol; icol++) {
-        byte[] bytes = Util.encodeString( arow[icol], true, hdfGroup);
-        tbuf.put( Util.truncPadNull( bytes, stgFieldLen));
+        byte[] bytes = HdfUtil.encodeString( arow[icol], true, hdfGroup);
+        tbuf.put( HdfUtil.truncPadNull( bytes, stgFieldLen));
       }
     }
     else if (dsubType == HdfGroup.DTYPE_REFERENCE) {
@@ -290,7 +290,7 @@ void formatBuf( int formatPass, HBuffer fmtBuf)
 throws HdfException
 {
   setFormatEntry( formatPass, true, fmtBuf); // BaseBlk: set blkPos, buf pos
-  if (hdfFile.bugs >= 1)
+  if (hdfFile.bugs >= 5)
     prtIndent("GlobalHeap.formatBuf:"
       + "  capacity: " + dataBuf.capacity()
       + "  numItem: " + numItem);

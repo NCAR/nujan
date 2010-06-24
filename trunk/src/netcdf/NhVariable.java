@@ -32,21 +32,120 @@ import java.util.Arrays;
 
 import hdfnet.HdfException;
 import hdfnet.HdfGroup;
-import hdfnet.Util;
+import hdfnet.HdfUtil;
 
+
+/**
+ * Represents a NetCDF4 variable (HDF5 calls it a "dataset").
+ * For typical use see {@link NhFileWriter}.
+ * @see NhFileWriter
+ */
 
 public class NhVariable {
 
-
+/**
+ * Data type for signed bytes (1 byte integers).<br>
+ * <ul>
+ * <li> Attributes of this type must have a value that is Java byte[].<br>
+ * <li> Variables of this type must have data that is Java
+ * Byte(scalar) or byte[] or byte[][] or byte[][][] or ...
+ * <li> Fill values for variables of this type must be Java Byte.
+ * <ul>
+ */
 public static final int TP_SBYTE       =  1;
+
+/**
+ * Data type for unsigned bytes (1 byte unsigned integers).<br>
+ * <ul>
+ * <li> Attributes of this type must have a value that is Java byte[].<br>
+ * <li> Variables of this type must have data that is Java
+ * Byte(scalar) or byte[] or byte[][] or byte[][][] or ...
+ * <li> Fill values for variables of this type must be Java Byte.
+ * <ul>
+ */
 public static final int TP_UBYTE       =  2;
+
+/**
+ * Data type for short integers (2 byte integers).<br>
+ * <ul>
+ * <li> Attributes of this type must have a value that is Java short[].<br>
+ * <li> Variables of this type must have data that is Java
+ * Short(scalar) or short[] or short[][] or short[][][] or ...
+ * <li> Fill values for variables of this type must be Java Short.
+ * <ul>
+ */
 public static final int TP_SHORT       =  3;
+
+/**
+ * Data type for integers (4 byte integers).<br>
+ * <ul>
+ * <li> Attributes of this type must have a value that is Java int[].<br>
+ * <li> Variables of this type must have data that is Java
+ * Integer(scalar) or int[] or int[][] or int[][][] or ...
+ * <li> Fill values for variables of this type must be Java Integer.
+ * <ul>
+ */
 public static final int TP_INT         =  4;
+
+/**
+ * Data type for long integers (8 byte integers).<br>
+ * <ul>
+ * <li> Attributes of this type must have a value that is Java int[].<br>
+ * <li> Variables of this type must have data that is Java
+ * Integer(scalar) or int[] or int[][] or int[][][] or ...
+ * <li> Fill values for variables of this type must be Java Integer.
+ * <ul>
+ */
 public static final int TP_LONG        =  5;
+
+/**
+ * Data type for standard floats (4 byte floats).<br>
+ * <ul>
+ * <li> Attributes of this type must have a value that is Java float[].<br>
+ * <li> Variables of this type must have data that is Java
+ * Float(scalar) or float[] or float[][] or float[][][] or ...
+ * <li> Fill values for variables of this type must be Java Float.
+ * <ul>
+ */
 public static final int TP_FLOAT       =  6;
+
+/**
+ * Data type for double precision floats (8 byte floats).<br>
+ * <ul>
+ * <li> Attributes of this type must have a value that is Java double[].<br>
+ * <li> Variables of this type must have data that is Java
+ * Double(scalar) or double[] or double[][] or double[][][] or ...
+ * <li> Fill values for variables of this type must be Java Double.
+ * <ul>
+ */
 public static final int TP_DOUBLE      =  7;
+
+/**
+ * Data type for character arrays.
+ * <ul>
+ * <li> Attributes of this type must have a value that is Java char[].<br>
+ * <li> Variables of this type must have data that is Java
+ * Character(scalar) or char[] or char[][] or char[][][] or ...
+ * <li> Fill values for variables of this type must be Java Character.
+ * <ul>
+ */
 public static final int TP_CHAR        =  8;
+
+/**
+ * Data type for String (text) data.
+ * <ul>
+ * <li> Attributes of this type must have a value that is Java String
+ * or String[].<br>
+ * <li> Variables of this type must have data that is Java
+ * String(scalar) or String[] or String[][] or String[][][] or ...
+ * <li> Fill values for variables of this type must be Java String.
+ * <ul>
+ */
 public static final int TP_STRING_VAR  =  9;
+
+/**
+ * Names of the TP_ constants.
+ */
 public static final String[] nhTypeNames = {
   "UNKNOWN", "SBYTE", "UBYTE", "SHORT", "INT",
   "LONG", "FLOAT", "DOUBLE", "CHAR", "STRING_VAR"};
@@ -92,8 +191,6 @@ throws NhException
 
   rank = nhDims.length;
 
-  //xxx make sure fillValue type corresponds with nhType
-
   // Translate nhType to dtype
   // Note: fixed len strings are not supported by the Netcdf API.
   // However, Netcdf TP_CHAR is translated into HDF5 DTYPE_STRING_FIX
@@ -125,9 +222,6 @@ throws NhException
       }
       else throwerr("unknown char fillValue class: " + hdfFillValue.getClass());
     }
-    //xxxif (nhType == TP_STRING_VAR) {
-    //xxx  stgFieldLen = 
-    //xxx}
   }
 
   // Build int[] dimLens from nhDims 
@@ -159,9 +253,6 @@ throws NhException
     tdim.coordVar = this;
   }
 
-//xxx debug everywhere
-
-//xxx cleaner way of "if bugs" ...
 
 
   // We don't allow compression of TP_STRING_* -
@@ -220,40 +311,85 @@ public String toString() {
 
 
 
-
-public String getName() { return varName; }
-
+/**
+ * Returns the type (one of TP_*) specified in the constructor.
+ */
 public int getType() { return nhType; }
 
+/**
+ * Returns the dimensions specified in the constructor.
+ */
 public NhDimension[] getDimensions() { return nhDims; }
 
+/**
+ * Returns the fill value specified in the constructor.
+ */
 public Object getFillValue() { return fillValue; }
 
+/**
+ * Returns the compression level specified in the constructor.
+ */
 public int getCompressionLevel() { return compressionLevel; }
 
+/**
+ * Returns the group containing this variable.
+ */
 public NhGroup getParentGroup() { return parentGroup; }
 
+/**
+ * Returns the open file containing this NhGroup.
+ */
 public NhFileWriter getFileWriter() { return nhFile; }
 
 
 
+/**
+ * Returns the name of this variable.
+ */
+public String getName() { return varName; }
+
+/**
+ * Returns the full path name of this variable, starting with
+ * the root group.
+ */
+public String getPath() {
+  return parentGroup.getPath() + "/" + varName;
+}
 
 
 
 
-//xxx unify logic with nhgroup.addattr.
+
+
+/**
+ * Adds an attribute to this group.
+ * Although HDF5 supports attributes of any dimsionality, 0, 1, 2, ...,
+ * the NetCDF data model only supports attributes that
+ * are a String or a 1 dimensional
+ * array of: String, byte, short, int, long, float, or double.
+ * <p>
+ * See {@link HdfGroup#addAttribute} for documentation on the legal
+ * types of attrValue.
+ * <p>
+ *
+ * @param attrName The name of the new attribute.
+ * @param atType The type of the new variable: one of NhVariable.TP_*.
+ * @param attrValue The value of the new attribute.
+ */
 
 public void addAttribute(
   String attrName,
   int atType,                // one of TP_*
-  Object attrValue,
-  boolean isVlen)
+  Object attrValue)
 throws NhException
 {
   if (nhFile.bugs >= 1) {
     prtf("NhVariable.addAttribute: var: \"" + varName + "\""
-      + "  attrName: \"" + attrName
-      + "\"  value: " + Util.formatObject( attrValue));
+      + "  nm: \"" + attrName + "\""
+      + "  type: " + NhVariable.nhTypeNames[atType]);
+  }
+  if (nhFile.bugs >= 10) {
+    prtf("  attrValue: " + HdfUtil.formatObject( attrValue));
   }
   NhGroup.checkName( attrName, "attribute in variable \"" + varName + "\"");
 
@@ -268,11 +404,13 @@ throws NhException
   // Netcdf cannot read HDF5 attributes that are Scalar STRING_VAR.
   // They must be encoded as STRING_FIX.
   // However datasets can be a scalar STRING_VAR.
-  if (dtype == HdfGroup.DTYPE_STRING_VAR && testScalar( attrValue))
+  if (dtype == HdfGroup.DTYPE_STRING_VAR
+    && testScalar( attrValue))
     dtype = HdfGroup.DTYPE_STRING_FIX;
 
+  // If attrType==DTYPE_STRING_FIX and stgFieldLen==0,
+  // MsgAttribute will find the max stg len in attrValue.
   int stgFieldLen = 0;     // max string len for STRING_FIX, without null term
-  if (atType == TP_CHAR) stgFieldLen = 1;
 
   try {
     hdfVar.addAttribute(
@@ -280,7 +418,7 @@ throws NhException
       dtype,
       stgFieldLen,
       attrValue,
-      isVlen);
+      false);              // isVlen
   }
   catch( HdfException exc) {
     exc.printStackTrace();
@@ -291,10 +429,17 @@ throws NhException
 
 
 
-//xxx clean up makefiles
 
-//xxx testall: if debug, display java output.
 
+/**
+ * Writes the data array for this variable to disk.
+ * <p>
+ * See {@link HdfGroup#addVariable} for documentation on the legal
+ * types of rawData.
+ * <p>
+ * @param rawData the data array or Object (for a scalar variable)
+ *  to be written.
+ */
 
 public void writeData(
   Object rawData)
@@ -302,7 +447,7 @@ throws NhException
 {
   if (nhFile.bugs >= 1) {
     prtf("NhVariable.writeData: nhType: " + NhVariable.nhTypeNames[nhType]
-      + "  rawData: " + Util.formatObject( rawData));
+      + "  rawData: " + HdfUtil.formatObject( rawData));
   }
   if (rawData == null) throwerr("rawData is null");
   Object vdata = null;
@@ -331,7 +476,7 @@ throws NhException
 
 
 
-// xxx
+// xxx Weird.  See anote.
 // In Netcdf attributes are handled differently than variables,
 // in particular for char[].
 // In HDF5 attributes can have the same datatypes and dimensions
@@ -349,7 +494,6 @@ throws NhException
 //   For an attribute we convert it to a single String, in
 //     getAttrValue.
 
-//xxx del:
 static Object getAttrValue(
   String attrName,
   Object attrValue,
@@ -360,7 +504,28 @@ throws NhException
   if (attrValue == null) throwerr("attribute value is null");
   Object resValue = null;
   boolean valOk = true;
-  if (attrValue instanceof byte[]
+
+  if (attrValue instanceof Byte)
+    resValue = new byte[] { ((Byte) attrValue).byteValue() };
+  else if (attrValue instanceof Short)
+    resValue = new short[] { ((Short) attrValue).shortValue() };
+  else if (attrValue instanceof Integer)
+    resValue = new int[] { ((Integer) attrValue).intValue() };
+  else if (attrValue instanceof Long)
+    resValue = new long[] { ((Long) attrValue).longValue() };
+  else if (attrValue instanceof Float)
+    resValue = new float[] { ((Float) attrValue).floatValue() };
+  else if (attrValue instanceof Double)
+    resValue = new double[] { ((Double) attrValue).doubleValue() };
+  else if (attrValue instanceof Character) {
+    resValue = new String( new char[] {
+      ((Character) attrValue).charValue() });
+  }
+
+  else if (attrValue instanceof String[])      // allow vec of String
+    resValue = attrValue;
+
+  else if (attrValue instanceof byte[]
     || attrValue instanceof short[]
     || attrValue instanceof int[]
     || attrValue instanceof long[]
@@ -370,15 +535,9 @@ throws NhException
     resValue = attrValue;
   }
   else if (attrValue instanceof char[]) {
-    //int[] dimLens = new int[] {((char[]) attrValue).length};
-    //resValue = NhVariable.convertCharsToStrings( dimLens, attrValue, bugs);
     resValue = new String( (char[]) attrValue);
   }
-  //xxx recall netcdf only allows 1dim vec attrs.
 
-  else if (attrValue instanceof String[]) {    // allow vec of String
-    resValue = attrValue;
-  }
   else if (attrValue instanceof Object[]) {
     // Allow vec of objs, each of which is a String
     Object[] objs = (Object[]) attrValue;
@@ -397,10 +556,10 @@ throws NhException
       + " in %s.  Type: %s",
       attrName, loc, attrValue.getClass().toString());
 
-  if (bugs >= 1) {
+  if (bugs >= 10) {
     prtf("getAttrValue: loc: " + loc + "  attrName: " + attrName);
-    prtf("  attrValue: " + Util.formatObject( attrValue));
-    prtf("  resValue: " + Util.formatObject( resValue));
+    prtf("  specd attrValue: " + HdfUtil.formatObject( attrValue));
+    prtf("  final resValue:  " + HdfUtil.formatObject( resValue));
   }
 
   return resValue;
@@ -492,7 +651,7 @@ throws NhException
   }
 
   if (bugs >= 1) {
-    prtf("convertCharsToStrings: new vdata: " + Util.formatObject( vdata));
+    prtf("convertCharsToStrings: new vdata: " + HdfUtil.formatObject( vdata));
   }
 
   return vdata;

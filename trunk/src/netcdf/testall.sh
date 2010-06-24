@@ -145,19 +145,21 @@ testOne() {
       gzip -c tempout.newe > $oldTxt
     fi
 
-
     # Test NhCopy
-    /bin/rm -f tempb.nc
-	copyCmd="java -cp tdcls:../hdf5/tdcls:${NCJAR} nhPkgTest.NhCopy -bugs 0 -compress $compress -inFile tempa.nc -outFile tempb.nc"
-    if [ "$bugs" != "none" ]; then echo "cmd: $cmd"; fi
-    $copyCmd > tempb.log
-    if [ "$?" -ne "0" ]; then
-      echo "NhCopy failed for config: $configMsg"
-      echo "  cmd: $cmd"
-      echo "  copyCmd: $copyCmd"
-      exit 1
+    useNhCopy=1
+    if [[ "$useNhCopy" == "1" ]]; then
+      /bin/rm -f tempb.nc
+      copyCmd="java -cp tdcls:../hdf5/tdcls:${NCJAR} nhPkgTest.NhCopy -bugs 0 -compress $compress -inFile tempa.nc -outFile tempb.nc"
+      if [ "$bugs" != "none" ]; then echo "copyCmd: $copyCmd"; fi
+      $copyCmd > tempb.log
+      if [ "$?" -ne "0" ]; then
+        echo "NhCopy failed for config: $configMsg"
+        echo "  cmd: $cmd"
+        echo "  copyCmd: $copyCmd"
+        exit 1
+      fi
+      checkOne $oldTxt tempb.nc
     fi
-    checkOne $oldTxt tempb.nc
 
   fi
 
