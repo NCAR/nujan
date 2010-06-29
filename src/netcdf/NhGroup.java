@@ -308,20 +308,31 @@ throws NhException
 
 
 /**
- * Adds a variable to this group (HDF5 calls it a variable a "dataset").
+ * Adds a variable to this group (HDF5 calls variables "datasets").
  * <p>
- * Legal types of fillValue:
+ * Legal types of the fill value and the rawData parameter passed to
+ * {@link NhVariable#writeData NhVariable.writeData} are:
  * <table border="1" align="center">
- *   <tr><th> nhType          </th><th> Java class of fillValue </th></tr>
- *   <tr><td> TP_SBYTE        </td><td> Byte                    </td></tr>
- *   <tr><td> TP_UBYTE        </td><td> Byte                    </td></tr>
- *   <tr><td> TP_SHORT        </td><td> Short                   </td></tr>
- *   <tr><td> TP_INT          </td><td> Integer                 </td></tr>
- *   <tr><td> TP_LONG         </td><td> Long                    </td></tr>
- *   <tr><td> TP_FLOAT        </td><td> Float                   </td></tr>
- *   <tr><td> TP_DOUBLE       </td><td> Double                  </td></tr>
- *   <tr><td> TP_CHAR         </td><td> Character               </td></tr>
- *   <tr><td> TP_STRING_VAR   </td><td> String                  </td></tr>
+ *   <tr><th> nhType          </th><th> Java class of fillValue </th>
+ *      <th> Java class of writeData rawData</th></tr>
+ *   <tr><td> TP_SBYTE        </td><td> Byte      </td>
+ *      <td>rank=0: Byte, rank=1: byte[], rank=2: byte[][], etc. </td></tr>
+ *   <tr><td> TP_UBYTE        </td><td> Byte      </td>
+ *      <td>rank=0: Byte, rank=1: byte[], rank=2: byte[][], etc. </td></tr>
+ *   <tr><td> TP_SHORT        </td><td> Short     </td>
+ *      <td>rank=0: Short, rank=1: short[], rank=2: short[][], etc. </td></tr>
+ *   <tr><td> TP_INT          </td><td> Integer   </td>
+ *      <td>rank=0: Integer, rank=1: int[], rank=2: int[][], etc. </td></tr>
+ *   <tr><td> TP_LONG         </td><td> Long      </td>
+ *      <td>rank=0: Long, rank=1: long[], rank=2: long[][], etc. </td></tr>
+ *   <tr><td> TP_FLOAT        </td><td> Float     </td>
+ *      <td>rank=0: Float, rank=1: float[], rank=2: float[][], etc. </td></tr>
+ *   <tr><td> TP_DOUBLE       </td><td> Double    </td>
+ *      <td>rank=0: Double, rank=1: double[], rank=2: double[][], etc. </td></tr>
+ *   <tr><td> TP_CHAR         </td><td> Character </td>
+ *      <td>rank=0: Character, rank=1: char[], rank=2: char[][], etc. </td></tr>
+ *   <tr><td> TP_STRING_VAR   </td><td> String    </td>
+ *      <td>rank=0: String, rank=1: String[], rank=2: String[][], etc. </td></tr>
  * </table>
  *
  * @param varName The name of the new variable.
@@ -388,7 +399,8 @@ throws NhException
 
 /**
  * Adds an attribute to this group.
- * Although HDF5 supports attributes of any dimsionality, 0, 1, 2, ...,
+ * Although the underlying HDF5 library supports attributes
+ * of any dimsionality, 0, 1, 2, ...,
  * the NetCDF data model only supports attributes that
  * are a String or a 1 dimensional
  * array of: String, byte, short, int, long, float, or double.
@@ -404,8 +416,7 @@ throws NhException
  *   <tr><td> TP_FLOAT        </td><td> float[]                   </td></tr>
  *   <tr><td> TP_DOUBLE       </td><td> double[]                  </td></tr>
  *   <tr><td> TP_CHAR         </td><td> char[]                    </td></tr>
- *   <tr><td> TP_STRING_VAR   </td><td> String                    </td></tr>
- *   <tr><td> TP_STRING_VAR   </td><td> String[]                  </td></tr>
+ *   <tr><td> TP_STRING_VAR   </td><td> String or String[]        </td></tr>
  * </table>
  *
  * @param attrName The name of the new attribute.

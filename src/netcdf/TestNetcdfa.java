@@ -76,11 +76,11 @@ static void runit( String[] args)
 throws NhException
 {
   int bugs = -1;
-  String typeStg = null;
   int nhType = -1;
   int[] dims = null;
   String fileVersionStg = null;
   int compressLevel = -1;
+  int numThread = -1;
   String outFile = null;
 
   if (args.length % 2 != 0) badparms("parms must be key/value pairs");
@@ -89,7 +89,6 @@ throws NhException
     String val = args[iarg+1];
     if (key.equals("-bugs")) bugs = Integer.parseInt( val);
     else if (key.equals("-nhType")) {
-      typeStg = val;
       if (val.equals("sbyte")) nhType = NhVariable.TP_SBYTE;
       else if (val.equals("ubyte")) nhType = NhVariable.TP_UBYTE;
       else if (val.equals("short")) nhType = NhVariable.TP_SHORT;
@@ -114,16 +113,20 @@ throws NhException
     }
     else if (key.equals("-fileVersion")) fileVersionStg = val;
     else if (key.equals("-compress")) compressLevel = Integer.parseInt( val);
+    else if (key.equals("-numThread")) numThread = Integer.parseInt( val);
     else if (key.equals("-outFile")) outFile = val;
     else badparms("unkown parm: " + key);
   }
 
   if (bugs < 0) badparms("missing parm: -bugs");
-  if (typeStg == null || nhType < 0) badparms("missing parm: -nhType");
+  if (nhType < 0) badparms("missing parm: -nhType");
   if (dims == null) badparms("missing parm: -dims");
   if (fileVersionStg == null) badparms("missing parm: -fileVersion");
   if (compressLevel < 0) badparms("missing parm: -compress");
+  if (numThread < 0) badparms("missing parm: -numThread");
   if (outFile == null) badparms("missing parm: -outFile");
+
+  if (numThread < 1 || numThread > 100) badparms("invalid numThread");
 
   int fileVersion = 0;
   if (fileVersionStg.equals("1")) fileVersion = 1;
@@ -131,7 +134,6 @@ throws NhException
   else badparms("unknown fileVersion: " + fileVersionStg);
 
   prtf("TestNetcdfa: bugs: %d", bugs);
-  prtf("TestNetcdfa: typeStg: \"%s\"", typeStg);
   prtf("TestNetcdfa: nhType: \"%s\"", NhVariable.nhTypeNames[nhType]);
   prtf("TestNetcdfa: rank: %d", dims.length);
   for (int idim : dims) {
@@ -141,7 +143,73 @@ throws NhException
   prtf("TestNetcdfa: compress: %d", compressLevel);
   prtf("TestNetcdfa: outFile: \"%s\"", outFile);
 
-  NhFileWriter hfile = new NhFileWriter( outFile, NhFileWriter.OPT_OVERWRITE, fileVersion);
+  final long startTime = System.currentTimeMillis();
+  if (numThread == 1)
+    testOne( bugs, nhType, dims, fileVersion, compressLevel, outFile);
+  else {
+    Thread[] threads = new Thread[numThread];
+    for (int ii = 0; ii < numThread; ii++) {
+      final String fnameFinal = String.format("%s.%02d", outFile, ii);
+      final int iiFinal = ii;
+      final int bugsFinal = bugs;
+      final int nhTypeFinal = nhType;
+      final int[] dimsFinal = dims;
+      final int fileVersionFinal = fileVersion;
+      final int compressLevelFinal = compressLevel;
+      threads[ii] = new Thread() {
+        public void run() {
+          prtf("%8.4f  starting thread %d",
+            0.001 * (System.currentTimeMillis() - startTime), iiFinal);
+          try {
+            testOne(
+              bugsFinal,
+              nhTypeFinal,
+              dimsFinal,
+              fileVersionFinal,
+              compressLevelFinal,
+              fnameFinal);
+          }
+          catch( NhException exc) {
+            exc.printStackTrace();
+            System.exit(1);
+          }
+        }
+      };
+      threads[ii].start();
+    } // for ii
+    for (int ii = 0; ii < numThread; ii++) {
+      prtf("%8.4f  waiting on thread %d",
+        0.001 * (System.currentTimeMillis() - startTime), ii);
+      prtf("waiting on thread %d", ii);
+      try { threads[ii].join(); }
+      catch( InterruptedException exc) {
+        exc.printStackTrace();
+        throwerr("caught: " + exc);
+      }
+      prtf("%3.7f  joined thread %d",
+        0.001 * (System.currentTimeMillis() - startTime), ii);
+    }
+  }
+} // end runit
+
+
+
+
+
+
+
+
+static void testOne(
+  int bugs,
+  int nhType,
+  int[] dims,
+  int fileVersion,
+  int compressLevel,
+  String fname)
+throws NhException
+{
+  NhFileWriter hfile = NhFileWriter.mkTestWriter(
+    "testingOnly", fname, NhFileWriter.OPT_OVERWRITE, fileVersion);
   hfile.setDebugLevel( bugs);
   hfile.setHdfDebugLevel( bugs);
 
@@ -258,7 +326,7 @@ throws NhException
   }
 
   hfile.close();
-}
+} // end testOne
 
 
 

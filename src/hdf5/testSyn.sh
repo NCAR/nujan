@@ -10,7 +10,7 @@
 #
 # To compare a new netcdf type (int and double, for example):
 #   cd ../netcdf
-#   for ii in 0 1 2 3 4 5; do diff <(sed -e '1,/ncdump/ d'  testVerif/test.int.rank.$ii.out) <(sed -e '1,/ncdump/ d'  testVerif/test.double.rank.$ii.out) | less; done
+#   for ii in 0 1 2 3 4 5; do diff <(sed -e '1,/ncdump/ d'  testSynOut/test.int.rank.$ii.out) <(sed -e '1,/ncdump/ d'  testSynOut/test.double.rank.$ii.out) | less; done
 
 
 
@@ -23,7 +23,7 @@ badparms() {
   echo "  dtype:     all / sfixed08 / ufixed08 /fixed16,32,64"
   echo "               float32,64 string14 vstring reference compound"
   echo "  rank:      all/0/1/2/3/4/5"
-  echo "  bugs       none / echo / update"
+  echo "  bugs       optional: none / echo / update"
   echo ""
   echo "Examples:"
   echo "./testall.sh v1  contig  0 fixed16  1"
@@ -32,6 +32,16 @@ badparms() {
   echo "./testall.sh all all     0 all      all"
   exit 1
 }
+
+if [ $# -eq 1 ]; then
+  if [ "$1" != "all" ]; then badparms "wrong num parms"; fi
+  ./testall.sh all all 0 all all
+  if [ "$?" -ne 0 ]; then echo "exiting"; exit 1; fi
+  ./testall.sh all chunked 5 all all
+  if [ "$?" -ne 0 ]; then echo "exiting"; exit 1; fi
+  exit 0
+fi
+
 
 if [ $# -ne 5 -a $# -ne 6 ]; then badparms "wrong num parms"; fi
 
@@ -146,7 +156,7 @@ testOne() {
 
     echo "  test: $configMsg  size: $(wc -c tempa.h5 | cut -f 1 -d ' ')"
 
-    oldTxt=testVerif/test.$dtype.rank.$rank.out.gz
+    oldTxt=testSynOut/test.$dtype.rank.$rank.out.gz
 
     dumpCmd="h5dump -p -w 10000 tempa.h5"
     $dumpCmd > tempout.newa
@@ -194,7 +204,7 @@ testOne() {
     $diffCmd
     diffOk=$?
 
-    # Copy to testVerif
+    # Copy to testSynOut
     if [ "$bugs" == "update" ]; then
       gzip -c tempout.newe > $oldTxt
     fi
@@ -205,7 +215,7 @@ testOne() {
       echo "  diffCmd: $diffCmd"
       echo "wc:"
       wc tempout.olde tempout.newe
-      #############exit 1
+      exit 1
     fi
 
   fi
