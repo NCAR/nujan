@@ -42,9 +42,8 @@ import hdfnet.HdfGroup;
  * Typical use:
  * <pre>
  * 
- *   int fileVersion = 2;        // either 1 or 2 (2 is recommended).
  *   NhFileWriter hfile = new NhFileWriter(
- *     outFile, NhFileWriter.OPT_OVERWRITE, fileVersion);
+ *     outFile, NhFileWriter.OPT_OVERWRITE);
  * 
  *   NhGroup rootGroup = hfile.getRootGroup();
  * 
@@ -110,15 +109,18 @@ public static final int OPT_OVERWRITE = 1;
 
 // Define constants for fileStatus
 /**
-  * Before endDefine: the client may define groups, variables, and attributes.
+  * Status returned by {@link #getStatus}: before endDefine.
+  * The client may define groups, variables, and attributes.
   */
 public static final int ST_DEFINING  = 1;
 /**
-  * After endDefine: the client may call writeData.
+  * Status returned by {@link #getStatus}: after endDefine.
+  * The client may call writeData.
   */
 public static final int ST_WRITEDATA = 2;
 /**
-  * After close: no further operations are possible.
+  * Status returned by {@link #getStatus}: after close.
+  * No further operations are possible.
   */
 public static final int ST_CLOSED    = 3;
 /**
@@ -146,7 +148,6 @@ int bugs;
  * Defaults are:
  * <ul>
  *   <li> optFlag = 0 &nbsp;&nbsp;&nbsp;  Don't overwrite existing files
- *   <li> fileVersion = 2    (Recommended)
  * </ul>
  *
  * @param path Name or path of the file to create.
@@ -163,10 +164,6 @@ throws NhException
 
 /**
  * Creates a new NetCDF4 (HDF5) output file.
- * Defaults are:
- * <ul>
- *   <li> fileVersion = 2    (Recommended)
- * </ul>
  *
  * @param path Name or path of the file to create.
  * @param optFlag 0 or the bitwise "or" of OPT_* flags.
@@ -183,6 +180,9 @@ throws NhException
 
 
 
+
+
+
 /**
  * Creates a new NetCDF4 (HDF5) output file.
  *
@@ -192,7 +192,7 @@ throws NhException
  *                   (2 is recommended).
  */
 
-public NhFileWriter(
+private NhFileWriter(
   String path,
   int optFlag,                   // zero or more OPT_* bit options
   int fileVersion)
@@ -221,6 +221,27 @@ throws NhException
 
 
 
+
+/**
+ * Do not use: for internal testing only.
+ */
+
+public static NhFileWriter mkTestWriter(
+  String chkStg,
+  String path,
+  int optFlag,                   // zero or more OPT_* bit options
+  int fileVersion)
+throws NhException
+{
+  if (! chkStg.equals("testingOnly"))
+    throwerr("Internal use only.  Please see the API documentation");
+  return new NhFileWriter( path, optFlag, fileVersion);
+}
+
+
+
+
+
 public String toString() {
   String res = String.format("path: \"%s\"  fileVersion: %d  status: %s",
     path, fileVersion, fileStatus);
@@ -231,7 +252,7 @@ public String toString() {
 
 /**
  * Sets the verbosity of debug messages sent to stdout.
- * Recommended: 0, 1, or 2.
+ * Recommended: 0.
  */
 public void setDebugLevel( int bugs) {
   this.bugs = bugs;
@@ -388,7 +409,7 @@ throws NhException
           || nhRefVars.length == 1
             && nhRefVars[0].varName.equals( dim.dimName))
         {
-          prtf("xxx skip REFERENCE_LIST for NhDimension: %s", dim);
+          //prtf("skip REFERENCE_LIST for single NhDimension: %s", dim);
         }
         else {
           dim.hdfDimVar.addAttribute(
@@ -427,7 +448,7 @@ throws NhException
         && coordDim != null
         && coordDim.dimName.equals( nhvar.varName))
       {
-        prtf("xxx skip DIMENSION_LIST for coord var: %s", nhvar);
+        //prtf("skip DIMENSION_LIST for single coord var: %s", nhvar);
       }
       else {       // else not coord var
         try {

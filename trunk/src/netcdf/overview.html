@@ -1,0 +1,107 @@
+
+<html>
+<head>
+<title> Nujan: NNew/Ucar Java Authoring of NetCDF4/HDF5 xxxtitle </title>
+<style type="text/css">
+  table {
+    background-color: #e0e0ff;
+  }
+</style>
+<body>
+<h2> Nujan: NNew/Ucar Java Authoring of NetCDF4/HDF5 </h2>
+
+
+<h3>Supported features in NetCDF3, NetCDF4, and Nujan. </h3>
+<p>
+"y" is yes, "-" is no.
+<p>
+
+<table align="center">
+<tr><th> Feature </th><th> NetCDF3<br>(C,Java) </th><th> NetCDF4<br>(C) </th><th> Nujan<br>(Java) </th></tr>
+  <tr><th> Primitive types:            </th><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td></tr>
+  <tr><td> char                        </td><td> y      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> byte                        </td><td> y      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> short                       </td><td> y      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> int                         </td><td> y      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> float                       </td><td> y      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> double                      </td><td> y      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> int64                       </td><td> -      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> unsigned_byte               </td><td> -      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> unsigned_short              </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> unsigned_int                </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> unsigned_int64              </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> string                      </td><td> -      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> &nbsp;                      </td><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td></tr>
+  <tr><th> User defined types:         </th><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td></tr>
+  <tr><td> Enum                        </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> Opaque                      </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> Compound                    </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> VariableLength              </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> &nbsp;                      </td><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td></tr>
+  <tr><th> Miscellaneous features:     </th><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td></tr>
+  <tr><td> Subgroups                   </td><td> -      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> One unlimited dim           </td><td> y      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> Multiple unlimited dims     </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> Restrict to NetCDF4 Classic </td><td> y      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> Partial writing             </td><td> y      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> Compression using gzip      </td><td> -      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> Other compression methods   </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> Arbitrary filters           </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> Modify existing files       </td><td> y      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> Modify after endDefine()    </td><td> y      </td><td> y      </td><td> -      </td></tr>
+</table>
+
+<p>
+See:<br>
+<a href="http://www.unidata.ucar.edu/software/netcdf/docs/faq.html#fv18">
+  http://www.unidata.ucar.edu/software/netcdf/docs/faq.html#fv18></a><br>
+<a href="http://www.unidata.ucar.edu/software/netcdf/workshops/2008/netcdf4/Nc4DataModel.html">
+  http://www.unidata.ucar.edu/software/netcdf/workshops/2008/netcdf4/Nc4DataModel.html</a><br>
+
+
+<h3>Notes on features </h3>
+
+
+<h4>Restrict to the NetCDF4 classic model</h4>
+The NetCDF4 C API offers a flag, CLASSIC_MODEL, that enforces
+that all features the client uses are within the "classic" subset
+of NetCDF4.  The classic subset is shown in the "NetCDF3" column in the table above.
+Restricting to the classic model allows a wider variety of readers to handle the file.
+
+<h4>Partial writing</h4>
+NetCDF4 allows writing a variable's data incrementally instead of all at
+once.  Nujan does not support this.
+
+<h4>Datasets (files) over 2 GB total size.</h4>
+This requires two mods to Nujan:
+<ul>
+  <li> Internally, a more complex implementation of chunking.
+    Currently Nujan uses a simple algorithm for chunking.
+  <li> Support for partial writing.
+</ul>
+
+<h4>Compression methods other than gzip, such as szip.</h4>
+
+<h4>Arbitrary filters, such as checksums, custom compression, etc.</h4>
+
+<h4>Any kind of modifications to existing files:</h4>
+<ul>
+  <li> Add/delete/update groups, variables, attributes
+  <li> Change data values
+</ul>
+
+<h4>Any kind of modifications after calling endDefine():</h4>
+<ul>
+  <li> Add/delete/update groups, variables, attributes
+</ul>
+
+<h4>Support for any HDF version other than 1.8.4.</h4>
+
+<h4>Concurrent reading of a file with an active writer.</h4>
+
+<h4>Multidimensional coordinate variables.</h4>
+This feature is seldom used,
+but occasionally is seen in a lat-lon grid for a non-linear projection.
+
+</body>
+</html>

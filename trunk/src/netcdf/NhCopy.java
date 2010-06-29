@@ -51,10 +51,15 @@ import hdfnet.HdfUtil;
 
 
 /**
- * Command line tool to copy a NetCDF4 file (that uses HDF5 format).
+ * Command line tool to copy a NetCDF4 file (which uses HDF5 format).
+ * For usage info, invoke NhCopy with no parameters.
  *
- * Uses the Unidata NetCDF4 Java reader from:<br>
- * http://www.unidata.ucar.edu/software/netcdf-java/
+ * Internally NhCopy uses
+ * <ul>
+ *   <li> the Unidata NetCDF4 Java reader from
+ *        http://www.unidata.ucar.edu/software/netcdf-java/
+ *   <li> our Java writer, {@link nhPkg.NhFileWriter}
+ * <ul>
  */
 
 public class NhCopy {
@@ -424,8 +429,11 @@ throws NhException
 
   String atName = attr.getName();
 
-  if (atName.startsWith("_"))
+  if (atName.equals("_lastModified")
+    || atName.equals("_Netcdf4Dimid"))
+  {
     prtf("ignoring \"%s\" attr: %s", outName, attr);
+  }
 
   else {
 

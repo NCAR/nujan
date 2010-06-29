@@ -15,7 +15,23 @@ testflagcls: ${SRC}
 
 clean:
 	rm -rf tdcls
+	rm -rf tddoc
 	/bin/rm -f testflagcls
+	/bin/rm -f temp*
+
+
+
+javadoc:
+	rm -rf tddoc
+	mkdir -p tddoc/tda/hdfnet
+	mkdir -p tddoc/tda/hdfnetTest
+	cp *.java tddoc/tda/hdfnet
+	mv tddoc/tda/hdfnet/Test*.java tddoc/tda/hdfnetTest
+	javadoc -public \
+	  -sourcepath tddoc/tda \
+	  -d tddoc \
+	  hdfnet hdfnetTest
+	rm -rf tddoc/tda
 
 
 

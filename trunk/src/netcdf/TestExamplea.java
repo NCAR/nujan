@@ -77,9 +77,8 @@ throws NhException
   }
   if (outFile == null) badparms("missing parm: -outFile");
 
-  int fileVersion = 2;        // either 1 or 2
   NhFileWriter hfile = new NhFileWriter(
-    outFile, NhFileWriter.OPT_OVERWRITE, fileVersion);
+    outFile, NhFileWriter.OPT_OVERWRITE);
 
   NhGroup rootGroup = hfile.getRootGroup();
 

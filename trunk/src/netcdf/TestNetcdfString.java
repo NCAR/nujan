@@ -138,7 +138,8 @@ throws NhException
   }
   else badparms("unknown rank");
 
-  NhFileWriter hfile = new NhFileWriter( outFile, NhFileWriter.OPT_OVERWRITE, fileVersion);
+  NhFileWriter hfile = NhFileWriter.mkTestWriter(
+    "testingOnly", outFile, NhFileWriter.OPT_OVERWRITE, fileVersion);
   hfile.setDebugLevel( bugs);
 
   NhGroup rootGroup = hfile.getRootGroup();

@@ -24,12 +24,14 @@ badparms() {
   echo "  compress:  all / compressLevel (0==none, 1 - 9)"
   echo "  nhType:    sbyte ubyte short int long float double char vstring"
   echo "  rank:      all/0/1/2/3/4/5"
-  echo "  bugs       none / echo / update"
+  echo "  bugs       optional: none / echo / update"
   echo ""
   echo "Examples:"
   echo "./testall.sh v1 0 short 1"
   exit 1
 }
+
+
 
 if [ $# -ne 4 -a $# -ne 5 ]; then badparms "wrong num parms"; fi
 
@@ -123,6 +125,7 @@ testOne() {
       -dims $dims \
       -fileVersion $fileVersion \
       -compress $compress \
+      -numThread 1 \
       -outFile tempa.nc"
 
     if [ "$bugs" != "none" ]; then echo "cmd: $cmd"; fi
@@ -137,8 +140,8 @@ testOne() {
 
     echo "  test: $configMsg  size: $(wc -c tempa.nc | cut -f 1 -d ' ')"
 
-    oldTxt=testVerif/test.$nhType.rank.$rank.out.gz
-    checkOne $oldTxt tempa.nc
+    oldTxt=testSynOut/test.$nhType.rank.$rank.out.gz
+    testComparePair.sh std $oldTxt tempa.nc
 
     # Copy to testVerif
     if [ "$bugs" == "update" ]; then
@@ -158,98 +161,12 @@ testOne() {
         echo "  copyCmd: $copyCmd"
         exit 1
       fi
-      checkOne $oldTxt tempb.nc
+      testComparePair.sh std $oldTxt tempb.nc
     fi
 
   fi
 
 } # end testOne
-
-
-
-
-
-
-checkOne() {
-  if [ $# -ne 2 ]; then
-    badparms "wrong num parms"
-  fi
-  oldTxt=$1
-  newDs=$2
-
-  dumpCmd="h5dump -p -w 10000 $newDs"
-  $dumpCmd | sed '1s/HDF5 .*/HDF5 "someFile" {/' > tempout.newa
-  if [ "$?" -ne "0" ]; then
-    echo "h5dump failed for config: $configMsg"
-    echo "  cmd: $cmd"
-    echo "  copyCmd: $copyCmd"
-    echo "  dumpCmd: $dumpCmd"
-    exit 1
-  fi
-
-  echo '===== ncdump =====' >> tempout.newa
-  dumpCmd="ncdump $newDs"
-  $dumpCmd | sed '1s/netcdf .*{/netcdf someFile {/' >> tempout.newa
-  if [ "$?" -ne "0" ]; then
-    echo "ncdump failed for config: $configMsg"
-    echo "  cmd: $cmd"
-    echo "  copyCmd: $copyCmd"
-    echo "  dumpCmd: $dumpCmd"
-    exit 1
-  fi
-
-  #sed -e 's/OFFSET [0-9][0-9]*/OFFSET someOffset/g' \
-  #    -e 's/GROUP [0-9][0-9]*/GROUP someOffset/g' \
-  #    -e 's/DATASET [0-9][0-9]*/DATASET someOffset/g' \
-  #  tempout.newa > tempout.newb
-  /bin/egrep -v '^ *OFFSET' tempout.newa > tempout.newb
-
-  # Filter out stuff that changes with contig vs chunked.
-  # For netcdf, don't filter the dimension variables,
-  # so the sed ends at the start of dimensions '^   DATASET "dim00"'.
-  #
-  # Here compress==0 <==> contiguous.
-
-  if [ "$compress" == "0" ]; then
-    /bin/sed -e '1,/^   DATASET "dim00"/s/^ *CONTIGUOUS.*/          contigOrChunked/' \
-      tempout.newb > tempout.newc
-  else
-    /bin/sed -e '1,/^   DATASET "dim00"/s/^ *CHUNKED.*/          contigOrChunked/' \
-      tempout.newb > tempout.newc
-  fi
-
-  # Filter out stuff that changes with compression level
-  if [ "$compress" == "0" ]; then
-    /bin/sed -e '1,/^   DATASET "dim00"/s/^ *NONE$/          compressType/' \
-      -e '1,/^   DATASET "dim00"/s/^ *SIZE.*/          someSize/' \
-      tempout.newc > tempout.newd
-  else
-    /bin/sed -e '1,/^   DATASET "dim00"/s/^ *COMPRESSION DEFLATE.*/          compressType/' \
-      -e '1,/^   DATASET "dim00"/s/^ *SIZE.*/          someSize/' \
-      tempout.newc > tempout.newd
-  fi
-
-  # Filter out group offsets for reference types
-  /bin/sed -e 's/GROUP [0-9][0-9]*/GROUP someOffset/g' \
-    -e 's/DATASET [0-9][0-9]*/DATASET someDataset/g' \
-    tempout.newd > tempout.newe
-
-  zcat $oldTxt > tempout.olde
-  diffCmd="diff -w tempout.olde tempout.newe"
-  if [ "$bugs" != "none" ]; then echo diffCmd: $diffCmd; fi
-  $diffCmd
-  diffOk=$?
-
-  if [ "$diffOk" -ne "0" ]; then
-    echo "Diff failed for config: $configMsg"
-    echo "  cmd: $cmd"
-    echo "  copyCmd: $copyCmd"
-    echo "  diffCmd: $diffCmd"
-    echo "wc:"
-    wc tempout.olde tempout.newe
-    #exit 1
-  fi
-} # end checkOne
 
 
 
