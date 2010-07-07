@@ -33,9 +33,11 @@ import edu.ucar.ral.nujan.hdf.HdfGroup;
 import edu.ucar.ral.nujan.hdf.HdfException;
 
 
-// Test fixed08, fixed16, fixed32, fixed64, float32, float64,
-// string, or reference type,
-// with any number of dimensions.
+/**
+ * Main test program for testing synthetic data files.
+ * Tests fixed08, fixed16, fixed32, fixed64, float32, float64,
+ * string, or reference type, with any number of dimensions.
+ */
 
 
 public class Testa {

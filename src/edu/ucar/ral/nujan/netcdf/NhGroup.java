@@ -360,8 +360,11 @@ throws NhException
       + "  var name: \"" + varName + "\"\n"
       + "  type: " + NhVariable.nhTypeNames[ nhType] + "\n"
       + "  dims: ";
-    for (NhDimension dm : nhDims) {
-      msg += "  \"" + dm.dimName + "\"(" + dm.dimLen + ")";
+    if (nhDims == null) msg += "(null)";
+    else {
+      for (NhDimension dm : nhDims) {
+        msg += "  \"" + dm.dimName + "\"(" + dm.dimLen + ")";
+      }
     }
     msg += "\n";
     msg += "  fill: " + fillValue + "\n";
@@ -375,7 +378,7 @@ throws NhException
   if (fillValue != null) {
     if (nhType == NhVariable.TP_STRING_VAR)
       throwerr("TP_STRING_* variables must have fillValue == null");
-    if (nhDims.length == 0)
+    if (nhDims == null || nhDims.length == 0)
       throwerr("scalar variables must have fillValue == null");
   }
 

@@ -1,7 +1,5 @@
 
-SRC = $(shell ls *.java)
-
-NCJAR = /d1/steves/ftp/netcdfJava/netcdfAll-4.1.jar
+SRC = $(shell ls *.java ../hdf/*.java)
 
 BUILDDIR = /home/steves/tech/hdf5/build
 DOCDIR = /home/steves/tech/hdf5/build/docNetcdf
@@ -11,6 +9,7 @@ all: testflagcls
 
 
 testflagcls: ${SRC}
+	(cd ../hdf; ${MAKE} testflagcls)
 	javac -d ${BUILDDIR} -cp ${BUILDDIR}:${NCJAR} *.java
 	touch testflagcls
 
@@ -20,12 +19,13 @@ clean:
 	/bin/rm -f testflagcls
 	/bin/rm -f temp*
 
-dist: testflagcls javadoc
+dist: testflagcls javadoc jar
 	rm -rf /scratch/steves/nujan
 	mkdir -p /scratch/steves/nujan
 	cp ${BUILDDIR}/*.jar /scratch/steves/nujan
 	cp -r ${DOCDIR} /scratch/steves/nujan/doc
-	cp TestExamplea.java /scratch/steves/nujan
+	cp ../netcdfTest/TestExamplea.java /scratch/steves/nujan
+	ls -alR /scratch/steves/nujan
 
 
 javadoc:
@@ -39,7 +39,8 @@ javadoc:
 
 
 jar: testflagcls
-	(cd ${BUILDDIR}; jar cvf nujan.2010.07.06.a.jar edu)
+	/bin/rm -f ${BUILDDIR}/nujan.*.jar
+	(cd ${BUILDDIR}; jar cvf nujan.2010.07.07.a.jar edu)
 
 
 

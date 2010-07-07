@@ -34,8 +34,10 @@ import edu.ucar.ral.nujan.hdf.HdfException;
 
 
 
-// Very small test, hardcoded test of references,
-// to mimic the C code testRefb.c.
+/**
+ * Very small hardcoded test of references,
+ * to mimic the C code testRefb.c.
+ */
 
 
 

@@ -192,7 +192,12 @@ throws HdfException
       + "  type: " + HdfUtil.formatDtypeDim( dtype, varDims));
   }
 
-  if (varDims.length == 0) {
+  if (varDims == null) {
+    if (isChunked) throwerr("cannot use chunked with null data");
+    if (compressionLevel > 0)
+      throwerr("cannot use compression with null data");
+  }
+  else if (varDims.length == 0) {
     if (isChunked) throwerr("cannot use chunked with scalar data");
     if (compressionLevel > 0)
       throwerr("cannot use compression with scalar data");
@@ -345,12 +350,14 @@ public void addAttribute(
 throws HdfException
 {
   if (hdfFile.bugs >= 1) {
-    prtf("HdfGroup.addAttribute: \"" + getPath() + "/" + attrName + "\""
-      + "  cls: " + attrValue.getClass().getName());
+    String tmsg = "HdfGroup.addAttribute: \"" + getPath()
+      + "/" + attrName + "\"" + "  cls: ";
+    if (attrValue == null) tmsg += "(null)";
+    else tmsg += attrValue.getClass().getName();
+    prtf( tmsg);
   }
   if (hdfFile.bugs >= 5) {
     prtf("  attr isVlen: " + isVlen);
-    prtf("  attrValue cls: " + attrValue.getClass().getName());
     prtf("  attrValue: " + HdfUtil.formatObject( attrValue));
   }
   if (findAttribute( attrName) != null)
@@ -558,7 +565,7 @@ throws HdfException, IOException
   int[] dataVarDims = Arrays.copyOfRange( dataInfo, 2, dataInfo.length);
 
   if (hdfFile.bugs >= 1) {
-    prtf("writeData: actual data:" + "\n"
+    prtf("HdfGroup.writeData: actual data:" + "\n"
       + "  vdata object: " + vdata + "\n"
       + "  vdata class: " + vdata.getClass() + "\n"
       + "  vdata dtype: " + dtypeNames[ dataDtype] + "\n"
@@ -676,15 +683,15 @@ throws HdfException, IOException
     rawDataSize = endPos - rawDataAddr;
 
     if (hdfFile.bugs >= 5) {
-      prtf("writeData: rawDataAddr: %d  endPos: %d  rawDataSize: %d",
+      prtf("HdfGroup.writeData: rawDataAddr: %d  endPos: %d  rawDataSize: %d",
         rawDataAddr, endPos, rawDataSize);
-      prtf("writeData: old eofAddr: %d", hdfFile.eofAddr);
+      prtf("HdfGroup.writeData: old eofAddr: %d", hdfFile.eofAddr);
     }
   }
 
   hdfFile.eofAddr = hdfFile.outChannel.position();
   if (hdfFile.bugs >= 2)
-    prtf("writeData.end: new eofAddr: %d", hdfFile.eofAddr);
+    prtf("HdfGroup.writeData.end: new eofAddr: %d", hdfFile.eofAddr);
 
 } // end writeDataSub
 

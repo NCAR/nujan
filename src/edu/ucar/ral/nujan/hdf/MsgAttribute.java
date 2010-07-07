@@ -85,16 +85,20 @@ throws HdfException
   if (hdfFile.bugs >= 1) {
     prtf("MsgAttribute: actual data:" + "\n"
       + "  attrValue object: " + attrValue + "\n"
-      + "  attrValue class: " + attrValue.getClass() + "\n"
       + "  attrValue dtype: " + HdfGroup.dtypeNames[ dataDtype] + "\n"
       + "  attrValue totNumEle: " + totNumEle + "\n"
       + "  attrValue rank: " + dataVarDims.length + "\n"
       + "  attrValue type and dims: "
       + HdfUtil.formatDtypeDim( dataDtype, dataVarDims));
+    if (attrValue != null)
+      prtf("MsgAttribute: attrValue class: " + attrValue.getClass());
   }
 
   // Check that the dataDtype and dataVarDims match what the user declared.
-  HdfUtil.checkTypeMatch( getPath(), attrType, dataDtype, dataVarDims, dataVarDims);
+  if (attrValue != null) {
+    HdfUtil.checkTypeMatch( getPath(), attrType, dataDtype,
+      dataVarDims, dataVarDims);    // specDims, dataDims
+  }
 
   String[] memberNames = null;
   if (isVlen) {
@@ -166,7 +170,10 @@ public String toString() {
     + "  type: " + HdfUtil.formatDtypeDim( attrType, dataVarDims) + "\n"
     + "  stgFieldLen: " + stgFieldLen + "\n"
     + "  attrValue: dataDtype: " + HdfGroup.dtypeNames[ dataDtype]
-    + "  class: " + attrValue.getClass() + "\n";
+    + "  class: ";
+  if (attrValue == null) res += "(null)\n";
+  else res += attrValue.getClass().getName() + "\n";
+
   if (dsubTypes != null) {
     res +=  "  dsubTypes:";
     for (int ii = 0; ii < dsubTypes.length; ii++) {
@@ -242,7 +249,10 @@ throws HdfException
   msgDataSpace.formatNakedMsg( formatPass, fmtBuf);
   if (hdfFile.fileVersion == 1) fmtBuf.alignPos( "attr align", 8);
 
-  if (isVlen) {
+  if (attrValue == null) {
+    // Don't write null attrValue
+  }
+  else if (isVlen) {
     // Vlen: format the globalHeap references to hdfFile.bbuf
     int[] heapIxs = hdfFile.mainGlobalHeap.putHeapVlenObject(
       hdfGroup,

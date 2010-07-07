@@ -43,7 +43,6 @@ class MsgDataSpace extends MsgBase {
 
 
 final int msgVersion = 1;
-int rank;                    // dimensionality == num dimensions
 
 // Bits for spaceFlag:
 //   0  maxSizes are present
@@ -56,6 +55,9 @@ int[] varDims;               // size of each dimension
                              //   This is a special case used
                              //   for empty attributes.
                              // if varDims.length==0, it's a scalar.
+
+int rank;                    // dimensionality == num dimensions
+long totNumEle;              // total num elements, calculated from varDims
 
 // Unlimited (-1) is not implemented here but would
 // be easy: just pass in dimMaxSizes instead of copying varDims.
@@ -71,12 +73,20 @@ MsgDataSpace(
 {
   super( TP_DATASPACE, hdfGroup, hdfFile);
   if (varDims == null) {
-    this.varDims = varDims;
+    this.varDims = null;
     rank = 0;
+    totNumEle = 0;
   }
   else {
     this.varDims = Arrays.copyOf( varDims, varDims.length);
     rank = varDims.length;
+    if (varDims.length == 0) totNumEle = 0;
+    else {
+      totNumEle = 1;
+      for (int ii : varDims) {
+        totNumEle *= ii;
+      }
+    }
   }
   this.dimMaxSizes = this.varDims;
   if (hdfFile.bugs >= 5) prtf("MsgDataSpace: " + this);
@@ -85,6 +95,7 @@ MsgDataSpace(
 
 public String toString() {
   String res = "rank: " + rank;
+  res += "  totNumEle: " + totNumEle;
   res += "  dims:";
   if (varDims == null) res += " null";
   else {

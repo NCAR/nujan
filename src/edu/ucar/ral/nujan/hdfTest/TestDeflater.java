@@ -30,6 +30,10 @@ package edu.ucar.ral.nujan.hdfTest;
 
 import java.util.zip.Deflater;
 
+/**
+ * Simple test of java.util.Deflater.  Does not use HDF5.
+ */
+
 
 class TestDeflater {
 

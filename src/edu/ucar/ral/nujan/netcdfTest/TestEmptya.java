@@ -38,11 +38,11 @@ import edu.ucar.ral.nujan.netcdf.NhVariable;
 
 
 /**
- * Example program.
+ * Test empty data, empty attributes.
  */
 
 
-public class TestExamplea {
+public class TestEmptya {
 
 
 static void badparms( String msg) {
@@ -67,19 +67,25 @@ public static void main( String[] args) {
 static void testIt( String[] args)
 throws NhException
 {
+  int bugs = -1;
   String outFile = null;
 
   if (args.length % 2 != 0) badparms("parms must be key/value pairs");
   for (int iarg = 0; iarg < args.length; iarg += 2) {
     String key = args[iarg];
     String val = args[iarg+1];
-    if (key.equals("-outFile")) outFile = val;
+    if (key.equals("-bugs")) bugs = Integer.parseInt( val);
+    else if (key.equals("-outFile")) outFile = val;
     else badparms("unkown parm: " + key);
   }
+  if (bugs < 0) badparms("missing parm: -bugs");
   if (outFile == null) badparms("missing parm: -outFile");
 
   NhFileWriter hfile = new NhFileWriter(
     outFile, NhFileWriter.OPT_OVERWRITE);
+
+  hfile.setDebugLevel( bugs);
+  hfile.setHdfDebugLevel( bugs);
 
   NhGroup rootGroup = hfile.getRootGroup();
 
@@ -95,48 +101,29 @@ throws NhException
 
   // Global attributes are added to the rootGroup.
   rootGroup.addAttribute(
-    "someName",
+    "emptyRootAttr",
     NhVariable.TP_STRING_VAR,
-    "some long comment");
+    null);
 
-  // Groups may be nested arbitrarily
-  NhGroup northernGroup = rootGroup.addGroup("northernData");
-
-  northernGroup.addAttribute(
-    "cityIndices",
-    NhVariable.TP_INT,
-    new int[] { 1, 2, 3, 5, 7, 13, 17});
-
-  // Variables may be added to any group.
-  Double fillValue = new Double( -999999);
+  Double fillValue = null;
   int compressLevel = 0;        // compression level: 0==none, 1 - 9
 
-  NhVariable humidityVar = northernGroup.addVariable(
+  NhVariable humidityVar = rootGroup.addVariable(
     "humidity",                 // varName
     NhVariable.TP_DOUBLE,       // nhType
-    nhDims,                     // varDims
+    null,                       // varDims
     fillValue,
     compressLevel);
 
   humidityVar.addAttribute(
-    "someUnits",
+    "emptyVarAttr",
     NhVariable.TP_STRING_VAR,
-    "fathoms per fortnight");
+    new String[0]);
 
   // End the definition stage.
   // All groups, variables, and attributes are created before endDefine.
   // All calls to writeData occur after endDefine.
   hfile.endDefine();
-
-  // The data type must match that declared in the addVariable call.
-  // The data shape must match xdim, ydim.
-  double[][] testData = {
-    { 11, 12, 13, 14, 15},
-    { 21, 22, 23, 24, 25},
-    { 31, 32, 33, 34, 35}
-  };
-
-  humidityVar.writeData( testData);
 
   hfile.close();
 
@@ -162,4 +149,4 @@ static void prtf( String msg, Object... args) {
   System.out.printf("\n");
 }
 
-} // end class TestExamplea
+} // end class TestEmptya
