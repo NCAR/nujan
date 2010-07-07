@@ -10,6 +10,7 @@ all: testflagcls
 
 testflagcls: ${SRC}
 	(cd ../netcdf; ${MAKE} testflagcls)
+	(cd ../hdfTest; ${MAKE} testflagcls)
 	javac -cp ${BUILDDIR}:${NCJAR} -d ${BUILDDIR} *.java
 	touch testflagcls
 

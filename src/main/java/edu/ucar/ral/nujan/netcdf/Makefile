@@ -25,7 +25,7 @@ dist: testflagcls javadoc jar
 	cp ${BUILDDIR}/*.jar /scratch/steves/nujan
 	cp -r ${DOCDIR} /scratch/steves/nujan/doc
 	cp ../netcdfTest/TestExamplea.java /scratch/steves/nujan
-	ls -alR /scratch/steves/nujan
+	ls -al /scratch/steves/nujan
 
 
 javadoc:
@@ -40,7 +40,7 @@ javadoc:
 
 jar: testflagcls
 	/bin/rm -f ${BUILDDIR}/nujan.*.jar
-	(cd ${BUILDDIR}; jar cvf nujan.2010.07.07.a.jar edu)
+	(cd ${BUILDDIR}; jar cvf nujan.2010.07.07.b.jar edu)
 
 
 

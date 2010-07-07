@@ -29,7 +29,6 @@
 package edu.ucar.ral.nujan.netcdf;
 
 import java.util.ArrayList;
-import java.util.regex.Pattern;
 
 import edu.ucar.ral.nujan.hdf.HdfException;
 import edu.ucar.ral.nujan.hdf.HdfGroup;
@@ -481,18 +480,18 @@ throws NhException
 
 
 
-
-
-
-static void checkName(
+public static void checkName(
   String name,
   String loc)
 throws NhException
 {
-  if (name == null || name.length() == 0)
-    throwerr("Name for %s is empty", loc);
-  if (! Pattern.matches("^[_a-zA-Z][_a-zA-Z0-9]*$", name))
-    throwerr("Invalid name for %s.  Name: \"%s\"", loc, name);
+  try {
+    HdfUtil.checkName( name, loc);
+  }
+  catch( HdfException exc) {
+    exc.printStackTrace();
+    throwerr( exc.toString());
+  }
 }
 
 
