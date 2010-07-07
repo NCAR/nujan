@@ -34,7 +34,9 @@ import edu.ucar.ral.nujan.hdf.HdfException;
 
 
 
-// Very small test, with hardcoded dtype and dims.
+/**
+ * Very small test, with hardcoded dtype and dims.
+ */
 
 
 
@@ -84,7 +86,7 @@ throws HdfException
 
   int fileVersion = 1;
   HdfFileWriter hfile = new HdfFileWriter(
-    outFile, fileVersion, HdfFileWriter.OPT_ALLOW_OVERWRITE);
+    outFile, fileVersion, HdfFileWriter.OPT_ALLOW_OVERWRITE, bugs);
   HdfGroup rootGroup = hfile.getRootGroup();
 
 

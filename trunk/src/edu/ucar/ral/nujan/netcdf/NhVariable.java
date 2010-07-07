@@ -183,13 +183,15 @@ throws NhException
 {
   this.varName = varName;
   this.nhType = nhType;
-  this.nhDims = Arrays.copyOf( nhDims, nhDims.length);
+  if (nhDims == null) this.nhDims = null;
+  else this.nhDims = Arrays.copyOf( nhDims, nhDims.length);
   this.fillValue = fillValue;
   this.compressionLevel = compressionLevel;
   this.parentGroup = parentGroup;
   this.nhFile = nhFile;
 
-  rank = nhDims.length;
+  if (nhDims == null) rank = 0;
+  else rank = nhDims.length;
 
   // Translate nhType to dtype
   // Note: fixed len strings are not supported by the Netcdf API.
@@ -200,7 +202,7 @@ throws NhException
   // isn't stored in the file.
 
   boolean isScalar = false;
-  if (nhDims.length == 0) isScalar = true;
+  if (nhDims != null && nhDims.length == 0) isScalar = true;
 
   dtype = findDtype( varName, nhType);
 
@@ -225,21 +227,24 @@ throws NhException
   }
 
   // Build int[] dimLens from nhDims 
-  dimLens = new int[ rank];
-  for (int ii = 0; ii < rank; ii++) {
-    // Check that nhDims[ii] is in our ancestors.
-    NhDimension tdim = parentGroup.findAncestorDimension(
-      nhDims[ii].getName());
-    if (tdim != nhDims[ii])
-      throwerr("dimension not found.  var: %s  dim: %s", varName, nhDims[ii]);
-    
-    int dlen = nhDims[ii].dimLen;
-    if (dlen <= 0 || dlen >= Integer.MAX_VALUE) {
-      throwerr("NhVariable: variable \"%s\", dimension %d,"
-        + " has illegal value: %d",
-        varName, ii, dlen);
+  if (nhDims == null) dimLens = null;
+  else {
+    dimLens = new int[ rank];
+    for (int ii = 0; ii < rank; ii++) {
+      // Check that nhDims[ii] is in our ancestors.
+      NhDimension tdim = parentGroup.findAncestorDimension(
+        nhDims[ii].getName());
+      if (tdim != nhDims[ii])
+        throwerr("dimension not found.  var: %s  dim: %s", varName, nhDims[ii]);
+      
+      int dlen = nhDims[ii].dimLen;
+      if (dlen <= 0 || dlen >= Integer.MAX_VALUE) {
+        throwerr("NhVariable: variable \"%s\", dimension %d,"
+          + " has illegal value: %d",
+          varName, ii, dlen);
+      }
+      dimLens[ii] = dlen;
     }
-    dimLens[ii] = dlen;
   }
 
   // If the variable name equals that of some dimension,
@@ -264,7 +269,7 @@ throws NhException
     throwerr("cannot use compression with TP_STRING_*");
 
   // Scalars cannot be compressed or chunked.
-  if (dimLens.length == 0 && compressionLevel > 0)
+  if ((dimLens == null || dimLens.length == 0) && compressionLevel > 0)
     throwerr("cannot use compression with scalar data");
 
   // HDF5 must be chunked for compression.
@@ -288,8 +293,10 @@ throws NhException
   }
 
   // Add us to each dimension's refList
-  for (NhDimension nhDim : nhDims) {
-    nhDim.refList.add( this);
+  if (nhDims != null) {
+    for (NhDimension nhDim : nhDims) {
+      nhDim.refList.add( this);
+    }
   }
 
 } // end constructor
@@ -501,6 +508,7 @@ static Object getAttrValue(
   int bugs)
 throws NhException
 {
+  if (attrValue == null) return null; //xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
   if (attrValue == null) throwerr("attribute value is null");
   Object resValue = null;
   boolean valOk = true;
@@ -687,14 +695,15 @@ throws NhException
 
 static boolean testScalar( Object val) {
   boolean bres = false;
-  if (val instanceof Byte
-    || val instanceof Short
-    || val instanceof Integer
-    || val instanceof Long
-    || val instanceof Float
-    || val instanceof Double
-    || val instanceof Character
-    || val instanceof String)
+  if (val != null
+    && (val instanceof Byte
+      || val instanceof Short
+      || val instanceof Integer
+      || val instanceof Long
+      || val instanceof Float
+      || val instanceof Double
+      || val instanceof Character
+      || val instanceof String))
   {
     bres = true;
   }

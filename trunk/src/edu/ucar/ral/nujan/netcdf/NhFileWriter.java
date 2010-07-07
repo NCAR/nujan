@@ -303,7 +303,6 @@ throws NhException
     int hdfOptFlag = 0;
     if ((optFlag & OPT_OVERWRITE) != 0)
       hdfOptFlag |= HdfFileWriter.OPT_ALLOW_OVERWRITE;
-    prtf("############################# hdf bugs: " + hdfDebugLevel);
     hdfFile = new HdfFileWriter(
       path, fileVersion, hdfOptFlag, hdfDebugLevel);
     rootGroup = new NhGroup( "", null, this);
@@ -624,13 +623,11 @@ throws NhException
   else if (fileStatus != ST_WRITEDATA) throwerr("invalid fileStatus");
   fileStatus = ST_CLOSED;
 
-  prtf("######### Nh close a");
   try { hdfFile.close(); }
   catch( HdfException exc) {
     exc.printStackTrace();
     throwerr("caught: " + exc);
   }
-  prtf("######### Nh close b");
 }
 
 

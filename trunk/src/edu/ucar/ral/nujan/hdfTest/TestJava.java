@@ -39,7 +39,9 @@ class TestAlpha<TP> {
   }
 }
 
-
+/**
+ * Tests of Java class handling.  Does not use HDF5.
+ */
 
 
 class TestJava {

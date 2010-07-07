@@ -49,6 +49,9 @@ static long alignLong( long bound, long val) {
 
 
 
+/**
+ * Returns array containing: elementType, totNumEle, dim0, dim1, dim2, ....
+ */
 
 static int[] getDimLen(
   Object obj,
@@ -210,7 +213,7 @@ throws HdfException
   // If first time, expand dimList.  Else check dimList match.
   if (curDim > dimList.size()) throwerr("invalid curDim");
   else if (curDim == dimList.size()) {
-    if (dimLen >= 0)     // if not scalar
+    if (dimLen > 0)     // if not scalar (-1) and empty dimension (0)
       dimList.add( new Integer( dimLen));
   }
   else if (dimLen != dimList.get( curDim).intValue()) {
@@ -432,17 +435,25 @@ throws HdfException
         + "  data type:     " + HdfGroup.dtypeNames[ dataType] + "\n");
   }
 
-  if (dataDims.length != specDims.length)
-    throwerr("type mismatch for: " + msg + "\n"
-      + "  declared rank: " + specDims.length + "\n"
-      + "  data rank:     " + dataDims.length + "\n");
-
-  for (int ii = 0; ii < specDims.length; ii++) {
-    if (dataDims[ii] != specDims[ii])
+  if (specDims == null) {
+    if (dataDims.length != 0)
       throwerr("type mismatch for: " + msg + "\n"
-        + "  data dimension length mismatch for dimension " + ii + "\n"
-        + "  declared dim: " + specDims[ii] + "\n"
-        + "  data dim: " + dataDims[ii] + "\n");
+        + "  declared rank: (null)\n"
+        + "  data rank:     " + dataDims.length + "\n");
+  }
+  else {
+    if (dataDims.length != specDims.length)
+      throwerr("type mismatch for: " + msg + "\n"
+        + "  declared rank: " + specDims.length + "\n"
+        + "  data rank:     " + dataDims.length + "\n");
+
+    for (int ii = 0; ii < specDims.length; ii++) {
+      if (dataDims[ii] != specDims[ii])
+        throwerr("type mismatch for: " + msg + "\n"
+          + "  data dimension length mismatch for dimension " + ii + "\n"
+          + "  declared dim: " + specDims[ii] + "\n"
+          + "  data dim: " + dataDims[ii] + "\n");
+    }
   }
 } // end checkTypeMatch
 
@@ -550,13 +561,15 @@ static String formatDtypeDim(
   int[] dims)
 {
   String res = HdfGroup.dtypeNames[dtype];
-  if (dims.length > 0) {
-    res += '[';
+  if (dims == null) res += " (dims==null)";
+  else if (dims.length == 0) res += " scalar";
+  else {
+    res += " [";
     for (int ii = 0; ii < dims.length; ii++) {
       if (ii > 0) res += ",";
       res += "" + dims[ii];
     }
-    res += ']';
+    res += "]";
   }
   return res;
 }

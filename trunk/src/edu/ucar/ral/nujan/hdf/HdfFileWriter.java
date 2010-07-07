@@ -306,7 +306,10 @@ throws HdfException
   findAllGroups( rootGroup, grpList);
   String errMsg = "";
   for (HdfGroup grp : grpList) {
-    if (grp.isVariable && ! grp.isWritten) {
+    if (grp.isVariable
+      && (! grp.isWritten)
+      && grp.msgDataSpace.totNumEle != 0)
+    {
       errMsg += "  " + grp.getPath();
     }
   }
