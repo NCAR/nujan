@@ -25,7 +25,11 @@ badparms() {
   echo "  compress:  all / compressLevel (0==none, 1 - 9)"
   echo "  nhType:    sbyte ubyte short int long float double char vstring"
   echo "  rank:      all/0/1/2/3/4/5"
-  echo "  bugs       optional: none / echo / update"
+  echo "  bugs       optional: none / echo / continue / update"
+  echo "               none: no debug msgs"
+  echo "               echo: some debug msgs"
+  echo "               continue: continue even if diff errors"
+  echo "               update: update verification results - Caution"
   echo ""
   echo "Examples:"
   echo "./testSyn.sh v1 0 short 1"
@@ -151,7 +155,9 @@ testOne() {
       echo '*** updated ***'
     fi
 
-    if [ "$diffOk" -ne "0" -a "$bugs" != "update" ]; then
+    if [ "$diffOk" -ne "0" \
+      -a "$bugs" != "continue" \
+      -a "$bugs" != "update" ]; then
       echo "testComparePair failed for config: $configMsg"
       echo "  cmd: $cmd"
       echo "  copyCmd: $copyCmd"
