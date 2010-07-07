@@ -26,7 +26,11 @@ badparms() {
   echo "  dtype:     all / sfixed08 / ufixed08 /fixed16,32,64"
   echo "               float32,64 string14 vstring reference compound"
   echo "  rank:      all/0/1/2/3/4/5"
-  echo "  bugs       optional: none / echo / update"
+  echo "  bugs       optional: none / echo / continue / update"
+  echo "               none: no debug msgs"
+  echo "               echo: some debug msgs"
+  echo "               continue: continue even if diff errors"
+  echo "               update: update verification results - Caution"
   echo ""
   echo "Examples:"
   echo "./testSyn.sh v1  contig  0 fixed16  1"
@@ -214,7 +218,9 @@ testOne() {
       echo '*** updated ***'
     fi
 
-    if [ "$diffOk" -ne "0" -a "$bugs" != "update" ]; then
+    if [ "$diffOk" -ne "0" \
+      -a "$bugs" != "continue" \
+      -a "$bugs" != "update" ]; then
       echo "Diff failed for config: $configMsg"
       echo "  cmd: $cmd"
       echo "  diffCmd: $diffCmd"
