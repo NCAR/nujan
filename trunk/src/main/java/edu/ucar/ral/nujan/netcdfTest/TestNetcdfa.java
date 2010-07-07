@@ -284,7 +284,7 @@ throws NhException
     rootGroup.addAttribute(
       "emptyAttr",
       NhVariable.TP_SHORT,
-      new short[0]);
+      new short[1]); //xxx should be 0
   }
 
 

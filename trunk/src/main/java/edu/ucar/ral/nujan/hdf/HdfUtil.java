@@ -33,6 +33,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.regex.Pattern;
 
 
 
@@ -456,6 +457,21 @@ throws HdfException
     }
   }
 } // end checkTypeMatch
+
+
+
+
+
+public static void checkName(
+  String name,
+  String loc)
+throws HdfException
+{
+  if (name == null || name.length() == 0)
+    throwerr("Name for %s is empty", loc);
+  if (! Pattern.matches("^[_a-zA-Z][-_a-zA-Z0-9]*$", name))
+    throwerr("Invalid name for %s.  Name: \"%s\"", loc, name);
+}
 
 
 

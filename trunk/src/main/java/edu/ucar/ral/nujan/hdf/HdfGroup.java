@@ -133,6 +133,10 @@ throws HdfException
   if (hdfFile.bugs >= 1) {
     prtf("HdfGroup: new group at path: \"" + getPath() + "\"");
   }
+  if (parentGroup != null) {     // if not creating root group
+    HdfUtil.checkName( groupName,
+      "subGroup in group \"" + parentGroup.groupName + "\"");
+  }
 
   subGroupList = new ArrayList<HdfGroup>();
   subVariableList = new ArrayList<HdfGroup>();
@@ -191,6 +195,8 @@ throws HdfException
     prtf("HdfGroup: new dataset at path: \"" + getPath() + "\""
       + "  type: " + HdfUtil.formatDtypeDim( dtype, varDims));
   }
+  HdfUtil.checkName( groupName,
+    "dataset in group \"" + parentGroup.groupName + "\"");
 
   if (varDims == null) {
     if (isChunked) throwerr("cannot use chunked with null data");
@@ -360,6 +366,9 @@ throws HdfException
     prtf("  attr isVlen: " + isVlen);
     prtf("  attrValue: " + HdfUtil.formatObject( attrValue));
   }
+  HdfUtil.checkName( attrName,
+    "attribute in group \"" + groupName + "\"");
+
   if (findAttribute( attrName) != null)
     throwerr("Duplicate attribute.  The group \"%s\" already contains"
       + "  an attribute named \"%s\"",
