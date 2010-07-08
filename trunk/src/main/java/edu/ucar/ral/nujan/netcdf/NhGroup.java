@@ -397,6 +397,16 @@ throws NhException
 
 
 
+//xxx doc this
+public boolean attributeExists(
+  String attrName)
+{
+  boolean bres = false;
+  if (hdfGroup.findAttribute( attrName) != null) bres = true;
+  return bres;
+}
+
+
 
 
 /**

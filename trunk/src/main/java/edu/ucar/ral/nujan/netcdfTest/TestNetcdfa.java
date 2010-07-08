@@ -281,10 +281,15 @@ throws NhException
       NhVariable.TP_STRING_VAR,
       "globTextValue");
 
-    rootGroup.addAttribute(
-      "emptyAttr",
-      NhVariable.TP_SHORT,
-      new short[0]);
+    //rootGroup.addAttribute(
+    //  "emptyAttr",
+    //  NhVariable.TP_SHORT,
+    //  null); //xxx new short[0]);
+
+    //rootGroup.addAttribute(
+    //  "nullAttr",
+    //  NhVariable.TP_SHORT,
+    //  null);
   }
 
 

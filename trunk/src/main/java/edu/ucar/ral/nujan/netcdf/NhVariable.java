@@ -368,6 +368,21 @@ public String getPath() {
 
 
 
+//xxx doc this
+public boolean attributeExists(
+  String attrName)
+{
+  boolean bres = false;
+  if (hdfVar.findAttribute( attrName) != null) bres = true;
+  return bres;
+}
+
+
+
+
+
+
+
 /**
  * Adds an attribute to this group.
  * Although HDF5 supports attributes of any dimsionality, 0, 1, 2, ...,

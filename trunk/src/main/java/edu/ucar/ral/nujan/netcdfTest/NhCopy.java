@@ -383,7 +383,7 @@ throws NhException
 
 static void copyAttribute(
   Attribute attr,
-  String outName,
+  String outName,    // name of outObj, for error msgs
   Object outObj,     // outObj is either NhGroup or NhVariable
   int bugs)
 throws NhException
@@ -445,7 +445,8 @@ throws NhException
   if (atName.equals("_lastModified")
     || atName.equals("_Netcdf4Dimid"))
   {
-    prtf("ignoring \"%s\" attr: %s", outName, attr);
+    prtf("Ignoring internal attribute for variable or group \"%s\"."
+      + "  Attribute: %s", outName, attr);
   }
 
   else {

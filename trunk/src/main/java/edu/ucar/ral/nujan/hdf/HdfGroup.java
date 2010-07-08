@@ -494,7 +494,7 @@ HdfGroup findSubItem( String subName)
 // Search for attribute.
 // Return null if not found.
 
-MsgAttribute findAttribute( String attrName)
+public MsgAttribute findAttribute( String attrName)
 {
   MsgAttribute resMsg = null;
   for (MsgBase baseMsg : hdrMsgList) {

@@ -1,9 +1,9 @@
 #!/bin/sh
 
 
-# Validation using synthetic data.
+# Validates the NetCDF4 layer using synthetic data.
 #
-# Run TestNetcdfa.java on various configurations and compare the
+# Runs TestNetcdfa.java on various configurations and compares the
 # output with saved known good files.
 #
 # For usage, see badparms below.
@@ -14,8 +14,9 @@
 
 
 NCJAR=/d1/steves/ftp/netcdfJava/netcdfAll-4.1.jar
-BUILDDIR=/home/steves/tech/hdf5/build
+BUILDDIR=../../../target/classes
 PKGBASE=edu.ucar.ral.nujan
+TESTDIR=.
 
 
 badparms() {
@@ -32,7 +33,8 @@ badparms() {
   echo "               update: update verification results - Caution"
   echo ""
   echo "Examples:"
-  echo "./testSyn.sh v1 0 short 1"
+  echo "./testNetcdfSyn.sh v1 0 short 1"
+  echo "./testNetcdfSyn.sh v2 5 all 2"
   exit 1
 }
 
@@ -73,11 +75,6 @@ echo "versions: $versions"
 echo "compressVals: $compressVals"
 echo "nhTypes: $nhTypes"
 echo "ranks: $ranks"
-
-make all
-if [ $? -ne 0 ]; then badparms "make failed"; fi
-
-
 
 
 
@@ -145,7 +142,7 @@ testOne() {
 
     echo "  test: $configMsg  size: $(wc -c tempa.nc | cut -f 1 -d ' ')"
 
-    oldTxt=testSynOut/test.$nhType.rank.$rank.out.gz
+    oldTxt=${TESTDIR}/testNetcdfSynOut/test.$nhType.rank.$rank.out.gz
     testComparePair.sh $bugs $compress $oldTxt tempa.nc
     diffOk=$?
 
