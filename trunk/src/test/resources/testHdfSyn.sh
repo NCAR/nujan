@@ -1,7 +1,7 @@
 #!/bin/sh
 
 
-# Validation using synthetic data.
+# Validate the HDF5 layer using synthetic data.
 #
 # Run Testa.java on various configurations and compare the
 # output with saved known good files.
@@ -13,7 +13,7 @@
 #   for ii in 0 1 2 3 4 5; do diff <(sed -e '1,/ncdump/ d'  testSynOut/test.int.rank.$ii.out) <(sed -e '1,/ncdump/ d'  testSynOut/test.double.rank.$ii.out) | less; done
 
 
-BUILDDIR=/home/steves/tech/hdf5/build
+BUILDDIR=../../../target/classes
 PKGBASE=edu.ucar.ral.nujan
 
 
@@ -33,10 +33,10 @@ badparms() {
   echo "               update: update verification results - Caution"
   echo ""
   echo "Examples:"
-  echo "./testSyn.sh v1  contig  0 fixed16  1"
-  echo "./testSyn.sh v1  chunked 0 string14 2"
-  echo "./testSyn.sh v2  contig  0 vstring  all"
-  echo "./testSyn.sh all all     0 all      all"
+  echo "./testHdfSyn.sh v1  contig  0 fixed16  1"
+  echo "./testHdfSyn.sh v1  chunked 0 string14 2"
+  echo "./testHdfSyn.sh v2  contig  0 vstring  all"
+  echo "./testHdfSyn.sh all all     0 all      all"
   exit 1
 }
 
@@ -90,12 +90,6 @@ echo "chunks: $chunks"
 echo "compressVals: $compressVals"
 echo "dtypes: $dtypes"
 echo "ranks: $ranks"
-
-make all
-if [ $? -ne 0 ]; then badparms "make failed"; fi
-
-
-
 
 
 

@@ -1,6 +1,10 @@
 #!/bin/sh
 
 
+# Invoke h5dump and ncdump on newDs, which is a NetCDF4 binary file.
+# Filter out some noise in the output.
+# Compare the resulting output with the old standard, oldTxt.
+# If not identical, print error messages and exit 1.
 
 
 badparms() {
