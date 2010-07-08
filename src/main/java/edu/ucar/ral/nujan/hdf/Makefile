@@ -1,4 +1,11 @@
 
+# OBSOLETE OBSOLETE OBSOLETE OBSOLETE OBSOLETE OBSOLETE 
+# OBSOLETE OBSOLETE OBSOLETE OBSOLETE OBSOLETE OBSOLETE 
+# OBSOLETE OBSOLETE OBSOLETE OBSOLETE OBSOLETE OBSOLETE 
+ 
+# Obsolete: Please use the maven build facilities instead.
+
+
 SRC = $(shell ls *.java)
 
 BUILDDIR = /home/steves/tech/hdf5/build
