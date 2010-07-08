@@ -470,11 +470,24 @@ throws HdfException
 
 
 
-void addWork( String msg, BaseBlk blk) {
-  workList.add( blk);
-  if (bugs >= 5) prtIndent(
-    "addWork: %s added: %s  pos 0x%x  new list len: %d",
-    msg, blk.blkName, blk.blkPosition, workList.size());
+void addWork( String msg, BaseBlk blk)
+throws HdfException
+{
+  boolean foundIt = false;
+  for (BaseBlk wblk : workList) {
+    if (wblk == blk) {
+      foundIt = true;
+      break;
+    }
+  }
+  if (! foundIt) workList.add( blk);
+  if (bugs >= 5) {
+    if (foundIt) prtIndent("addWork: %s ignored duplicate addWork.  blk: %s",
+      msg, blk);
+    else prtIndent(
+      "addWork: %s added: %s  pos 0x%x  new list len: %d",
+      msg, blk.blkName, blk.blkPosition, workList.size());
+  }
 }
 
 

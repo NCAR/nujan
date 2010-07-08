@@ -1,11 +1,18 @@
 #!/bin/sh
 
 
-# Validation with real test data.
+# Validates the NetCDF4 layer using real data.
+#
+# Runs TestNetcdfa.java on various configurations and compares the
+# output with saved known good files.
+#
+# For usage, see badparms below.
 #
 
-NCJAR=/home/ss/ftp/netcdfJava/netcdfAll-4.1.jar
 NCJAR=/d1/steves/ftp/netcdfJava/netcdfAll-4.1.jar
+BUILDDIR=../../../target/classes
+PKGBASE=edu.ucar.ral.nujan
+TESTDIR=.
 
 
 badparms() {
@@ -19,7 +26,7 @@ badparms() {
   echo "  bugs       optional: none / echo / update"
   echo ""
   echo "Examples:"
-  echo "./testReal.sh v1 0 ~/tech/hdf5/src/data/margolis a gfs-grb2.nc"
+  echo "./testNetcdfReal.sh v1 0 testNetcdfRealData/samples a gfs-grb2.nc"
   exit 1
 }
 
@@ -59,8 +66,7 @@ echo "inDir: $inDir"
 echo "subDir: $subDir"
 echo "files: $files"
 
-make all
-if [ $? -ne 0 ]; then badparms "make failed"; fi
+
 
 
 # Copy to testRealOut
@@ -84,7 +90,13 @@ for version in $versions; do
       configMsg="./testReal.sh v$version $compress $inDir $subDir $ifile"
 
       /bin/rm -f tempb.nc
-      copyCmd="java -cp tdcls:../hdf5/tdcls:${NCJAR} nhPkgTest.NhCopy -bugs 0 -compress $compress -fileVersion $version -inFile $inPath -outFile tempb.nc"
+      copyCmd="java -cp ${BUILDDIR}:${NCJAR} \
+        ${PKGBASE}.netcdfTest.NhCopy \
+        -bugs 0 \
+        -compress $compress \
+        -fileVersion $version \
+        -inFile $inPath \
+        -outFile tempb.nc"
       if [ "$bugs" != "none" ]; then echo "copyCmd: $copyCmd"; fi
       $copyCmd > tempb.log
       if [ "$?" -ne "0" ]; then
@@ -102,7 +114,7 @@ for version in $versions; do
         exit 1
       fi
 
-      oldTxt=testRealOut/test.$subDir.$ifile.out.gz
+      oldTxt=${TESTDIR}/testNetcdfRealOut/test.$subDir.$ifile.out.gz
       zcat $oldTxt > tempout.olda
       diffCmd="diff tempout.olda tempout.newa"
       $diffCmd

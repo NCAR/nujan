@@ -1,9 +1,9 @@
 #!/bin/sh
 
 
-# Validate the HDF5 layer using synthetic data.
+# Validates the HDF5 layer using synthetic data.
 #
-# Run Testa.java on various configurations and compare the
+# Runs Testa.java on various configurations and compares the
 # output with saved known good files.
 #
 # For usage, see badparms below.
@@ -15,6 +15,7 @@
 
 BUILDDIR=../../../target/classes
 PKGBASE=edu.ucar.ral.nujan
+TESTDIR=.
 
 
 badparms() {
@@ -158,7 +159,7 @@ testOne() {
 
     echo "  test: $configMsg  size: $(wc -c tempa.h5 | cut -f 1 -d ' ')"
 
-    oldTxt=testSynOut.v$fileVersion/test.$dtype.rank.$rank.out.gz
+    oldTxt=${TESTDIR}/testHdfSynOut.v$fileVersion/test.$dtype.rank.$rank.out.gz
 
     dumpCmd="h5dump -p -w 10000 tempa.h5"
     $dumpCmd > tempout.newa

@@ -27,12 +27,14 @@ clean:
 	/bin/rm -f testflagcls
 	/bin/rm -f temp*
 
+
 dist: testflagcls javadoc jar
 	rm -rf /scratch/steves/nujan
 	mkdir -p /scratch/steves/nujan
 	cp ${BUILDDIR}/*.jar /scratch/steves/nujan
 	cp -r ${DOCDIR} /scratch/steves/nujan/doc
 	cp ../netcdfTest/TestExamplea.java /scratch/steves/nujan
+	cp -r ~/tech/hdf5/svn/nc4writer/trunk/src/main/java /scratch/steves/nujan/src
 	ls -al /scratch/steves/nujan
 
 
@@ -48,7 +50,7 @@ javadoc:
 
 jar: testflagcls
 	/bin/rm -f ${BUILDDIR}/nujan.*.jar
-	(cd ${BUILDDIR}; jar cvf nujan.2010.07.07.b.jar edu)
+	(cd ${BUILDDIR}; jar cvf nujan.2010.07.08.a.jar edu)
 
 
 
