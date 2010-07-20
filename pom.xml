@@ -54,7 +54,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Versions -->
-        <build--maven-plugin.version>1.5</build-helper-maven-plugin.version>
+        <build-helper-maven-plugin.version>1.5</build-helper-maven-plugin.version>
         <changelog-maven-plugin.version>2.0-beta-1</changelog-maven-plugin.version>
         <changes-maven-plugin.version>2.0-beta-1</changes-maven-plugin.version>
         <cobertura-maven-plugin.version>2.3</cobertura-maven-plugin.version>
