@@ -27,7 +27,7 @@
 
 
 package edu.ucar.ral.nujan.netcdf;
-import your.package.here;
+
 import java.util.Arrays;
 
 import edu.ucar.ral.nujan.hdf.HdfException;
