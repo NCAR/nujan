@@ -8,11 +8,11 @@
         <name>Research Applications Laboratory NCAR/RAL</name>
         <url>http:/ral.ucar.edu</url>
     </organization>
-    <groupId>edu.ucar.ral.nujan</groupId>
+    <groupId>edu.ucar.ral</groupId>
     <artifactId>nujan</artifactId>
     <packaging>bundle</packaging>
     <version>1.0-SNAPSHOT</version>
-    <name>Name/Description for the project</name>
+    <name>Pure Java NetCDF 4/HDF 5 writing library</name>
     <url>http://wiki.ucar.edu/display/NNEWD</url>
 
     <ciManagement>
