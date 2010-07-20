@@ -75,9 +75,7 @@
         <maven-resources-plugin.version>2.3</maven-resources-plugin.version>
         <taglist-maven-plugin.version>2.4</taglist-maven-plugin.version>
         <testng.version>5.8</testng.version>
-        <!-- xxx
         <ucar.netcdf-api.version>4.1.20100227.0121-ralfix.1</ucar.netcdf-api.version>
-        -->
         <!-- Date obtained from README in netcdf-4.1.jar -->
         <ucar.unidata-common.version>4.1.20100227.0121</ucar.unidata-common.version>
         <ucar.unidata-grib.version>8.0</ucar.unidata-grib.version>
@@ -235,41 +233,25 @@
 
     <dependencies>
         
-        <!--
         <dependency>
             <groupId>edu.ucar.unidata</groupId>
             <artifactId>netcdf-api</artifactId>
         </dependency>
-        -->
 
-        <dependency>
-          <groupId>netcdfJava</groupId>
-          <artifactId>netcdfJava</artifactId>
-          <version>4.1</version>
-          <scope>system</scope>
-          <systemPath>/d1/steves/ftp/netcdfJava/netcdfAll-4.1.jar</systemPath>
-        </dependency>
-
-        <!--
         <dependency>
             <groupId>edu.ucar.unidata</groupId>
             <artifactId>unidata-common</artifactId>
         </dependency>
-        -->
         
-        <!--
         <dependency>
             <groupId>edu.ucar.unidata</groupId>
             <artifactId>unidata-grib</artifactId>
         </dependency>
-        -->
         
-        <!--
         <dependency>
             <groupId>jj2000.j2k</groupId>
             <artifactId>jpeg2000</artifactId>
         </dependency>
-        -->
 
         <dependency>
             <groupId>commons-codec</groupId>
