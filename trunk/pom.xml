@@ -420,7 +420,7 @@
                             visad.util;resolution:=optional,
                             edu.ucar.rap;resolution:=optional,
                         </Import-Package>
-                        <Embed-Dependency>unidata-grib,netcdf-api,unidata-common,jpeg2000</Embed-Dependency>
+                        <Embed-Dependency></Embed-Dependency>
                         <DynamicImport-Package>*</DynamicImport-Package>
                         <Bundle-ClassPath>.</Bundle-ClassPath>
                         <!-- Comment out the src/main/resources for including src/test/resources for testing -->
