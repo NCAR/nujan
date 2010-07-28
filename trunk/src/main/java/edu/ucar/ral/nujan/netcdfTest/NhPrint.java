@@ -30,11 +30,11 @@ package edu.ucar.ral.nujan.netcdfTest;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 
 import ucar.ma2.Array;
 import ucar.ma2.DataType;
-import ucar.ma2.Index;
-import ucar.ma2.IndexIterator;
 import ucar.nc2.Attribute;
 import ucar.nc2.Dimension;
 import ucar.nc2.Group;
@@ -51,9 +51,24 @@ import ucar.nc2.Variable;
 public class NhPrint {
 
 
+static void badparms( String msg) {
+  prtf("Error: " + msg);
+  prtf("Parms:");
+  prtf("  -bugs       debug level.  Default is 0.");
+  prtf("  -sort       y/n.  Sort groups, attributes, and variables.");
+  prtf("  -inFile     input file name.");
+  prtf("");
+  prtf("Example:");
+  prtf("java -cp x/classes:x/netcdfAll-4.1.jar edu.ucar.ral.nujan.netcdfTest.NhPrint -bugs 0 -sort y -inFile tempa.nc");
+  System.exit(1);
+}
+
+
+
+
 public static void main( String[] args) {
   try {
-    printIt( args);
+    runIt( args);
   }
   catch( Exception exc) {
     exc.printStackTrace();
@@ -65,22 +80,11 @@ public static void main( String[] args) {
 
 
 
-static void badparms( String msg) {
-  prtf("Error: " + msg);
-  prtf("Parms:");
-  prtf("  -bugs       debug level.  Default is 0.");
-  prtf("  -inFile     input file name.");
-  prtf("");
-  prtf("Example:");
-  prtf("java -cp tdcls:netcdfAll-4.0.jar testpk.NhPrint -inFile ta.nc");
-  System.exit(1);
-}
-
-
-static void printIt( String[] args)
+static void runIt( String[] args)
 throws Exception
 {
   int bugs = 0;
+  boolean sortFlag = false;
   String inFile = null;
   int iarg = 0;
   while (iarg < args.length) {
@@ -88,6 +92,7 @@ throws Exception
     if (iarg >= args.length) badparms("no value for the last key");
     String val = args[iarg++];
     if (key.equals("-bugs")) bugs = Integer.parseInt( val);
+    else if (key.equals("-sort")) sortFlag = parseBoolean( key, val);
     else if (key.equals("-inFile")) inFile = val;
     else badparms("unknown parm: \"" + key + "\"");
   }
@@ -100,8 +105,7 @@ throws Exception
     inCdf = NetcdfFile.open( inFile);
     Group inGroup = inCdf.getRootGroup();
 
-    // pass 1: define vars
-    printGroup( inGroup, bugs, 0);
+    printGroup( inGroup, sortFlag, bugs, 0);
     inCdf.close();
     inCdf = null;
   }
@@ -109,7 +113,7 @@ throws Exception
     exc.printStackTrace();
     badparms("const: caught: " + exc);
   }
-} // end const
+} // end runIt
 
 
 
@@ -118,6 +122,7 @@ throws Exception
 
 static void printGroup(
   Group inGroup,
+  boolean sortFlag,
   int bugs,
   int indent)
 throws Exception
@@ -126,15 +131,39 @@ throws Exception
   prtIndent( indent, "Group: name: " + inGroup.getName());
   prtIndent( indent, "Group: shortName: " + inGroup.getShortName());
 
-  for (Attribute attr : inGroup.getAttributes()) {
+  Attribute[] attrs = inGroup.getAttributes().toArray( new Attribute[0]);
+  if (sortFlag) {
+    Arrays.sort( attrs, new Comparator<Attribute>() {
+      public int compare( Attribute attra, Attribute attrb) {
+        return attra.getName().compareTo( attrb.getName());
+      }
+    });
+  }
+  for (Attribute attr : attrs) {
     printAttr( "global", attr, indent);
   }
 
-  for (Dimension dim : inGroup.getDimensions()) {
+  Dimension[] dims = inGroup.getDimensions().toArray( new Dimension[0]);
+  if (sortFlag) {
+    Arrays.sort( dims, new Comparator<Dimension>() {
+      public int compare( Dimension dima, Dimension dimb) {
+        return dima.getName().compareTo( dimb.getName());
+      }
+    });
+  }
+  for (Dimension dim : dims) {
     prtIndent( indent, "dim: %s", dim);
   }
 
-  for (Variable var : inGroup.getVariables()) {
+  Variable[] vars = inGroup.getVariables().toArray( new Variable[0]);
+  if (sortFlag) {
+    Arrays.sort( vars, new Comparator<Variable>() {
+      public int compare( Variable vara, Variable varb) {
+        return vara.getName().compareTo( varb.getName());
+      }
+    });
+  }
+  for (Variable var : vars) {
     prtIndent( indent, "");
     prtIndent( indent, "var: %s", var);
     prtIndent( indent, "getName: %s", var.getName());
@@ -154,8 +183,16 @@ throws Exception
     printArray( indent + 1, arr);
   }
 
-  for (Group inSub : inGroup.getGroups()) {
-    printGroup( inSub, bugs, indent + 1);
+  Group[] subGroups = inGroup.getGroups().toArray( new Group[0]);
+  if (sortFlag) {
+    Arrays.sort( subGroups, new Comparator<Group>() {
+      public int compare( Group suba, Group subb) {
+        return suba.getName().compareTo( subb.getName());
+      }
+    });
+  }
+  for (Group inSub : subGroups) {
+    printGroup( inSub, sortFlag, bugs, indent + 1);
   }
   
 } // end printGroup
@@ -182,6 +219,11 @@ throws Exception
   printArray( indent + 2, arr);
   prtIndent( indent + 1, "attr.toString: %s", attr);
 }
+
+
+
+
+
 
 
 static void printArray( int indent, Array arr)
@@ -237,6 +279,22 @@ static void printArray( int indent, Array arr)
     }
   }
 }
+
+
+
+
+
+static boolean parseBoolean(
+  String key,
+  String val)
+{
+  boolean bres = false;
+  if (val.equals("n")) bres = false;
+  else if (val.equals("y")) bres = true;
+  else badparms("invalid value for parm " + key + ": \"" + val + "\"");
+  return bres;
+}
+
 
 
 
