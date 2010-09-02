@@ -16,6 +16,7 @@
 BUILDDIR=../../../target/classes
 PKGBASE=edu.ucar.ral.nujan
 TESTDIR=.
+H5CHECK=/d1/steves/ftp/hdf5/tdi/bin/h5check
 
 
 badparms() {
@@ -43,9 +44,9 @@ badparms() {
 
 if [ $# -eq 1 ]; then
   if [ "$1" != "all" ]; then badparms "wrong num parms"; fi
-  ./testSyn.sh all all 0 all all
+  ./testHdfSyn.sh all all 0 all all
   if [ "$?" -ne 0 ]; then echo "exiting"; exit 1; fi
-  ./testSyn.sh all chunked 5 all all
+  ./testHdfSyn.sh all chunked 5 all all
   if [ "$?" -ne 0 ]; then echo "exiting"; exit 1; fi
   exit 0
 fi
@@ -145,26 +146,37 @@ testOne() {
       -fileVersion $fileVersion \
       -chunked $chunk \
       -compress $compress \
+      -utcModTime 0 \
       -outFile tempa.h5"
 
     if [ "$bugs" != "none" ]; then echo "cmd: $cmd"; fi
-    configMsg="./testSyn.sh v$fileVersion $chunk $compress $dtype $rank"
+    configMsg="./testHdfSyn.sh v$fileVersion $chunk $compress $dtype $rank"
 
     $cmd > tempa.log
     if [ "$?" -ne "0" ]; then
-      echo "Cmd failed for config: $configMsg"
+      echo "Cmd failed for:"
+      echo "  config: $configMsg"
       echo "  cmd: $cmd"
       exit 1
     fi
 
     echo "  test: $configMsg  size: $(wc -c tempa.h5 | cut -f 1 -d ' ')"
 
+    $H5CHECK tempa.h5 > /dev/null
+    if [ "$?" -ne "0" ]; then
+      echo "$H5CHECK failed for:"
+      echo "  config: $configMsg"
+      echo "  cmd: $cmd"
+      exit 1
+    fi
+
     oldTxt=${TESTDIR}/testHdfSynOut.v$fileVersion/test.$dtype.rank.$rank.out.gz
 
     dumpCmd="h5dump -p -w 10000 tempa.h5"
     $dumpCmd > tempout.newa
     if [ "$?" -ne "0" ]; then
-      echo "h5dump failed for config: $configMsg"
+      echo "h5dump failed for:"
+      echo "  config: $configMsg"
       echo "  cmd: $cmd"
       echo "  dumpCmd: $dumpCmd"
       exit 1
@@ -207,7 +219,7 @@ testOne() {
     $diffCmd
     diffOk=$?
 
-    # Copy to testSynOut
+    # If update, copy to testSynOut
     if [ "$bugs" == "update" ]; then
       gzip -c tempout.newe > $oldTxt
       echo '*** updated ***'
@@ -216,7 +228,8 @@ testOne() {
     if [ "$diffOk" -ne "0" \
       -a "$bugs" != "continue" \
       -a "$bugs" != "update" ]; then
-      echo "Diff failed for config: $configMsg"
+      echo "Diff failed for:"
+      echo "  config: $configMsg"
       echo "  cmd: $cmd"
       echo "  diffCmd: $diffCmd"
       echo "wc:"

@@ -31,29 +31,64 @@ package edu.ucar.ral.nujan.hdf;
 import java.util.ArrayList;
 
 
-// This is a version 1 Btree node, required for chunked data.
+/**
+ * Represents a Btree node, required for chunked data.
+ * <p>
+ * Rather than have a full tree structure, we just use a single
+ * leaf node that may be huge.  Performance tests have shown
+ * this performs as well as the hierarchical tree structure.
+ *
+ * BtreeNodes are used in two places:<ul>
+ *   <li> For fileVersion==1, HdfGroup uses a BtreeNode for the symbol table.
+ *        In this case we have subTableList = list of exactly 1
+ *        SymbolTable.  The SymbolTable can contain as many
+ *        symbols as needed.
+ *   <li> For fileVersion==1 and 2, MsgLayout uses a BtreeNode
+ *     to point to the raw data chunks.
+ *     Theoretically we could have a whole tree of chunks, but
+ *     we always have exactly 1 chunk.  In general this is like
+ *     the contiguous format, but we must use chunked since
+ *     HDF5 compression requires chunked format.
+ * </ul>
+ *
+ */
 
 class BtreeNode extends BaseBlk {
 
-static final int NT_GROUP = 0;  // this tree points to group nodes
-                                //   (only used for fileVersion==1)
-static final int NT_DATA  = 1;  // this tree points to raw data chunk nodes
+/**
+ * This tree points to group nodes
+ * (only used for fileVersion==1)
+ */
+static final int NT_GROUP = 0;
+
+/**
+ * This tree points to raw data chunk nodes.
+ */
+static final int NT_DATA  = 1;
+
 static final String[] nodeTypeNames = {"GROUP", "DATA"};
 
 
-// For fileVersion==1 only:
-// If we're an internal node:
-// Our children are BtreeNodes (numKid of them).
+/**
+ * For an internal node with fileVersion==1: list of our children
+ * (numKid of them).
+ */
 ArrayList<BtreeNode> subNodeList = null;
 
-// For fileVersion==1 only:
-// Else we're a so-called leaf node, although the
-// true leaf nodes are SymbolTables.
-// Our children are SymbolTables (numKid of them).
+/**
+ * For a NON-internal node with fileVersion==1:
+ * we're a so-called leaf node, and subTableList
+ * is a list of our children SymbolTables
+ * (numKid of them).
+ * Although the true leaf nodes are SymbolTables.
+ * We have only 1 element in subTableList: symbolTable.
+ */
 ArrayList<SymbolTable> subTableList = null;
 
-// For fileVersion==1 only:
-// This is the only member of subTableList.
+/**
+ * For a NON-internal node with fileVersion==1:
+ * this is the only element in subTableList.
+ */
 SymbolTable symbolTable;
 
 // For fileVersion==1 only:
@@ -86,8 +121,9 @@ final byte[] highKey = new byte[] {
 
 
 
-// For fileVersion==1 only:
-// Constructor for NT_GROUP trees.
+/**
+ * Constructor used with fileVersion==1 SymbolTables.
+ */
 BtreeNode(
   LocalHeap localHeap,
   HdfFileWriter hdfFile)
@@ -115,8 +151,10 @@ throws HdfException
 
 
 
-// For fileVersion==2 or (fileVersion==1 and NT_DATA):
-// Constructor for NT_DATA trees.
+/**
+ * Constructor for NT_DATA trees, for either fileVersion==1 or 2.
+ */
+
 BtreeNode(
   int compressionLevel,
   HdfGroup hdfGroup,
@@ -152,8 +190,10 @@ public String toString() {
 }
 
 
-// For fileVersion==1 only:
-// Called by HdfGroup.addSubGroup.
+/**
+ * Adds a name to the symbolTable - for fileVersion==1 only.
+ * Called by HdfGroup.addSubGroup.
+ */
 void addTreeName(
   HdfGroup subGroup)
 throws HdfException
@@ -163,67 +203,80 @@ throws HdfException
 
 
 
-// The formatted output is always the same, the fileVersion==1 format.
-// Oddly fileVersion==2 only uses Btrees for the chunked data,
-// but requires fileVersion==1 Btrees for data chunks.
-//
-// We must format all the entries to fill out the btree node,
-// even if some are empty.
-// If the full table is not present, the HDF5 C software
-// may die when it tries to load the table and finds
-// the max table length extends beyond the end of file.
-//
-// A sample stack trace is appended to this file.
-//
-// ==========
-//
-// Analysis of Btree node size in HDF5 1.8.4 C API.
-//
-// See H5B.c:1784
-//     shared->sizeof_rnode = (H5B_SIZEOF_HDR(f) +    /*node header  */
-//       shared->two_k * H5F_SIZEOF_ADDR(f) +         /*child pointers */
-//       (shared->two_k + 1) * shared->sizeof_rkey);  /*keys    */
-// 
-// Expanding:
-//     shared->sizeof_rnode = (
-//       H5B_SIZEOF_HDR(f)
-//              # See H5B.c:118
-//              #   header: 4(magic) + 1(type) + 1(level) + 2(numUsed)
-//              #         + 8(leftSibling) + 8(rightSibling) = 24
-// 
-//     + shared->two_k
-//              # See H5B.c:1761,1780
-//              #     H5B_shared_new(...)
-//              #     two_k = 2 * H5F_KVALUE(f, type)
-//              # See H5Fprivate.h:267
-//              #     #define H5F_KVALUE(F,T)         (H5F_Kvalue(F,T))
-//              # See H5Fquery.c:289
-//              #     H5F_Kvalue(const H5F_t *f, const H5B_class_t *type)
-//              #     returns: f->shared->sblock->btree_k[type->id]
-//              #       = 2 * shared->sblock->btree_k[type(SNODE or CHUNK)]
-//              #
-//              # However, sometimes the btree_k we specify is
-//              # overridden by the default:
-//              # See H5Fsuper_cache.c:267
-//              #     btree_k[H5B_CHUNK_ID] = HDF5_BTREE_CHUNK_IK_DEF;
-//              # See H5Fprivate.h:396
-//              #     #define HDF5_BTREE_SNODE_IK_DEF         16
-//              #     #define HDF5_BTREE_CHUNK_IK_DEF         32
-//              #     /* Note! this value is assumed to be 32 for
-//              #     version 0 of the superblock and if it is
-//              #     changed, the code must compensate. -QAK */
-// 
-//     * H5F_SIZEOF_ADDR(f)
-//              # See H5Fprivate.h:240
-//              #     #define H5F_SIZEOF_ADDR(F)   ((F)->shared->sizeof_addr)
-//               #     = 8   # len of ptr
-// 
-//     + (shared->two_k + 1) * shared->sizeof_rkey);
-//              # See H5Dbtree.c: H5D_btree_shared_create
-//              #   sizeof_rkey = 4 +         # chunk size
-//              #                 4 +         # filter mask
-//              #                 ndims * 8;  # dimension offsets
 
+/**
+ * Formats the block to output buffer fmtBuf - see notes below.
+ *
+ * <pre>
+ * The formatted output is always the same, the fileVersion==1 format.
+ * Oddly fileVersion==2 only uses Btrees for the chunked data,
+ * but requires fileVersion==1 Btrees for data chunks.
+ *
+ * We must format all the entries to fill out the btree node,
+ * even if some are empty.
+ * If the full table is not present, the HDF5 C software
+ * may die when it tries to load the table and finds
+ * the max table length extends beyond the end of file.
+ *
+ * A sample stack trace is appended to this file.
+ *
+ * ==========
+ *
+ * Analysis of Btree node size in HDF5 1.8.4 C API.
+ *
+ * See H5B.c:1784
+ *     shared->sizeof_rnode = (H5B_SIZEOF_HDR(f) +    // node header
+ *       shared->two_k * H5F_SIZEOF_ADDR(f) +         // child pointers
+ *       (shared->two_k + 1) * shared->sizeof_rkey);  // keys
+ * 
+ * Expanding:
+ *     shared->sizeof_rnode = (
+ *       H5B_SIZEOF_HDR(f)
+ *              # See H5B.c:118
+ *              #   header: 4(magic) + 1(type) + 1(level) + 2(numUsed)
+ *              #         + 8(leftSibling) + 8(rightSibling) = 24
+ * 
+ *     + shared->two_k
+ *              # See H5B.c:1761,1780
+ *              #     H5B_shared_new(...)
+ *              #     two_k = 2 * H5F_KVALUE(f, type)
+ *              # See H5Fprivate.h:267
+ *              #     #define H5F_KVALUE(F,T)         (H5F_Kvalue(F,T))
+ *              # See H5Fquery.c:289
+ *              #     H5F_Kvalue(const H5F_t *f, const H5B_class_t *type)
+ *              #     returns: f->shared->sblock->btree_k[type->id]
+ *              #       = 2 * shared->sblock->btree_k[type(SNODE or CHUNK)]
+ *              #
+ *              # However, sometimes the btree_k we specify is
+ *              # overridden by the default:
+ *              # See H5Fsuper_cache.c:267
+ *              #     btree_k[H5B_CHUNK_ID] = HDF5_BTREE_CHUNK_IK_DEF;
+ *              # See H5Fprivate.h:396
+ *              #     #define HDF5_BTREE_SNODE_IK_DEF         16
+ *              #     #define HDF5_BTREE_CHUNK_IK_DEF         32
+ *              #     /* Note! this value is assumed to be 32 for
+ *              #     version 0 of the superblock and if it is
+ *              #     changed, the code must compensate. -QAK
+ * 
+ *     * H5F_SIZEOF_ADDR(f)
+ *              # See H5Fprivate.h:240
+ *              #     #define H5F_SIZEOF_ADDR(F)   ((F)->shared->sizeof_addr)
+ *               #     = 8   # len of ptr
+ * 
+ *     + (shared->two_k + 1) * shared->sizeof_rkey);
+ *              # See H5Dbtree.c: H5D_btree_shared_create
+ *              #   sizeof_rkey = 4 +         # chunk size
+ *              #                 4 +         # filter mask
+ *              #                 ndims * 8;  # dimension offsets
+ * </pre>
+ *
+ * @param formatPass: <ul>
+ *   <li> 1: Initial formatting to determine the formatted length.
+ *          In HdfGroup we add msgs to hdrMsgList.
+ *   <li> 2: Final formatting.
+ * </ul>
+ * @param fmtBuf  output buffer
+ */
 
 void formatBuf( int formatPass, HBuffer fmtBuf)
 throws HdfException
@@ -362,7 +415,7 @@ throws HdfException
 // expects, and the calculated table end falls beyond the eof.
 //
 // Why keep a stack trace?  It may be useful the next time
-// someone has to use gdb to debug a btree problem.
+// someone has to use gdb with HDF5 to debug a btree problem.
 // In particular the breakpoint at H5Bcache.c:200 was handy.
 //
 // #1  0x081148af in H5FD_read (file=0x84b9408, dxpl_id=167772168,

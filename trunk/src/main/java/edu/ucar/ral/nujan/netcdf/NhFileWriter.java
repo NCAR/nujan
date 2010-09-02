@@ -245,7 +245,9 @@ public NhFileWriter(
   String path)
 throws NhException
 {
-  this( path, 0, 2, 0, 0);     // optFlag = 0, fileVersion = 2, bugs = 0, 0
+  this( path, 0, 2, 0, 0, 0);  // optFlag = 0, fileVersion = 2,
+                               // bugs = 0, 0
+                               // utcModTime = 0 (use current time)
 }
 
 
@@ -262,7 +264,8 @@ public NhFileWriter(
   int optFlag)                    // zero or more OPT_* bit options
 throws NhException
 {
-  this( path, optFlag, 2, 0, 0);  // fileVersion = 2, bugs = 0, 0
+  this( path, optFlag, 2, 0, 0, 0);  // fileVersion = 2, bugs = 0, 0,
+                                     // utcModTime = 0 (use current time)
 }
 
 
@@ -290,7 +293,8 @@ public NhFileWriter(
   int optFlag,                   // zero or more OPT_* bit options
   int fileVersion,
   int nhDebugLevel,
-  int hdfDebugLevel)
+  int hdfDebugLevel,
+  long utcModTime)           // milliSecs since 1970, or if 0 use current time
 throws NhException
 {
   this.path = path;
@@ -304,7 +308,8 @@ throws NhException
     if ((optFlag & OPT_OVERWRITE) != 0)
       hdfOptFlag |= HdfFileWriter.OPT_ALLOW_OVERWRITE;
     hdfFile = new HdfFileWriter(
-      path, fileVersion, hdfOptFlag, hdfDebugLevel);
+      path, fileVersion, hdfOptFlag, hdfDebugLevel,
+      utcModTime);
     rootGroup = new NhGroup( "", null, this);
       // rootName, parent, nhFileWriter
     rootGroup.hdfGroup = hdfFile.getRootGroup();

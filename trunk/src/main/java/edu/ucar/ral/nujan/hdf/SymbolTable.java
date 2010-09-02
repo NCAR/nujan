@@ -33,6 +33,15 @@ import java.util.Arrays;
 import java.util.Comparator;
 
 
+
+/**
+ * Implements an HDF5 symbol table; used only for fileVersion 1.
+ * The SymbolTable is a leaf node on a fileVersion 1 BtreeNode
+ * and stores all the symbols for a group's subgroups and
+ * variables.
+ * <p>
+ * A SymbolTable is essentially just a list of SymTabEntry.
+ */
 class SymbolTable extends BaseBlk {
 
 
@@ -50,6 +59,11 @@ final int signd = 'D';
 final int tableVersion = 1;
 
 
+
+/**
+ * @param localHeap The owning group's individual local heap.
+ * @param hdfFile The global owning HdfFileWriter.
+ */
 
 SymbolTable(
   LocalHeap localHeap,

@@ -33,7 +33,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 
-// Msg 05: fill value
+/**
+ * HDF5 message type 5: MsgFillValue: specify data fill value.
+ */
 
 class MsgFillValue extends MsgBase {
 
@@ -67,6 +69,35 @@ int fillDefined;
 byte[] fillBytes;
 
 
+/**
+ * @param dtype The fill value type - one of HdfGroup.DTYPE*.
+ * @param isFillExtant There are 4 cases:
+ *   <table border="1'>
+ *   <tr><th> isFillExtant </th><th> fillValue </th><th> HDF5 result </th></tr>
+ *   <tr><td> false </td><td> null     </td><td> no fill value </td></tr>
+ *   <tr><td> true  </td><td> null     </td><td> use default fill value (fillDefined=1, fillLen=0)</td></tr>
+ *   <tr><td> false </td><td> Non-null </td><td> error </td></tr>
+ *   <tr><td> true  </td><td> Non-null </td><td> specified fill value </td></tr>
+ *   </table>
+ *
+ * @param fillValue The fill value.  They type must agree with dtype:
+ *   <table border="1'>
+ *   <tr><th> dtype                     </th><th> fillValue Java type </th></tr>
+ *   <tr><td> HdfGroup.DTYPE_SFIXED08   </td><td> Byte    </td></tr>
+ *   <tr><td> HdfGroup.DTYPE_UFIXED08   </td><td> Byte    </td></tr>
+ *   <tr><td> HdfGroup.DTYPE_FIXED16    </td><td> Short   </td></tr>
+ *   <tr><td> HdfGroup.DTYPE_FIXED32    </td><td> Integer </td></tr>
+ *   <tr><td> HdfGroup.DTYPE_FIXED64    </td><td> Long    </td></tr>
+ *   <tr><td> HdfGroup.DTYPE_FLOAT32    </td><td> Float   </td></tr>
+ *   <tr><td> HdfGroup.DTYPE_FLOAT64    </td><td> Double  </td></tr>
+ *   <tr><td> HdfGroup.DTYPE_STRING_FIX </td><td> String  </td></tr>
+ *   <tr><td> HdfGroup.DTYPE_STRING_VAR </td><td> String  </td></tr>
+ *   </table>
+ *
+ * @param hdfGroup The owning HdfGroup.
+ * @param hdfFile The global owning HdfFileWriter.
+ */
+
 // If isFillExtant but fillValue==null,
 // we output fillDefined=1, fillLen=0,
 // which h5dump interprets as "fill value defined: default".
@@ -77,7 +108,6 @@ MsgFillValue(
   boolean isFillExtant,           // if extant but fillValue==null: default
   Object fillValue,               // null, Byte, Short, Int, Long,
                                   // Float, Double, String, etc.
-  int elementLen,                 // element length of the fillValue
   HdfGroup hdfGroup,              // the owning group
   HdfFileWriter hdfFile)
 throws HdfException
@@ -86,22 +116,43 @@ throws HdfException
   this.dtype = dtype;
   this.isFillExtant = isFillExtant;
   this.fillValue = fillValue;
-  this.elementLen = elementLen;
 
+  elementLen = 0;
   if (! isFillExtant) {
     if (fillValue != null) throwerr("not extant but fillValue != null");
-    if (elementLen != 0) throwerr("fillValue == null but elementLen != 0");
     fillDefined = 0;
     fillBytes = null;
   }
 
   else if (fillValue == null) {
-    if (elementLen != 0) throwerr("fillValue == null but elementLen != 0");
     fillDefined = 1;
     fillBytes = null;
   }
 
   else {
+
+    // Set elementLen
+    if (dtype == HdfGroup.DTYPE_SFIXED08) elementLen = 1;
+    else if (dtype == HdfGroup.DTYPE_UFIXED08) elementLen = 1;
+    else if (dtype == HdfGroup.DTYPE_FIXED16) elementLen = 2;
+    else if (dtype == HdfGroup.DTYPE_FIXED32) elementLen = 4;
+    else if (dtype == HdfGroup.DTYPE_FIXED64) elementLen = 8;
+    else if (dtype == HdfGroup.DTYPE_FLOAT32) elementLen = 4;
+    else if (dtype == HdfGroup.DTYPE_FLOAT64) elementLen = 8;
+    else if (dtype == HdfGroup.DTYPE_STRING_FIX) {
+      byte[] bytes = HdfUtil.encodeString( (String) fillValue, true, hdfGroup);
+      elementLen = bytes.length;
+      prtf("xxx testaa: fillValue: \"" + fillValue + "\"  elementLen: "
+        + elementLen + "  dtype: " + HdfGroup.dtypeNames[ dtype]);
+    }
+    else if (dtype == HdfGroup.DTYPE_STRING_VAR) {
+      // Element is: len(4), gcolAddr(8), gcolIndex(4)
+      elementLen = 4 + 8 + 4;
+    }
+    else throwerr("illegal dtype for fill value: " + dtype);
+
+
+
     fillDefined = 1;
     fillBytes = new byte[elementLen];
     ByteBuffer tbuf = ByteBuffer.wrap( fillBytes);
@@ -150,7 +201,7 @@ throws HdfException
         throwerr("fill type mismatch.  Expected: String.  Found: "
           + fillValue.getClass() + "  for group: " + hdfGroup.getPath());
       byte[] bytes = HdfUtil.encodeString( (String) fillValue, true, hdfGroup);
-      tbuf.put( HdfUtil.truncPadNull( bytes, elementLen));
+      tbuf.put( bytes);
     }
     else if (dtype == HdfGroup.DTYPE_STRING_VAR) {
       // We will fill the fillBytes later, in formatMsgCore below,
@@ -160,8 +211,6 @@ throws HdfException
       if (! (fillValue instanceof String))
         throwerr("fill type mismatch.  Expected: String.  Found: "
           + fillValue.getClass() + "  for group: " + hdfGroup.getPath());
-      if (elementLen != 4 + HdfFileWriter.OFFSET_SIZE + 4)
-        throwerr("invalid elementLen for fillValue");
     }
     else throwerr("unknown dtype for fillValue."
       + "  dtype: " + dtype

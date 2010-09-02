@@ -30,7 +30,15 @@ package edu.ucar.ral.nujan.hdf;
 
 
 
-// Msg 21: attribute info
+/**
+ * HDF5 message type 21: MsgAttrInfo:
+ * attribute info (not the Attribute itself - see MsgAttribute).
+ * <p>
+ * Extends abstract MsgBase, so we must implement formatMsgCore
+ * (see doc for class MsgBase).
+ * <p>
+ * A new MsgAttrInfo is created in the HdfGroup constructors.
+ */
 
 class MsgAttrInfo extends MsgBase {
 
@@ -39,11 +47,20 @@ class MsgAttrInfo extends MsgBase {
 
 final int version = 0;
 
-// Flag bits:
-//   0:  track creation order for attrs
-//   1:  index creation order for attrs
+/**
+ * Flag bits:<ul>
+ *   <li> 0:  track creation order for attrs
+ *   <li> 1:  index creation order for attrs
+ * </ul>
+ */
+
 final int flag = 3;
 
+
+/**
+ * @param hdfGroup The owning HdfGroup.
+ * @param hdfFile The global owning HdfFileWriter.
+ */
 
 MsgAttrInfo(
   HdfGroup hdfGroup,              // the owning group
@@ -63,8 +80,12 @@ public String toString() {
 
 
 
+/**
+ * Extends abstract MsgBase:
+ * formats everything after the message header into fmtBuf.
+ * Called by MsgBase.formatFullMsg and MsgBase.formatNakedMsg.
+ */
 
-// Format everything after the message header
 void formatMsgCore( int formatPass, HBuffer fmtBuf)
 throws HdfException
 {

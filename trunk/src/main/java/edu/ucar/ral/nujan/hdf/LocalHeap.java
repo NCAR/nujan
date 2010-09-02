@@ -32,6 +32,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 
+
+/**
+ * Represents a local heap.  These are used in fileVersion==1
+ * SymbolTables to keep the names of subgroups and variables.
+ */
+
 class LocalHeap extends BaseBlk {
 
 final int signa = 'H';
@@ -40,12 +46,22 @@ final int signc = 'A';
 final int signd = 'P';
 
 final int heapVersion = 0;
-long dataSegLen;
-long dataSegAddr;
 
-// Internal variables
-int curHeapLen = 0;          // offset of next free byte
+/**
+ * Offset of the next free bytee.
+ */
+int curHeapLen = 0;
+
+/**
+ * Array of the actual items to be stored in the heap.
+ * Parallel array with offsetList.
+ */
 ArrayList<byte[]> itemList;
+
+/**
+ * Array of the offsets of the heap items.
+ * Parallel array with itemList.
+ */
 ArrayList<Integer> offsetList;
 
 
@@ -73,6 +89,10 @@ public String toString() {
 
 
 
+/**
+ * Adds itemBare to our itemList, updates our offsetList,
+ * and returns offsetList[n-1] == the byte offset of itemBare.
+ */
 
 int putHeapItem(
   String msg,
@@ -108,8 +128,36 @@ throws HdfException
 
 
 
-// Scan itemList for matching item
-// Returns -1 if not found
+/**
+ * Scans itemList for a matching item; returns the item's offset
+ * in the heap, or throws an HdfException if not found.
+ */
+
+// Throws exc if not found
+int getHeapOffset(
+  byte[] itemBare)                 // without null termination
+throws HdfException
+{
+  // Add null term
+  byte[] itemTerm = Arrays.copyOf( itemBare, itemBare.length + 1);
+
+  int ires = getHeapOffsetSub( itemTerm);
+  if (ires < 0)
+    throwerr("getHeapOffset: item not found: %s",
+      HdfUtil.formatBytes( itemBare, 0, itemBare.length));
+  return ires;
+}
+
+
+
+
+
+
+/**
+ * Scans itemList for a matching item; returns the item's offset
+ * in the heap, or -1 if not found.
+ */
+
 int getHeapOffsetSub(
   byte[] itemTerm)          // null terminated
 throws HdfException
@@ -130,24 +178,12 @@ throws HdfException
 
 
 
-// Throws exc if not found
-int getHeapOffset(
-  byte[] itemBare)                 // without null termination
-throws HdfException
-{
-  // Add null term
-  byte[] itemTerm = Arrays.copyOf( itemBare, itemBare.length + 1);
-
-  int ires = getHeapOffsetSub( itemTerm);
-  if (ires < 0)
-    throwerr("getHeapOffset: item not found: %s",
-      HdfUtil.formatBytes( itemBare, 0, itemBare.length));
-  return ires;
-}
 
 
-
-
+/**
+ * Extends abstract BaseBlk: formats this individual BaseBlk
+ * to fmtBuf.
+ */
 
 void formatBuf( int formatPass, HBuffer fmtBuf)
 throws HdfException

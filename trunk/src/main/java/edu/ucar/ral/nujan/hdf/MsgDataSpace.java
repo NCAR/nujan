@@ -32,10 +32,13 @@ package edu.ucar.ral.nujan.hdf;
 import java.util.Arrays;
 
 
-// Msg 01: dataSpace
-// Note that for empty attributes, only the v2 file format
-// has the null dataspace message.
-// The v1 file format does not have a null dataspace.
+/**
+ * HDF5 message type 1: MsgDataSpace: contains dimension info
+ * <p>
+ * Note that for empty attributes, only the v2 file format
+ * has the null dataspace message.
+ * The v1 file format does not have a null dataspace.
+ */
 
 class MsgDataSpace extends MsgBase {
 
@@ -45,9 +48,9 @@ class MsgDataSpace extends MsgBase {
 final int msgVersion = 1;
 
 // Bits for spaceFlag:
-//   0  maxSizes are present
-//   1  permutations are present
-int spaceFlag = 1;           // maxSizes are present
+//   0  maxSizes are present (decimal 1)
+//   1  permutations are present (decimal 2)
+int spaceFlag = 0;           // no maxSizes, no permutations
 
 
 int[] varDims;               // size of each dimension
@@ -66,6 +69,12 @@ long[] dimPermuations;
 
 
 
+/**
+ * @param varDims The length of each dimension.
+ * @param hdfGroup The owning HdfGroup.
+ * @param hdfFile The global owning HdfFileWriter.
+ */
+
 MsgDataSpace(
   int[] varDims,
   HdfGroup hdfGroup,                    // the owning group
@@ -80,7 +89,9 @@ MsgDataSpace(
   else {
     this.varDims = Arrays.copyOf( varDims, varDims.length);
     rank = varDims.length;
-    if (varDims.length == 0) totNumEle = 0;
+    if (varDims.length == 0) {
+      totNumEle = 0;
+    }
     else {
       totNumEle = 1;
       for (int ii : varDims) {
@@ -122,7 +133,14 @@ public String toString() {
 
 
 
-// Format everything after the message header
+
+
+
+/**
+ * Extends abstract MsgBase:
+ * formats everything after the message header into fmtBuf.
+ * Called by MsgBase.formatFullMsg and MsgBase.formatNakedMsg.
+ */
 
 void formatMsgCore( int formatPass, HBuffer fmtBuf)
 throws HdfException

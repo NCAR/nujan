@@ -28,15 +28,43 @@
 
 package edu.ucar.ral.nujan.hdf;
 
+/**
+ * Represents a metadata structure (block).
+ * <p>
+ * Extended by BtreeNode GlobalHeap HdfFileWriter HdfGroup
+ *   LocalHeap MsgBase SymbolTable SymTabEntry
+ * <p>
+ * The subclass must override formatBuf to format the
+ * structure to the output buffer.
+ */
+
 
 abstract class BaseBlk {
 
 
+/**
+ * The offset of this BaseBlk in HdfFileWriter.mainBuf.
+ */
 long blkPosition;
 
+/**
+ * For debug: the name of the BaseBlk, such as "HdfGroup" or "MsgAttribute".
+ */
 String blkName;
+
+/**
+ * The global owning HdfFileWriter.
+ */
 HdfFileWriter hdfFile;
 
+
+
+
+/**
+ * @param blkName For debug: the name of the BaseBlk,
+ *   such as "HdfGroup" or "MsgAttribute".
+ * @param hdfFile The global owning HdfFileWriter.
+ */
 
 BaseBlk(
   String blkName,
@@ -56,6 +84,15 @@ public String toString() {
 
 
 
+/**
+ * Formats the block to output buffer fmtBuf.
+ * @param formatPass: <ul>
+ *   <li> 1: Initial formatting to determine the formatted length.
+ *          In HdfGroup we add msgs to hdrMsgList.
+ *   <li> 2: Final formatting.
+ * </ul>
+ * @param fmtBuf  output buffer
+ */
 
 abstract void formatBuf( int formatPass, HBuffer fmtBuf)
 throws HdfException;
@@ -66,8 +103,14 @@ throws HdfException;
 
 
 
+/**
+ * Aligns fmtBuf position to multiple of 8 and sets our blkPosition
+ * to the new position.
+ * Prints debug message for formatBuf entry.
+ * Should be called first thing in formatBuf() in every
+ * class extending BaseBlk.
+ */
 
-// Sets this.blkPosition and bbuf position
 void setFormatEntry(
   int formatPass,
   boolean useAlign,
@@ -85,6 +128,13 @@ throws HdfException
 
 
 
+
+/**
+ * Prints debug message for formatBuf exit.
+ * Should be called last thing in formatBuf() in every
+ * class extending BaseBlk.
+ */
+
 void noteFormatExit(
   HBuffer fmtBuf)
 throws HdfException
@@ -97,6 +147,9 @@ throws HdfException
 
 
 
+/**
+ * Just throws HdfException
+ */
 
 static void throwerr( String msg, Object... args)
 throws HdfException
@@ -107,6 +160,9 @@ throws HdfException
 
 
 
+/**
+ * Prints a line indented by hdfFile.indent.
+ */
 
 void prtIndent( String msg, Object... args) {
   prtf( hdfFile.mkIndent() + msg, args);
@@ -114,6 +170,9 @@ void prtIndent( String msg, Object... args) {
 
 
 
+/**
+ * Prints a line.
+ */
 
 static void prtf( String msg, Object... args) {
   System.out.printf( msg + "\n", args);

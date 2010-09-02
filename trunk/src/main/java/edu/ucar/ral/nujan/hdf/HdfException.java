@@ -29,6 +29,10 @@
 package edu.ucar.ral.nujan.hdf;
 
 
+/**
+ * Simple wrapper around java.lang.Exception.
+ */
+
 public class HdfException extends Exception {
 
 public HdfException( String msg) {

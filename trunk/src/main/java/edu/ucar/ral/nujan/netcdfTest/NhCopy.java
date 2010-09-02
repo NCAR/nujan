@@ -149,7 +149,8 @@ throws NhException
       NhFileWriter.OPT_OVERWRITE,
       fileVersion,
       bugs,          // Netcdf debug level
-      bugs);         // HDF5 debug level
+      bugs,          // HDF5 debug level
+      0);            // utcModTime: use current time.
 
     Group inGroup = inCdf.getRootGroup();
     NhGroup outGroup = outCdf.getRootGroup();

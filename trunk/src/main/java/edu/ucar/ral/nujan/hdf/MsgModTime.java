@@ -33,7 +33,10 @@ import java.util.Date;
 import java.util.SimpleTimeZone;
 
 
-// Msg 18: object modification time
+/**
+ * HDF5 message type 18: MsgModTime:
+ * object modification time.
+ */
 
 class MsgModTime extends MsgBase {
 

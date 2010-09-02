@@ -29,7 +29,10 @@
 package edu.ucar.ral.nujan.hdf;
 
 
-// Msg 03: dataType
+/**
+ * HDF5 message type 3: MsgDataType:
+ * contains data type info (fixed/float/string/etc, elementLen, etc).
+ */
 
 class MsgDataType extends MsgBase {
 
@@ -171,6 +174,18 @@ int stgFieldLen;          // stg len for DTYPE_STRING_FIX, without null term
 
 
 
+
+/**
+ * @param dtype The element type - one of HdfGroup.DTYPE*.
+ * @param dsubTypes Array of subtypes for for DTYPE_VLEN or DTYPE_COMPOUND.
+ *        Each element is one of HdfGroup.DTYPE*.
+ * @param subNames  Member names for DTYPE_COMPOUND.
+ * @param stgFieldLen String length for a DTYPE_STRING_FIX variable,
+ *        without null termination.
+ *        Should be 0 for all other types, including DTYPE_STRING_VAR.
+ * @param hdfGroup The owning HdfGroup.
+ * @param hdfFile The global owning HdfFileWriter.
+ */
 
 MsgDataType(
   int dtype,                 // one of HdfGroup.DTYPE*
@@ -376,6 +391,12 @@ throws HdfException
 
 
 
+
+/**
+ * Throws HdfException if the dsubType is not allowed
+ * for a member of DTYPE_VLEN or DTYPE_COMPOUND.
+ */
+
 void checkDsubType( int dsubType)
 throws HdfException
 {
@@ -421,7 +442,13 @@ public String toString() {
 
 
 
-// Format everything after the message header
+
+/**
+ * Extends abstract MsgBase:
+ * formats everything after the message header into fmtBuf.
+ * Called by MsgBase.formatFullMsg and MsgBase.formatNakedMsg.
+ */
+
 void formatMsgCore( int formatPass, HBuffer fmtBuf)
 throws HdfException
 {

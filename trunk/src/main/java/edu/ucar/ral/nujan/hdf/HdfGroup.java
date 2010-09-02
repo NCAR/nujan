@@ -35,25 +35,49 @@ import java.util.Arrays;
 import java.util.ArrayList;
 
 
+/**
+ * Represents a Group or Dataset in HDF5 (both have the same
+ * representation).
+ */
+
 public class HdfGroup extends BaseBlk {
 
 
 
 // Overall type summary
+/** dtype value: unknown (should never happen) */
 public static final int DTYPE_UNKNOWN       =  0;
+
+/** dtype value: 8 bit signed integer */
 public static final int DTYPE_SFIXED08      =  1;
+/** dtype value: 8 bit unsigned integer */
 public static final int DTYPE_UFIXED08      =  2;
+/** dtype value: 16 bit signed integer */
 public static final int DTYPE_FIXED16       =  3;
+/** dtype value: 32 bit signed integer */
 public static final int DTYPE_FIXED32       =  4;
+/** dtype value: 64 bit signed integer */
 public static final int DTYPE_FIXED64       =  5;
+/** dtype value: 32 bit signed float */
 public static final int DTYPE_FLOAT32       =  6;
+/** dtype value: 64 bit signed float */
 public static final int DTYPE_FLOAT64       =  7;
+//xxx del:
 public static final int DTYPE_TEST_CHAR     =  8;  // for internal test only
+/** dtype value: fixed length string */
 public static final int DTYPE_STRING_FIX    =  9;
+/** dtype value: variable length string */
 public static final int DTYPE_STRING_VAR    = 10;
+/** dtype value: reference to a group */
 public static final int DTYPE_REFERENCE     = 11;
+/** dtype value: 1-dimensional variable length array of some other type,
+  specified by dsubTypes.  */
 public static final int DTYPE_VLEN          = 12;
+/** dtype value: compound type composed of other types,
+  specified by dsubTypes.  */
 public static final int DTYPE_COMPOUND      = 13;
+
+/** Names of the DTYPE_* constants */
 public static final String[] dtypeNames = {
   "UNKNOWN",
   "SFIXED08", "UFIXED08", "FIXED16", "FIXED32", "FIXED64",
@@ -61,14 +85,27 @@ public static final String[] dtypeNames = {
   "STRING_FIX", "STRING_VAR", "REFERENCE",
   "VLEN", "COMPOUND"};
 
-// Signature is used for fileVersion==2 only:
+// Signature is used for fileVersion==2 only.
+/** HdfGroup signature byte 0 */
 final int signa = 'O';
+/** HdfGroup signature byte 1 */
 final int signb = 'H';
+/** HdfGroup signature byte 2 */
 final int signc = 'D';
+/** HdfGroup signature byte 3 */
 final int signd = 'R';
 
 // Referenced blocks
+/**
+ * List of sub-groups (HdfGroups having isVariable==false)
+ * contained in this group.
+ */
 ArrayList<HdfGroup> subGroupList = null;
+
+/**
+ * List of sub-variables (HdfGroups having isVariable==true)
+ * contained in this group.
+ */
 ArrayList<HdfGroup> subVariableList = null;
 
 // fileVersion==1 only:
@@ -78,37 +115,95 @@ LocalHeap localHeap;
 
 
 // Blocks contained in hdrMsgList
+/** An HDF5 dataType message, contained in our hdrMsgList. */
 MsgDataType msgDataType;
+
+/** An HDF5 dataSpace message, contained in our hdrMsgList. */
 MsgDataSpace msgDataSpace;
+
+/** An HDF5 layout message, contained in our hdrMsgList. */
 MsgLayout msgLayout;
+
+/** An HDF5 fillValue message, contained in our hdrMsgList. */
 MsgFillValue msgFillValue;
+
+/** An HDF5 modification time message, contained in our hdrMsgList. */
 MsgModTime msgModTime;
+
+/** An HDF5 attribute message, contained in our hdrMsgList. */
 MsgAttrInfo msgAttrInfo;
+
+/** An HDF5 filter message, contained in our hdrMsgList. */
 MsgFilter msgFilter;
 
-// fileVersion==1 only:
+/**
+ * An HDF5 symbolTable message, contained in our hdrMsgList
+ * (used only for fileVersion==1).
+ */
 MsgSymbolTable msgSymbolTable;
 
 
+/**
+ * If false, this HdfGroup represents an HDF5 group; if true,
+ * this HdfGroup represents a data variable.
+ */
+boolean isVariable;
 
-boolean isVariable;               // false: group;  true: represents data
+/**
+ * The local name of this group or variable -
+ * does not include the complete path (see getPath() for that).
+ */
 String groupName;
+
+/**
+ * The parent group (null for the rootGroup).
+ */
 HdfGroup parentGroup;
+
+/**
+ * String length for a DTYPE_STRING_FIX variable, without null termination.
+ * Should be 0 for all other types, including DTYPE_STRING_VAR.
+ */
 int stgFieldLen;
+
+/**
+ * Zip compression level: 0==Uncompressed; 1 - 9 are increasing compression.
+ */
 int compressionLevel;
 
+/**
+ * List of header messages, like MsgDataType, MsgDataSpace,
+ * MsgAttribute, etc., to be formatted for this group.
+ */
 ArrayList<MsgBase> hdrMsgList;
 
-// Variables
-final boolean isVlen = false;    // VLEN variables are not supported.
-                                 // (although VLEN attributes are supported).
-
+/**
+ * When isVariable==true,
+ * the data type of this variable.
+ */
 int dtype;                       // one of DTYPE*
 
 
+/**
+ * When isVariable==true,
+ * the offset in the output file (HdfFileWriter.outStream)
+ * of the raw data for this variable.
+ */
 long rawDataAddr;
+
+/**
+ * When isVariable==true,
+ * the length (in bytes) in the output file (HdfFileWriter.outStream)
+ * of the raw data for this variable.
+ */
 long rawDataSize;
-boolean isWritten = false;       // has this variable been written
+
+/**
+ * When isVariable==true,
+ * has this variable been written?  That is,
+ * did the client call writeData?
+ */
+boolean isWritten = false;
 
 // fileVersion==2 only:
 int linkCreationOrder = 0;
@@ -118,7 +213,14 @@ int linkCreationOrder = 0;
 
 
 
-// Create a group, not a variable
+/**
+ * Creates an HDF5 group that is not a variable (isVariable == false).
+ * @param groupName The local name of the new group -
+ *   does not include the complete path (see getPath() for that).
+ * @param parentGroup The parent group (null for the rootGroup).
+ * @param hdfFile The global owning HdfFileWriter.
+ */
+
 HdfGroup(
   String groupName,
   HdfGroup parentGroup,        // is null when creating the rootGroup
@@ -161,7 +263,45 @@ throws HdfException
 
 
 
-// Create a variable
+/**
+ * Creates an HDF5 variable (isVariable == true).
+ * @param groupName The local name of the new variable.
+ * @param parentGroup The parent group.
+ * @param dtype The data type - one of DTYPE_*.
+ * @param dsubTypes  The types of the members when dtype=DTYPE_COMPOUND.
+ * @param subNames  The names of the members when dtype=DTYPE_COMPOUND.
+ * @param stgFieldLen String length for a DTYPE_STRING_FIX variable,
+ *        without null termination.
+ *        Should be 0 for all other types, including DTYPE_STRING_VAR.
+ * @param varDims Dimensions for this variable.  varDims may be null
+ *        or may have length 0 in odd cases where a variable has
+ *        no data.  For example a variable may have attributes
+ *        without data.  If varDims is null or length 0, must have
+ *        isChunked==false and compressionLevel==0.
+ * @param fillValue Fill value of appropriate type for this variable.
+ *        May be null.
+ *        <p>
+ * <table border="1" cellpadding="2">
+ * <tr><th> dtype value      </th><th> Meaning                 </th><th> Java class of fillValue  </th></tr>
+ * <tr><td> DTYPE_SFIXED08   </td><td> Signed byte             </td><td> Byte                     </td></tr>
+ * <tr><td> DTYPE_UFIXED08   </td><td> Unsigned byte           </td><td> Byte                     </td></tr>
+ * <tr><td> DTYPE_FIXED16    </td><td> Signed 16 bit int       </td><td> Short                    </td></tr>
+ * <tr><td> DTYPE_FIXED32    </td><td> Signed 32 bit int       </td><td> Integer                  </td></tr>
+ * <tr><td> DTYPE_FIXED64    </td><td> Signed 64 bit int       </td><td> Long                     </td></tr>
+ * <tr><td> DTYPE_FLOAT32    </td><td> Signed 32 bit float     </td><td> Float                    </td></tr>
+ * <tr><td> DTYPE_FLOAT64    </td><td> Signed 64 bit float     </td><td> Double                   </td></tr>
+ * <tr><td> DTYPE_STRING_FIX </td><td> Fixed length string     </td><td> String                   </td></tr>
+ * <tr><td> DTYPE_STRING_VAR </td><td> Variable length string  </td><td> String                   </td></tr>
+ * </table>
+ *        <p>
+ *
+ * @param isChunked If false, use contiguous data storage;
+ *        if true use chunked.
+ * @param compressionLevel Zip compression level:
+ *        0==Uncompressed; 1 - 9 are increasing compression.
+ * @param hdfFile The global owning HdfFileWriter.
+ */
+
 HdfGroup(
   String groupName,
   HdfGroup parentGroup,
@@ -170,8 +310,8 @@ HdfGroup(
                              // or DTYPE_COMPOUND
   String[] subNames,         // member names for DTYPE_COMPOUND
 
-  int stgFieldLen,           // string length for DTYPE_STRING_FIX.
-                             // Without null termination.
+  int stgFieldLen,           // String length for a DTYPE_STRING_FIX
+                             // variable, without null termination.
                              // Should be 0 for all other types,
                              // including DTYPE_STRING_VAR.
 
@@ -179,7 +319,8 @@ HdfGroup(
   Object fillValue,          // null, Byte, Short, Int, Long,
                              // Float, Double, String, etc.
   boolean isChunked,
-  int compressionLevel,
+  int compressionLevel,      // Zip compression level: 0==Uncompressed;
+                             // 1 - 9 are increasing compression.
   HdfFileWriter hdfFile)
 throws HdfException
 {
@@ -222,13 +363,11 @@ throws HdfException
   msgLayout = new MsgLayout( layoutClass, compressionLevel, this, hdfFile);
 
   boolean isFillExtant = false;
-  int fillLen = 0;
   if (fillValue != null) {
     isFillExtant = true;
-    fillLen = msgDataType.elementLen;
   }
   msgFillValue = new MsgFillValue(
-    dtype, isFillExtant, fillValue, fillLen, this, hdfFile);
+    dtype, isFillExtant, fillValue, this, hdfFile);
   msgModTime = new MsgModTime(
     hdfFile.utcModTimeMilliSec, this, hdfFile);
 
@@ -262,6 +401,7 @@ throws HdfException
 
 /**
  * Creates a sub-group of the current group.
+ * @param subName The local name of the new subGroup.
  */
 
 public HdfGroup addGroup(
@@ -287,6 +427,38 @@ throws HdfException
 
 /**
  * Creates a variable in the current group.
+ *
+ * @param varName The local name of the new variable.
+ * @param dtype The data type - one of DTYPE_*.
+ * @param stgFieldLen String length for a DTYPE_STRING_FIX variable,
+ *        without null termination.
+ *        Should be 0 for all other types, including DTYPE_STRING_VAR.
+ * @param varDims Dimensions for this variable.  varDims may be null
+ *        or may have length 0 in odd cases where a variable has
+ *        no data.  For example a variable may have attributes
+ *        without data.  If varDims is null or length 0, must have
+ *        isChunked==false and compressionLevel==0.
+ * @param fillValue Fill value of appropriate type for this variable.
+ *        May be null.
+ *        <p>
+ * <table border="1" cellpadding="2">
+ * <tr><th> dtype value      </th><th> Meaning                 </th><th> Java class of fillValue  </th></tr>
+ * <tr><td> DTYPE_SFIXED08   </td><td> Signed byte             </td><td> Byte                     </td></tr>
+ * <tr><td> DTYPE_UFIXED08   </td><td> Unsigned byte           </td><td> Byte                     </td></tr>
+ * <tr><td> DTYPE_FIXED16    </td><td> Signed 16 bit int       </td><td> Short                    </td></tr>
+ * <tr><td> DTYPE_FIXED32    </td><td> Signed 32 bit int       </td><td> Integer                  </td></tr>
+ * <tr><td> DTYPE_FIXED64    </td><td> Signed 64 bit int       </td><td> Long                     </td></tr>
+ * <tr><td> DTYPE_FLOAT32    </td><td> Signed 32 bit float     </td><td> Float                    </td></tr>
+ * <tr><td> DTYPE_FLOAT64    </td><td> Signed 64 bit float     </td><td> Double                   </td></tr>
+ * <tr><td> DTYPE_STRING_FIX </td><td> Fixed length string     </td><td> String                   </td></tr>
+ * <tr><td> DTYPE_STRING_VAR </td><td> Variable length string  </td><td> String                   </td></tr>
+ * </table>
+ *        <p>
+ *
+ * @param isChunked If false, use contiguous data storage;
+ *        if true use chunked.
+ * @param compressionLevel Zip compression level:
+ *        0==Uncompressed; 1 - 9 are increasing compression.
  */
 
 public HdfGroup addVariable(
@@ -345,6 +517,30 @@ throws HdfException
 
 /**
  * Creates an attribute in the current group or variable.
+ *
+ * @param attrName The local name of the new attribute.
+ * @param attrType The data type - one of DTYPE_*.
+ * @param stgFieldLen String length for a DTYPE_STRING_FIX variable,
+ *        without null termination.
+ *        Should be 0 for all other types, including DTYPE_STRING_VAR.
+ * @param attrValue  The value of this attribute.
+ *        <p>
+ * <table border="1" cellpadding="2">
+ * <tr><th> Java class of attrValue                       </th><th> dtype              </th></tr>
+ * <tr><td> Byte (scalar) or byte[] or byte[][] or ...             </td><td> DTYPE_UFIXED08     </td></tr>
+ * <tr><td> Short (scalar) or short[] or short[][] or ...          </td><td> DTYPE_FIXED16      </td></tr>
+ * <tr><td> Integer (scalar) or int[] or int[][] or ...            </td><td> DTYPE_FIXED32      </td></tr>
+ * <tr><td> Long (scalar) or long[] or long[][] or ...             </td><td> DTYPE_FIXED64      </td></tr>
+ * <tr><td> Float (scalar) or float[] or float[][] or ...          </td><td> DTYPE_FLOAT32      </td></tr>
+ * <tr><td> Double (scalar) or double[] or double[][] or ...       </td><td> DTYPE_FLOAT64      </td></tr>
+ * <tr><td> Character (scalar) or char[] or char[][] or ...        </td><td> DTYPE_STRING_FIX   </td></tr>
+ * <tr><td> String (scalar) or String[] or String[][] or ...       </td><td> DTYPE_STRING_VAR   </td></tr>
+ * <tr><td> HdfGroup (scalar) or HdfGroup[] or HdfGroup[][] or ... </td><td> DTYPE_REFERENCE    </td></tr>
+ * </table>
+ *        <p>
+ *
+ * @param isVlen if true this array is a 2-dimensional array
+ *        in which rows may have differing lengths (ragged right edge).
  */
 
 public void addAttribute(
@@ -428,20 +624,31 @@ public String toString() {
 
 
 
+/**
+ * Returns the full path name within the HDF5 file, starting at
+ * the root group.  Example: "/forecast/temperature".
+ */
 
 String getPath()
 {
-  String nm = "";
+  String res = "";
   HdfGroup grp = this;
   while (grp != null) {
-    if (nm.length() != 0) nm = "/" + nm;
-    nm = grp.groupName + nm;
+    if (res.length() != 0) res = "/" + res;
+    res = grp.groupName + res;
     grp = grp.parentGroup;
   }
-  return nm;
+  if (res.length() == 0) res = "/";
+  return res;
 }
 
 
+
+/**
+ * Adds a sub-HdfGroup, either for a true group or a variable,
+ * to this group.
+ * @param subGroup The group to be added.
+ */
 
 void addSubGroup(
   HdfGroup subGroup)
@@ -463,9 +670,11 @@ throws HdfException
 
 
 
-
-// Search for subGroup or variable
-// Return null if not found.
+/**
+ * Searches our subGroupList and subVariableList (not recursively)
+ * for a matching local name; returns null if not found.
+ * @param subName The name for which to search.
+ */
 
 HdfGroup findSubItem( String subName)
 {
@@ -487,12 +696,15 @@ HdfGroup findSubItem( String subName)
   return resGroup;
 }
 
+//xxx recursive searches?
 
 
 
-
-// Search for attribute.
-// Return null if not found.
+/**
+ * Searches our hdrMsgList (not recursively)
+ * for a matching attribute name; returns null if not found.
+ * @param attrName The name for which to search.
+ */
 
 public MsgAttribute findAttribute( String attrName)
 {
@@ -514,7 +726,9 @@ public MsgAttribute findAttribute( String attrName)
 
 
 
-// Return number of attributes.
+/**
+ * Returns the number of attributes.
+ */
 
 int getNumAttribute()
 {
@@ -531,8 +745,26 @@ int getNumAttribute()
 
 
 
-
-
+/**
+ * Writes all data for a single variable to disk.
+ *
+ *        <p>
+ * <table border="1" cellpadding="2">
+ * <tr><th> dtype              </th><th> Java class of vdata                           </th></tr>
+ * <tr><td> DTYPE_UFIXED08     </td><td> Byte (scalar) or byte[] or byte[][] or ...             </td></tr>
+ * <tr><td> DTYPE_FIXED16      </td><td> Short (scalar) or short[] or short[][] or ...          </td></tr>
+ * <tr><td> DTYPE_FIXED32      </td><td> Integer (scalar) or int[] or int[][] or ...            </td></tr>
+ * <tr><td> DTYPE_FIXED64      </td><td> Long (scalar) or long[] or long[][] or ...             </td></tr>
+ * <tr><td> DTYPE_FLOAT32      </td><td> Float (scalar) or float[] or float[][] or ...          </td></tr>
+ * <tr><td> DTYPE_FLOAT64      </td><td> Double (scalar) or double[] or double[][] or ...       </td></tr>
+ * <tr><td> DTYPE_STRING_FIX   </td><td> Character (scalar) or char[] or char[][] or ...        </td></tr>
+ * <tr><td> DTYPE_STRING_VAR   </td><td> String (scalar) or String[] or String[][] or ...       </td></tr>
+ * <tr><td> DTYPE_REFERENCE    </td><td> HdfGroup (scalar) or HdfGroup[] or HdfGroup[][] or ... </td></tr>
+ * </table>
+ *        <p>
+ *
+ * @param vdata  The data to be written.
+ */
 
 public void writeData( Object vdata)
 throws HdfException
@@ -545,6 +777,9 @@ throws HdfException
 }
 
 
+/**
+ * Implements writeData: see writeData doc.
+ */
 
 void writeDataSub( Object vdata)
 throws HdfException, IOException
@@ -564,14 +799,17 @@ throws HdfException, IOException
 
   // Find dtype and varDims of vdata
   /// xxx old:
-  ///int[] dataInfo = HdfUtil.getDtypeAndDimsOld( isVlen, vdata);
+  ///int[] dataInfo = HdfUtil.getDtypeAndDimsOld( false, vdata);
   ///int dataDtype = dataInfo[0];
   ///int[] dataVarDims = Arrays.copyOfRange( dataInfo, 1, dataInfo.length);
 
-  int[] dataInfo = HdfUtil.getDimLen( vdata, isVlen);
+  // Use isVlen==false: variable length data arrays are not supported,
+  // although variable length attributes are.
+  int[] dataInfo = HdfUtil.getDimLen( vdata, false);
   int dataDtype = dataInfo[0];
   int totNumEle = dataInfo[1];
-  int[] dataVarDims = Arrays.copyOfRange( dataInfo, 2, dataInfo.length);
+  int elementLen = dataInfo[2];
+  int[] dataVarDims = Arrays.copyOfRange( dataInfo, 3, dataInfo.length);
 
   if (hdfFile.bugs >= 1) {
     prtf("HdfGroup.writeData: actual data:" + "\n"
@@ -668,7 +906,7 @@ throws HdfException, IOException
       dtype,
       stgFieldLen,
       vdata,
-      new Counter(),
+      new HdfModInt(0),
       -1,               // gcolAddr for DTYPE_STRING_VAR
       null,             // gcol for DTYPE_STRING_VAR
       outbuf);
@@ -711,9 +949,11 @@ throws HdfException, IOException
 
 
 
-
-
-
+/**
+ * Extends abstract BaseBlk: formats this individual BaseBlk
+ * to fmtBuf.  If fileVersion==2, calls layoutVersion2 to do
+ * the work.
+ */
 
 void formatBuf( int formatPass, HBuffer fmtBuf)
 throws HdfException
@@ -836,7 +1076,7 @@ throws HdfException
 
     HBuffer tempHbuf = new HBuffer(
       null,                 // outChannel
-      compressionLevel,
+      0,                    // compressionLevel
       hdfFile);
 
     int svIndent = hdfFile.indent;
@@ -857,11 +1097,16 @@ throws HdfException
   } // if fileVersion == 2
 
   noteFormatExit( fmtBuf);         // BaseBlk: print debug
-}
+} // end formatBuf
 
 
 
 
+
+/**
+ * Called by formatBuf when fileVersion==2: formats this individual BaseBlk
+ * to fmtBuf.
+ */
 
 
 long layoutVersion2(
@@ -957,35 +1202,40 @@ throws HdfException
 
 
 
-// Format a regular array of raw data.  Not ragged array.
-// If strings, they are all fixed len: they are padded to elementLen.
-//
-// The data, vdata, may be one of:
-//   Byte,      byte[],      [][],  [][][],  etc.
-//   Short,     short[],     [][],  [][][],  etc.
-//   Integer,   int[],       [][],  [][][],  etc.
-//   Long,      long[],      [][],  [][][],  etc.
-//   Float,     float[],     [][],  [][][],  etc.
-//   Double,    double[],    [][],  [][][],  etc.
-//   Character, char[],      [][],  [][][],  etc.
-//   String,    String[],    [][],  [][][],  etc.
-//   HdfGroup,  HdfGroup[],  [][],  [][][],  etc.  (reference)
-//
-// The scalar types (Short, Integer, Float, etc)
-// and the 1 dimensional types (short[], int[], float[], etc)
-// are handled explicitly below.
-//
-// The higher dimension types, [][], [][][], etc, are handled
-// by recursive calls in the test: if vdata instanceof Object[].
-//
-// String[] is handled recursively as Object[], then as scalar String.
-// Similarly for HdfGroup[].
+/**
+ * Formats a regular array of raw data.  Not a ragged (VLEN) array.
+ * Called by writeDataSub and MsgAttribute.formatMsgCore.
+ * <p>
+ * If strings, they are all fixed len: they are padded to elementLen.
+ * <p>
+ * vdata may be one of:<ul>
+ *   <li> Byte (scalar),      byte[],      [][],  [][][],  etc.
+ *   <li> Short (scalar),     short[],     [][],  [][][],  etc.
+ *   <li> Integer (scalar),   int[],       [][],  [][][],  etc.
+ *   <li> Long (scalar),      long[],      [][],  [][][],  etc.
+ *   <li> Float (scalar),     float[],     [][],  [][][],  etc.
+ *   <li> Double (scalar),    double[],    [][],  [][][],  etc.
+ *   <li> Character (scalar), char[],      [][],  [][][],  etc.
+ *   <li> String (scalar),    String[],    [][],  [][][],  etc.
+ *   <li> HdfGroup (scalar),  HdfGroup[],  [][],  [][][],  etc.  (reference)
+ * </ul>
+ *
+ * The scalar types (Short, Integer, Float, etc)
+ * and the 1 dimensional types (short[], int[], float[], etc)
+ * are handled explicitly below.
+ *
+ * The higher dimension types, [][], [][][], etc, are handled
+ * by recursive calls in the test: if vdata instanceof Object[].
+ *
+ * String[] is handled recursively as Object[], then as scalar String.
+ * Similarly for HdfGroup[].
+ */
 
 void formatRawData(
   int dtp,             // one of DTYPE_*
   int stgFieldLen,     // used for DTYPE_STRING_FIX
   Object vdata,
-  Counter cntr,        // used for the index of compound types
+  HdfModInt cntr,      // used for the index of compound types
   long gcolAddr,       // used for DTYPE_STRING_VAR
   GlobalHeap gcol,     // used for DTYPE_STRING_VAR
   HBuffer fmtBuf)      // output buffer
@@ -1131,13 +1381,22 @@ throws HdfException
 
 
 
-// For irow = 0, < len(vdata):
-//   format to fmtBuf:
-//     len of ele == ncol
-//     blkPosition of mainGlobalHeap
-//     heapIx[irow]
-//
-// Called by MsgAttribute.formatMsgCore.
+
+/**
+ * Formats the GlobalHeap indices of ragged (VLEN) array vdata
+ * to fmtBuf.  The data itself must have been formatted previously
+ * to the GlobalHeap by calling GlobalHeap.putHeapVlenObject.
+ * <p>
+ * <pre>
+ * For irow = 0, < len(vdata):
+ *   format to fmtBuf:
+ *     len of ele == ncol
+ *     blkPosition of mainGlobalHeap
+ *     heapIxs[irow]
+ * </pre>
+ *
+ * Called by MsgAttribute.formatMsgCore.
+ */
 
 void formatVlenRawData(
   int[] heapIxs,

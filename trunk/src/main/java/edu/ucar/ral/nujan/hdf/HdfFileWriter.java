@@ -38,99 +38,257 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 
 
+// xxx all xxx
+
+/**
+ * Represents an open output file.
+ * There is exactly one HdfFileWriter per output file.
+ *
+ * <h2> Overall control flow </h2>
+ *
+ * <pre>
+ * User program:
+ *   HdfFileWriter hdfFile = new HdfFileWriter("testa.hdf", 2, 0, 0);
+ *   HdfGroup rootGroup = hdfFile.getRootGroup();
+ *   HdfGroup velocity = rootGroup.addVariable("velocity,...);
+ *   velocity.addAttribute("units", HdfGroup.DTYPE_STRING_FIX, 0,
+ *     "meters per second", false);
+ *   hdfFile.endDefine();
+ *   velocity.writeData( velocityArray);
+ *   hdfFile.close();
+ *
+ * HdfFileWriter:
+ *   Constructor:
+ *     Initialize rootGroup.
+ *     Set eofAddr = 0
+ *   endDefine:
+ *     Call formatBufAll to format all metadata into mainBuf, pass 1 of 2.
+ *     Set eofAddr = mainBuf.getPos() == length of formatted metadata
+ *
+ *   (Here the user's calls to HdfGroup.writeData update our eofAddr).
+ *       
+ *   close:
+ *     Call formatBufAll to format all metadata into mainBuf, pass 2 of 2.
+ *     Write mainBuf to outChannel == outFile starting at file offset 0.
+ *       The variable data previously written in HdfGroup.writeData
+ *       follow the metadata.
+ *
+ * </pre>
+ */
+
 public class HdfFileWriter extends BaseBlk {
 
 
 
-// Bit flags for optFlag
+/**
+ * Bit flag for optFlag: allow overwrite of an existing file.
+ */
 public static final int OPT_ALLOW_OVERWRITE = 1;
 
 
 
 
+/**
+ * The size in bytes of all internal offsets and addresses
+ */
 static final int OFFSET_SIZE = 8;
+
+/**
+ * A tag for an undefined internal address.
+ */
 static final int UNDEFINED_ADDR = -1;
 
 
 // Define constants for fileStatus
+/**
+ * fileStatus: we are defining the file (before calling endDefine).
+ */
 static final int ST_DEFINING  = 1;
+/**
+ * fileStatus: definition is complete; we are writing data (after calling endDefine).
+ */
 static final int ST_WRITEDATA = 2;
+/**
+ * fileStatus: writing data is complete (after calling close).
+ */
 static final int ST_CLOSED    = 3;
+
+/**
+ * Names for fileStatus values.
+ */
 static final String[] statusNames = {
   "UNKNOWN", "DEFINING", "WRITEDATA", "CLOSED"};
 
 
-// Referenced blocks
+/**
+ * The one and only root Group.
+ */
 HdfGroup rootGroup;
 
 
+/**
+ * This GlobalHeap contains all: attributes that are either VLEN and String,
+ * and FillValues that are Strings.
+ * Variables that are DTYPE_STRING_VAR contain their own so-called
+ * GlobalHeap for storing the strings.
+ */
 GlobalHeap mainGlobalHeap = null;
 
-// fileVersion==1 only:
+/**
+ * For fileVersion==1, the symbol table entry pointing
+ * to the rootGroup.
+ */
 SymTabEntry symTabEntry;
 
 
 
+/**
+ * The file path (name) of the output file on disk.
+ */
 String filePath;
+
+/**
+ * Internal HDF5 version: 1==old, 2==new.
+ */
 int fileVersion;
+
+/**
+ * Options passed to the constructor.
+ * Currently the only possible option is OPT_ALLOW_OVERWRITE.
+ */
 int optFlag;                    // zero or more OPT_* bit options
 
-int fileStatus;                 // one of ST_*
+/**
+ * Current file status: ST_DEFINING, ST_WRITEDATA, or ST_CLOSED.
+ */
+int fileStatus;
 
-long utcModTimeMilliSec;        // java date: milliseconds after 1970
-long utcModTimeSec;             // java date: seconds after 1970
+/**
+ * The time of the file open, in milliseconds after 1970.
+ */
+long utcModTimeMilliSec;
 
+/**
+ * The time of the file open, in seconds after 1970.
+ */
+long utcModTimeSec;
+
+/**
+ * Current indentation level, for debug only.
+ */
 int indent = 0;
-int debugLevel = 0;             // main debug level
-int bugs = 0;                   // current debug level, may be < debugLevel
 
+/**
+ * Main debug logging level.  Default is 0.
+ * Meaningful levels are: 0, 1, 2, 5, 10.
+ */
+int debugLevel = 0;             // main debug level
+
+/**
+ * Current debug logging level.  Default is 0.
+ * Meaningful levels are: 0, 1, 2, 5, 10.
+ * In some cases we set bugs < debugLevel to omit
+ * a section of tedious output.
+ */
+int bugs = 0;
+
+/**
+ * The in-memory buffer used to construct all metadata (HdfGroups,
+ * messages, attributes, Btrees, etc).
+ * In endDefine() we write this buffer out to the start of the file.
+ */
 private HBuffer mainBuf;
 
+/**
+ * Output stream for outFile, underneath outChannel.
+ */
 FileOutputStream outStream;
+
+/**
+ * Output channel for outFile, on top of outStream.
+ */
 FileChannel outChannel;
 
+/**
+ * List of BaseBlks that need to be formatted to mainBuf.
+ * Used by formatBufAll, which is called by endDefine (formatPass=1)
+ * and close (formatPass=2).
+ */
 ArrayList<BaseBlk> workList = null;
 
 
 
+/** HdfFileWriter (HDF5 file) signature byte 0 */
 final int signa = 0x89;
+/** HdfFileWriter (HDF5 file) signature byte 1 */
 final int signb = 'H';
+/** HdfFileWriter (HDF5 file) signature byte 2 */
 final int signc = 'D';
+/** HdfFileWriter (HDF5 file) signature byte 3 */
 final int signd = 'F';
+/** HdfFileWriter (HDF5 file) signature byte 4 */
 final int signe = '\r';
+/** HdfFileWriter (HDF5 file) signature byte 5 */
 final int signf = '\n';
+/** HdfFileWriter (HDF5 file) signature byte 6 */
 final int signg = 0x1a;
+/** HdfFileWriter (HDF5 file) signature byte 7 */
 final int signh = '\n';
 
-final int offsetSize = OFFSET_SIZE;       // size of offsets
-final int lengthSize = OFFSET_SIZE;       // size of lengths
 
-// Consistency bits: (The low order bit is 0)
-//    0: file is open for write
-//    1: file has been verified as consistent
+/**
+ * HDF5 file format: consistency bits: (The low order bit is 0).
+ *    0: file is open for write.
+ *    1: file has been verified as consistent.
+ * Always 0; not used by this software.
+ */
 final int consistencyFlag = 0;
 
+/**
+ * HDF5 file format: starting offset of header (superblock).
+ * Always 0; not used by this software.
+ */
 final long baseAddress = 0;
 
+/**
+ * HDF5 file format: offset of superblock extension.
+ * Always 0; not used by this software.
+ */
 final long superblockExtensionAddress = UNDEFINED_ADDR;    // -1
 
+/**
+ * Current address of the end of file.
+ * This is updated by endDefine and HdfGroup.writeDataSub.
+ */
 long eofAddr;
 
 
 
 
-// fileVersion==1 only:
-// A leaf btree node (a symbol table) should have:
-//   k_leaf <= numUsedEntries <= 2 * k_leaf
+/**
+ * Used by fileVersion==1 only:
+ * A leaf btree node (a symbol table) should have:<br>
+ *   k_leaf &lt;= numUsedEntries &lt;= 2 * k_leaf
+ */
 int k_leaf = 4;          // This is set in SymbolTable.addSymName
 
-// fileVersion==1 only:
-// An internal btree node should have:
-//   k_internal <= numUsedEntries <= 2 * k_internal
+/**
+ * Used by fileVersion==1 only:
+ * An internal btree node should have:<br>
+ *   k_internal &lt;= numUsedEntries &lt;= 2 * k_internal
+ */
 int k_internal = 16;
 
 
 
+/**
+ * Creates a new HDF5 output file.
+ * @param filePath  The name or disk path of the file to create.
+ * @param fileVersion  Either 1 (old HDF5 format) or 2 (new HDF5 format).
+ *     Using 2 is strongly recommended.
+ * @param optFlag  The bitwise OR of one or more OPT_* flags.
+ *     Currently the only one implemented is OPT_ALLOW_OVERWRITE.
+ */
 
 public HdfFileWriter(
   String filePath,               // file to create
@@ -138,28 +296,37 @@ public HdfFileWriter(
   int optFlag)                   // zero or more OPT_* bit options
 throws HdfException
 {
-  this( filePath, fileVersion, optFlag, 0);   // debugLevel = 0
+  this( filePath, fileVersion, optFlag, 0, 0);   // debug = 0, modTime = 0
 }
 
 
 
 
-// Debug levels:
-//    0   none
-//    1   add: HdfGroup: addVariable, add addAttribute, writeData
-//    2   add: endDefine, close, formatBufAll, more writeData, flush
-//    5   add: all written data
-//   10   add: HBuffer.expandBuf
-
 /**
  * Do not use: for internal testing only.
+ * Creates a new HDF5 output file.
+ * @param filePath  The name or disk path of the file to create.
+ * @param fileVersion  Either 1 (old HDF5 format) or 2 (new HDF5 format).
+ *     Using 2 is strongly recommended.
+ * @param optFlag  The bitwise OR of one or more OPT_* flags.
+ *     Currently the only one implemented is OPT_ALLOW_OVERWRITE.
+ * @param debugLevel  Level for logging debug messages to stdout:<ul>
+ *   <li>   0:   none
+ *   <li>   1:   HdfGroup: addVariable, addAttribute, writeData
+ *   <li>   2:   also: endDefine, close, formatBufAll, more writeData, flush
+ *   <li>   5:   also: all written data
+ *   <li>  10:   also: HBuffer.expandBuf
+ * @param utcModTime Specify internal file modification time
+ *   in milliSeconds since 1970.  If 0, we use the current time.
+ *  </ul>
  */
 
 public HdfFileWriter(
-  String filePath,               // file to create
+  String filePath,           // file to create
   int fileVersion,
-  int optFlag,                   // zero or more OPT_* bit options
-  int debugLevel)
+  int optFlag,               // zero or more OPT_* bit options
+  int debugLevel,
+  long utcModTime)           // milliSecs since 1970, or if 0 use current time
 throws HdfException
 {
   super("HdfFileWriter", null);  // BaseBlk: hdfFile = null
@@ -173,7 +340,9 @@ throws HdfException
   if (fileVersion != 1 && fileVersion != 2)
     throwerr("invalid fileVersion: %d", fileVersion);
   fileStatus = ST_DEFINING;
-  utcModTimeMilliSec = System.currentTimeMillis();
+  utcModTimeMilliSec = utcModTime;
+  if (utcModTimeMilliSec == 0)
+    utcModTimeMilliSec = System.currentTimeMillis();
   utcModTimeSec = utcModTimeMilliSec / 1000;
   indent = 0;
 
@@ -205,7 +374,7 @@ throws HdfException
     throwerr("caught: %s", exc);
   }
   outChannel = outStream.getChannel();
-}
+} // end constructor
 
 
 
@@ -220,18 +389,28 @@ public String toString() {
 
 
 
+/**
+ * Returns the unique root Group.
+ */
+
 public HdfGroup getRootGroup() {
   return rootGroup;
 }
 
 
 
+/**
+ * Returns the main debug level = debugLevel.
+ */
 public int getDebugLevel() {
   return debugLevel;
 }
 
 
 
+/**
+ * Sets both the main and the current debug levels.
+ */
 
 public void setDebugLevel( int debugLevel) {
   this.debugLevel = debugLevel;     // main debugLevel
@@ -240,6 +419,16 @@ public void setDebugLevel( int debugLevel) {
 
 
 
+
+/**
+ * Indicates the end of definition phase for the client.
+ * <ul>
+ *   <li> Calls formatBufAll to format all metadata into
+ *       mainBuf, using formatPass==1
+ *       (formatPass==2 happens later in endDefine).
+ *   <li> Sets eofAddr = mainBuf.getPos().
+ * </ul>
+ */
 
 public void endDefine()
 throws HdfException
@@ -288,6 +477,20 @@ throws HdfException
 
 
 
+/**
+ * Indicates the end of writing data for the client.
+ * Previously the eofAddr was updated by each call to
+ * HdfGroup.writeData, and we don't alter it.
+ * <ul>
+ *   <li> Calls formatBufAll to format all metadata into
+ *       mainBuf, using formatPass==2
+ *       (formatPass==1 happened earlier in endDefine).
+ *   <li> Writes mainBuf to outChannel (the output file)
+ *       starting at position 0 (before the raw data for variables)
+ *   <li> Closes outChannel and outStream.
+ * </ul>
+ */
+
 
 public void close()
 throws HdfException
@@ -330,7 +533,7 @@ throws HdfException
   if (bugs >= 2)
     prtf("HdfFileWriter.close: after pass 2: mainBuf pos: %d", mainBuf.getPos());
 
-  // Write buffer to outfile
+  // Write mainBuf to outfile
   try {
     outChannel.position( 0);
     mainBuf.writeChannel( outChannel);
@@ -347,6 +550,11 @@ throws HdfException
 
 
 
+/**
+ * Recursively adds all groups in the tree headed by grp to groupList.
+ * @param grp    group to start depth first tree search
+ * @param groupList  output list of groups
+ */
 
 void findAllGroups(
   HdfGroup grp,
@@ -366,8 +574,17 @@ void findAllGroups(
 }
 
 
+// xxx make everything private
 
 
+/**
+ * Formats all  metadata (HdfGroups, messages, attributes, Btrees, etc)
+ * to mainBuf, the in-memory buffer used to format all metadata.
+ * This is called by endDefine with formatPass == 1,
+ * and by close with formatPass == 2.
+ * Essentially formatBufAll does a breadth first search of
+ * BaseBlks, using workList to keep the list of BaseBlks to format.
+ */
 
 void formatBufAll( int formatPass)
 throws HdfException
@@ -406,6 +623,11 @@ throws HdfException
 
 
 
+/**
+ * Extends abstract BaseBlk: formats this individual BaseBlk
+ * to fmtBuf and calls addWork to add any referenced BaseBlks
+ * to workList for future formatting.
+ */
 
 void formatBuf( int formatPass, HBuffer fmtBuf)
 throws HdfException
@@ -432,8 +654,8 @@ throws HdfException
     fmtBuf.putBufByte("HdfFileWriter: symTabEntryVersion", 0);
     fmtBuf.putBufByte("HdfFileWriter: reserved", 0);
     fmtBuf.putBufByte("HdfFileWriter: sharedHdrMsgVersion", 0);
-    fmtBuf.putBufByte("HdfFileWriter: offsetSize", offsetSize);
-    fmtBuf.putBufByte("HdfFileWriter: lengthSize", lengthSize);
+    fmtBuf.putBufByte("HdfFileWriter: OFFSET_SIZE", OFFSET_SIZE);
+    fmtBuf.putBufByte("HdfFileWriter: LENGTH_SIZE", OFFSET_SIZE);
     fmtBuf.putBufByte("HdfFileWriter: reserved", 0);
     fmtBuf.putBufShort("HdfFileWriter: k_leaf", k_leaf);
     fmtBuf.putBufShort("HdfFileWriter: k_internal", k_internal);
@@ -446,8 +668,8 @@ throws HdfException
     symTabEntry.formatBuf( formatPass, fmtBuf);
   }
   if (fileVersion == 2) {
-    fmtBuf.putBufByte("HdfFileWriter: offsetSize", offsetSize);
-    fmtBuf.putBufByte("HdfFileWriter: lengthSize", lengthSize);
+    fmtBuf.putBufByte("HdfFileWriter: OFFSET_SIZE", OFFSET_SIZE);
+    fmtBuf.putBufByte("HdfFileWriter: LENGTH_SIZE", OFFSET_SIZE);
     fmtBuf.putBufByte("HdfFileWriter: consistencyFlag", consistencyFlag);
     fmtBuf.putBufLong("HdfFileWriter: baseAddress", baseAddress);
     fmtBuf.putBufLong("HdfFileWriter: superblockExtensionAddress",
@@ -469,6 +691,11 @@ throws HdfException
 
 
 
+
+/**
+ * Adds blk to workList, so formatBufAll will call blk's formatBuf
+ * in the future.
+ */
 
 void addWork( String msg, BaseBlk blk)
 throws HdfException
@@ -495,7 +722,9 @@ throws HdfException
 
 
 
-
+/**
+ * For debug: format indent, current position in mainBuf, and name.
+ */
 
 String formatName(
   String name,
@@ -514,6 +743,10 @@ String formatName(
 
 
 
+
+/**
+ * For debug: returns indent String.
+ */
 
 String mkIndent() {
   String res = "";

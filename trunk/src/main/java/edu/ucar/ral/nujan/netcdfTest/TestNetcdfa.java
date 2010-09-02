@@ -28,7 +28,12 @@
 
 package edu.ucar.ral.nujan.netcdfTest;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Date;
+import java.util.SimpleTimeZone;
+
 
 import edu.ucar.ral.nujan.netcdf.NhDimension;
 import edu.ucar.ral.nujan.netcdf.NhException;
@@ -56,6 +61,8 @@ static void badparms( String msg) {
   prtf("  -dims         <int,int,...>   or \"0\" if a scalar");
   prtf("  -fileVersion  1 / 2");
   prtf("  -compress     compression level: 0==none, 1 - 9");
+  prtf("  -utcModTime   either yyyy-mm-dd or yyyy-mm-ddThh:mm:ss");
+  prtf("                or 0, meaning use the current time");
   prtf("  -outFile      <fname>");
   System.exit(1);
 }
@@ -80,6 +87,7 @@ throws NhException
   int[] dims = null;
   String fileVersionStg = null;
   int compressLevel = -1;
+  long utcModTime = -1;
   int numThread = -1;
   String outFile = null;
 
@@ -113,6 +121,25 @@ throws NhException
     }
     else if (key.equals("-fileVersion")) fileVersionStg = val;
     else if (key.equals("-compress")) compressLevel = Integer.parseInt( val);
+    else if (key.equals("-utcModTime")) {
+      if (val.equals("0")) utcModTime = 0;
+      else {
+        SimpleDateFormat utcSdf = null;
+        if (val.length() == 10)      // yyyy-mm-dd
+          utcSdf = new SimpleDateFormat("yyyy-MM-dd");
+        else if (val.length() == 19)      // yyyy-MM-ddTHH:mm:ss
+          utcSdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+        else badparms("invalid -utcModTime: \"" + val + "\"");
+
+        utcSdf.setTimeZone( new SimpleTimeZone( 0, "UTC"));
+        Date dt = null;
+        try { dt = utcSdf.parse( val); }
+        catch( ParseException exc) {
+          badparms("invalid -utcModTime: \"" + val + "\"");
+        }
+        utcModTime = dt.getTime();
+      }
+    }
     else if (key.equals("-numThread")) numThread = Integer.parseInt( val);
     else if (key.equals("-outFile")) outFile = val;
     else badparms("unkown parm: " + key);
@@ -123,6 +150,7 @@ throws NhException
   if (dims == null) badparms("missing parm: -dims");
   if (fileVersionStg == null) badparms("missing parm: -fileVersion");
   if (compressLevel < 0) badparms("missing parm: -compress");
+  if (utcModTime < 0) badparms("missing parm: -utcModTime");
   if (numThread < 0) badparms("missing parm: -numThread");
   if (outFile == null) badparms("missing parm: -outFile");
 
@@ -141,11 +169,17 @@ throws NhException
   }
   prtf("TestNetcdfa: fileVersion: %s", fileVersion);
   prtf("TestNetcdfa: compress: %d", compressLevel);
+
+  SimpleDateFormat utcSdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+  utcSdf.setTimeZone( new SimpleTimeZone( 0, "UTC"));
+  prtf("Testa: utcModTime: %d  %s", utcModTime, utcSdf.format( utcModTime));
+
   prtf("TestNetcdfa: outFile: \"%s\"", outFile);
 
   final long startTime = System.currentTimeMillis();
   if (numThread == 1)
-    testOne( bugs, nhType, dims, fileVersion, compressLevel, outFile);
+    testOne( bugs, nhType, dims, fileVersion, compressLevel,
+      utcModTime, outFile);
   else {
     Thread[] threads = new Thread[numThread];
     for (int ii = 0; ii < numThread; ii++) {
@@ -156,6 +190,7 @@ throws NhException
       final int[] dimsFinal = dims;
       final int fileVersionFinal = fileVersion;
       final int compressLevelFinal = compressLevel;
+      final long utcModTimeFinal = utcModTime;
       threads[ii] = new Thread() {
         public void run() {
           prtf("%8.4f  starting thread %d",
@@ -167,6 +202,7 @@ throws NhException
               dimsFinal,
               fileVersionFinal,
               compressLevelFinal,
+              utcModTimeFinal,
               fnameFinal);
           }
           catch( NhException exc) {
@@ -205,12 +241,14 @@ static void testOne(
   int[] dims,
   int fileVersion,
   int compressLevel,
+  long utcModTime,           // milliSecs since 1970, or if 0 use current time
   String fname)
 throws NhException
 {
   NhFileWriter hfile = new NhFileWriter(
     fname, NhFileWriter.OPT_OVERWRITE, fileVersion,
-    bugs, bugs);    // nhBugs, hdfBugs
+    bugs, bugs,            // nhBugs, hdfBugs
+    utcModTime);           // utcModTime: use current time.
 
   NhGroup rootGroup = hfile.getRootGroup();
 
@@ -281,15 +319,15 @@ throws NhException
       NhVariable.TP_STRING_VAR,
       "globTextValue");
 
-    //rootGroup.addAttribute(
-    //  "emptyAttr",
-    //  NhVariable.TP_SHORT,
-    //  null); //xxx new short[0]);
+    rootGroup.addAttribute(
+      "emptyAttr",
+      NhVariable.TP_SHORT,
+      new short[0]);
 
-    //rootGroup.addAttribute(
-    //  "nullAttr",
-    //  NhVariable.TP_SHORT,
-    //  null);
+    rootGroup.addAttribute(
+      "nullAttr",
+      NhVariable.TP_SHORT,
+      null);
   }
 
 

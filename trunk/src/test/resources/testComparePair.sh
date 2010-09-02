@@ -33,7 +33,8 @@ checkOne() {
   dumpCmd="h5dump -p -w 10000 $newDs"
   $dumpCmd | sed '1s/HDF5 .*/HDF5 "someFile" {/' > tempout.newa
   if [ "$?" -ne "0" ]; then
-    echo "h5dump failed for config: $configMsg"
+    echo "h5dump failed for:"
+    echo "  config: $configMsg"
     echo "  cmd: $cmd"
     echo "  copyCmd: $copyCmd"
     echo "  dumpCmd: $dumpCmd"
@@ -44,7 +45,8 @@ checkOne() {
   dumpCmd="ncdump $newDs"
   $dumpCmd | sed '1s/netcdf .*{/netcdf someFile {/' >> tempout.newa
   if [ "$?" -ne "0" ]; then
-    echo "ncdump failed for config: $configMsg"
+    echo "ncdump failed for:"
+    echo "  config: $configMsg"
     echo "  cmd: $cmd"
     echo "  copyCmd: $copyCmd"
     echo "  dumpCmd: $dumpCmd"
@@ -101,7 +103,8 @@ checkOne() {
   diffOk=$?
 
   if [ "$diffOk" -ne "0" ]; then
-    echo "Diff failed for config: $configMsg"
+    echo "Diff failed for:"
+    echo "  config: $configMsg"
     echo "  cmd: $cmd"
     echo "  copyCmd: $copyCmd"
     echo "  diffCmd: $diffCmd"
