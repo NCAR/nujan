@@ -45,7 +45,7 @@ public class TestUnitAlpha extends TestCase {
 
 
 public void testa() throws Exception {
-  String nameExpected = "src/testUnitData/test001.nc";
+  String nameExpected = "src/test/resources/testUnitData/test001.nc";
   String nameActual = "target/temp.test001.nc";
   createFile( nameActual);
 
