@@ -29,7 +29,10 @@
 package edu.ucar.ral.nujan.hdf;
 
 
-// Msg 00: NIL msg, to be ignored
+/**
+ * HDF5 message type 0: MsgNil: NIL msg to be ignored;
+ * not used in this package
+ */
 
 class MsgNil extends MsgBase {
 

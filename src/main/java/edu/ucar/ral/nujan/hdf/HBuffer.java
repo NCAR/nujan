@@ -35,26 +35,63 @@ import java.nio.channels.FileChannel;
 import java.util.zip.Deflater;
 
 
+/**
+ * A write-only buffer either in memory or on top of an
+ * open output FileChannel.
+ */
+
 class HBuffer {
 
 
-static final int BLEN = 10000;     // approx len of write to channel
+/**
+ * Approx len of write to channel
+ */
+static final int BLEN = 10000;
 
 
-private FileChannel outChannel;   // if null, just builds internal bbuf.
+/**
+ * Open output FileChannel, or null in the case of a memory-only buffer.
+ */
+private FileChannel outChannel;
+
+/**
+ * Deflater compression level (0==none) for use with outChannel.
+ */
 int compressionLevel;
+
+/**
+ * The global owning HdfFileWriter.
+ */
 HdfFileWriter hdfFile;
 
+
+/**
+ * The in-memory buffer, or the front end to the outChannel.
+ */
 private ByteBuffer bbuf;
+
+/**
+ * Used to compress when compressionLevel > 0.
+ */
 Deflater deflater;
 
 
 
+/**
+ * Creates a write-only buffer on top of an open output FileChannel,
+ * or, if outChannel==null, in main memory.
+ *
+ * @param outChannel Either an open output FileChannel, or null.
+ * @param compressionLevel The Deflater compression level used with
+ *     an open output FileChannel.  0 == no compression.
+ * @param hdfFile The global owning HdfFileWriter.
+ */
 
 HBuffer(
   FileChannel outChannel,         // if null, just builds internal bbuf.
   int compressionLevel,
   HdfFileWriter hdfFile)
+throws HdfException
 {
   this.outChannel = outChannel;
   this.compressionLevel = compressionLevel;
@@ -63,6 +100,8 @@ HBuffer(
   bbuf = ByteBuffer.allocate( BLEN);
   bbuf.order( ByteOrder.LITTLE_ENDIAN);
   if (compressionLevel > 0) {
+    if (outChannel == null)
+      throwerr("cannot have compressionLevel > 0 with no outChannel");
     deflater = new Deflater( compressionLevel);
   }
   if (hdfFile.bugs >= 5) {
@@ -93,6 +132,9 @@ public String toString() {
 
 
 
+/**
+ * Clears the in-memory buffer, but doesn't change the outChannel.
+ */
 
 void clear() {
   bbuf.clear();
@@ -100,12 +142,19 @@ void clear() {
 
 
 
+/**
+ * Returns the current position of the in-memory buffer.
+ */
 
 int getPos() {
   return bbuf.position();
 }
 
 
+
+/**
+ * Sets the current position of the in-memory buffer.
+ */
 
 void setPos( long pos)
 throws HdfException
@@ -119,6 +168,10 @@ throws HdfException
 
 
 
+/**
+ * Returns a subset of the bytes in the in-memory buffer:
+ *    for startPos &lt;= pos &lt; limPos.
+ */
 
 byte[] getBufBytes(
   long startPos,
@@ -140,6 +193,11 @@ throws HdfException
 
 
 
+/**
+ * Writes the in-memory buffer to <b><tt>chan</tt><b>
+ * - a <b>different</b> FileChannel than our outChannel.
+ * Must have compressionLevel == 0.
+ */
 
 void writeChannel( FileChannel chan)
 throws HdfException
@@ -162,7 +220,10 @@ throws HdfException
 
 
 
-// If bbuf is too short, either expand it or write it to outChannel.
+/**
+ * Insure bbuf has at least idelta free space - if bbuf is too full,
+ * write bbuf to outChannel (if outChanel != null) or expand bbuf.
+ */
 
 private void expandBuf( int idelta)
 throws HdfException
@@ -228,8 +289,11 @@ throws HdfException
 
 
 
+/**
+ * Compresses bbuf contents and writes to outChannel.
+ */
 
-void writeCompressedOutput()
+private void writeCompressedOutput()
 throws IOException, HdfException
 {
   if (hdfFile.bugs >= 5) {
@@ -264,6 +328,10 @@ throws IOException, HdfException
 
 
 
+/**
+ * Writes bbuf to outChannel, compressing if need be.
+ */
+
 void flush()
 throws IOException, HdfException
 {
@@ -293,6 +361,12 @@ throws IOException, HdfException
 
 
 
+/**
+ * Advances bbuf's position to the next multiple of bound.
+ * @param msg Unused
+ * @param bound  The desired multiple, such as 8.
+ */
+
 long alignPos(
   String msg,
   long bound)
@@ -309,6 +383,13 @@ throws HdfException
 
 
 
+
+/**
+ * Puts a single byte to the internal buffer.
+ * @param name  debug name
+ * @param value contains the value in the low order byte.
+ */
+
 void putBufByte(
   String name,
   int value)
@@ -323,6 +404,12 @@ throws HdfException
 }
 
 
+/**
+ * Puts an array of bytes to the internal buffer.
+ * @param name  debug name
+ * @param values the bytes to be copied.
+ */
+
 void putBufBytes(
   String name,
   byte[] values)
@@ -334,6 +421,12 @@ throws HdfException
   bbuf.put( values);
 }
 
+
+/**
+ * Puts a single short value to the internal buffer.
+ * @param name  debug name
+ * @param value contains the value in the low order two bytes.
+ */
 
 void putBufShort(
   String name,
@@ -348,6 +441,12 @@ throws HdfException
 }
 
 
+/**
+ * Puts a single int value to the internal buffer.
+ * @param name  debug name
+ * @param value contains the value to be copied.
+ */
+
 void putBufInt(
   String name,
   int value)
@@ -358,6 +457,12 @@ throws HdfException
   bbuf.putInt( value);
 }
 
+
+/**
+ * Puts a single long value to the internal buffer.
+ * @param name  debug name
+ * @param value contains the value to be copied.
+ */
 
 void putBufLong(
   String name,
@@ -370,6 +475,12 @@ throws HdfException
 }
 
 
+/**
+ * Puts a single float value to the internal buffer.
+ * @param name  debug name
+ * @param value contains the value to be copied.
+ */
+
 void putBufFloat(
   String name,
   float value)
@@ -380,6 +491,12 @@ throws HdfException
   bbuf.putFloat( value);
 }
 
+
+/**
+ * Puts a single double value to the internal buffer.
+ * @param name  debug name
+ * @param value contains the value to be copied.
+ */
 
 void putBufDouble(
   String name,
@@ -392,6 +509,12 @@ throws HdfException
 }
 
 
+
+/**
+ * Appends the contents of inBuf to our internal buffer.
+ * @param name  debug name
+ * @param inBuf  The buffer to be copied.
+ */
 
 void putBufBuf(
   String name,
@@ -408,9 +531,12 @@ throws HdfException
 
 
 
-// Called by putBuf*
+/**
+ * Debug: prints name, valueLength, hexValue.
+ * Called by putBuf*.
+ */
 
-void printValue(
+private void printValue(
   int len,
   String name,
   Object value)

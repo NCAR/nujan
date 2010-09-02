@@ -40,7 +40,7 @@ badparms() {
 
 
 
-if [ $# -ne 4 -a $# -ne 5 ]; then badparms "wrong num parms"; fi
+if [ $# -ne 4 -a $# -ne 5 ]; then badparms "main: wrong num parms"; fi
 
 versionSpec=$1
 compressSpec=$2
@@ -53,7 +53,7 @@ if [ $# -eq 5 ]; then bugs=$5; fi
 if [ "$versionSpec" == "all" ]; then versions="1 2"
 elif [ "$versionSpec" == "v1" ]; then versions="1"
 elif [ "$versionSpec" == "v2" ]; then versions="2"
-else badparms "invalid ver"
+else badparms "main: invalid version"
 fi
 
 if [ "$compressSpec" == "all" ]; then compressVals="0 5"
@@ -78,12 +78,21 @@ echo "ranks: $ranks"
 
 
 
+exitUnlessContinue() {
+  if [ $# -ne 1 ]; then
+    badparms "exitUnlessContinue: wrong num parms"
+  fi
+  bugs=$1
+  if [ "$bugs" != "continue" -a "$bugs" != "update" ]; then
+    exit 1
+  fi
+}
 
 
 
 testOne() {
   if [ $# -ne 4 ]; then
-    badparms "wrong num parms"
+    badparms "testOne: wrong num parms"
   fi
   fileVersion=$1
   compress=$2
@@ -102,7 +111,7 @@ testOne() {
   elif [[ "$rank" == "5" ]]; then dims="3,4,5,2,3"
   elif [[ "$rank" == "6" ]]; then dims="3,4,5,2,3,2"
   elif [[ "$rank" == "7" ]]; then dims="3,4,5,2,3,2,3"
-  else badparms "invalid rank: $rank"
+  else badparms "testOne: invalid rank: $rank"
   fi
 
 
@@ -127,15 +136,17 @@ testOne() {
       -dims $dims \
       -fileVersion $fileVersion \
       -compress $compress \
+      -utcModTime 0 \
       -numThread 1 \
       -outFile tempa.nc"
 
     if [ "$bugs" != "none" ]; then echo "cmd: $cmd"; fi
-    configMsg="./testSyn.sh v$fileVersion $compress $nhType $rank"
+    configMsg="./testNetcdfSyn.sh v$fileVersion $compress $nhType $rank"
 
     $cmd > tempa.log
     if [ "$?" -ne "0" ]; then
-      echo "Cmd failed for config: $configMsg"
+      echo "Cmd failed for"
+      echo "  config: $configMsg"
       echo "  cmd: $cmd"
       exit 1
     fi
@@ -143,26 +154,41 @@ testOne() {
     echo "  test: $configMsg  size: $(wc -c tempa.nc | cut -f 1 -d ' ')"
 
     oldTxt=${TESTDIR}/testNetcdfSynOut/test.$nhType.rank.$rank.out.gz
+    ###xxx replace with CompareNh.java
     testComparePair.sh $bugs $compress $oldTxt tempa.nc
+
+
+    ###compareCmd="java -cp ${BUILDDIR}:${NCJAR} \
+    ###  ${PKGBASE}.netcdfTest.NhCompare \
+    ###  -bugs 0 \
+    ###  -order y \
+    ###  -skipUnder y \
+    ###  -verbose n \
+    ###  -inFilea tempa.nc \
+    ###  -inFileb testNetcdfSynOut/test.v$fileVersion.$nhType.compress.$compress.rank.$rank.nc"
+
+    ###if [ "$bugs" != "none" ]; then echo "compareCmd: $compareCmd"; fi
+    ###$compareCmd > tempb.log
     diffOk=$?
 
-    # Copy to testSynOut
+    # If update, copy to testSynOut
     if [ "$bugs" == "update" ]; then
       gzip -c tempout.newf > $oldTxt
       echo '*** updated ***'
     fi
 
-    if [ "$diffOk" -ne "0" \
-      -a "$bugs" != "continue" \
-      -a "$bugs" != "update" ]; then
-      echo "testComparePair failed for config: $configMsg"
+    if [ "$diffOk" -ne "0" ]; then
+      echo "testComparePair on original failed for:"
+      echo "  config: $configMsg"
       echo "  cmd: $cmd"
+      echo "  compareCmd: $compareCmd"
       echo "  copyCmd: $copyCmd"
-      exit 1
+      exitUnlessContinue $bugs
     fi
+    ############xxxxx /bin/cp tempa.nc testNetcdfSynOut/test.v$fileVersion.$nhType.compress.$compress.rank.$rank.nc
 
     # Test NhCopy
-    useNhCopy=1
+    useNhCopy=0
     if [[ "$useNhCopy" == "1" ]]; then
       /bin/rm -f tempb.nc
       copyCmd="java -cp ${BUILDDIR}:${NCJAR} \
@@ -173,19 +199,22 @@ testOne() {
         -inFile tempa.nc \
         -outFile tempb.nc"
       if [ "$bugs" != "none" ]; then echo "copyCmd: $copyCmd"; fi
-      $copyCmd > tempb.log
+      $copyCmd > tempc.log
       if [ "$?" -ne "0" ]; then
-        echo "NhCopy failed for config: $configMsg"
+        echo "NhCopy failed for:"
+        echo "  config: $configMsg"
         echo "  cmd: $cmd"
         echo "  copyCmd: $copyCmd"
         exit 1
       fi
-      testComparePair.sh $bugs $compress $oldTxt tempb.nc
-      if [ "$?" -ne "0" -a "$bugs" != "update" ]; then
-        echo "testComparePair failed for config: $configMsg"
+      ###xxx replace with CompareNh.java
+      ###xxx testComparePair.sh $bugs $compress $oldTxt tempb.nc
+      if [ "$?" -ne "0" ]; then
+        echo "testComparePair on copy failed for:"
+        echo "  config: $configMsg"
         echo "  cmd: $cmd"
         echo "  copyCmd: $copyCmd"
-        exit 1
+        exitUnlessContinue $bugs
       fi
     fi
 

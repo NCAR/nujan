@@ -29,6 +29,12 @@
 package edu.ucar.ral.nujan.hdf;
 
 
+/**
+ * Represents a single symbol in a SymbolTable.
+ * Used only for fileVersion 1 symbols: the names of the subgroups
+ * and variables within a given group.
+ */
+
 class SymTabEntry extends BaseBlk {
 
 
@@ -50,6 +56,12 @@ int cacheType;           // Cache type.  Default is 0.
 BtreeNode scratchBtree;   // scratchPad contents
 LocalHeap scratchHeap;    // scratchPad contents
 
+
+/**
+ * @param heapOffset Offset of the symbol in the owning group's local heap.
+ * @param hdfGroup The owning HdfGroup.
+ * @param hdfFile The global owning HdfFileWriter.
+ */
 
 SymTabEntry(
   long heapOffset,

@@ -33,26 +33,120 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 
 
-// Msg 12: attribute
+/**
+ * HDF5 message type 12: MsgAttribute:
+ * Contains both the attribute name and value.
+ * <p>
+ * Extends abstract MsgBase, so we must implement formatMsgCore
+ * (see doc for class MsgBase).
+ * <p>
+ * A new MsgAttribute is created in HdfGroup.addAttribute.
+ */
 
 class MsgAttribute extends MsgBase {
 
+/**
+ * The attribute's local name.
+ */
 String attrName;
-int attrType;              // one of DTYPE_*
+
+/**
+ * The type of attrValue: one of HdfGroup.DTYPE_*.
+ * Must agree with dataDtype, which is the type of
+ * attrValue as determined by HdfUtil.getDimLen.
+ */
+int attrType;
+
+/**
+ * String length for a DTYPE_STRING_FIX variable, without null termination.
+ * Should be 0 for all other types, including DTYPE_STRING_VAR.
+ */
 int stgFieldLen;
+
+/**
+ * The attribute value.
+ * The type of attrValue must agree with attrType.
+ */
 Object attrValue;
+
+/**
+ * True this array is a 2-dimensional array
+ * in which rows may have differing lengths (ragged right edge).
+ */
 boolean isVlen;
 
+/**
+ * The internal MsgDataType (part of this MsgAttribute).
+ */
 MsgDataType msgDataType;
+
+/**
+ * The internal MsgDataSpace (part of this MsgAttribute).
+ */
 MsgDataSpace msgDataSpace;
 
+/**
+ * The type of attrValue (one of HdfGroup.DTYPE_) as determined
+ * by HdfUtil.getDimLen.  Must agree with attrType.
+ */
 int dataDtype;
+
+/**
+ * The total number of elements in attrValue,
+ * as determined by HdfUtil.getDimLen.
+ */
 int totNumEle;
+
+/**
+ * The length in bytes of the elements of attrValue,
+ * as determined by HdfUtil.getDimLen.
+ * For example, if Integer or int[] or int[][] or..., elementLen = 4.
+ * For String and char[], elementLen = max len encountered.
+ */
+int elementLen;
+
+/**
+ * Length of the dimensions of attrValue,
+ * as determined by HdfUtil.getDimLen.
+ */
 int[] dataVarDims;
+
+/**
+ * For DTYPE_VLEN or DTYPE_COMPOUND, the types of the contained
+ * elements (values of HdfGroup.DTYPE_* ).
+ */
 int[] dsubTypes = null;
 
 
+//xxx all ///
 
+/**
+ * Creates a new MsgAttribute.
+ *
+ * @param attrName
+ * The attribute's local name.
+ *
+ * @param attrType
+ * The type of attrValue: one of HdfGroup.DTYPE_*.
+ * Must agree with dataDtype, which is the type of
+ * attrValue as determined by HdfUtil.getDimLen.
+ *
+ * @param attrstgFieldLen
+ * String length for a DTYPE_STRING_FIX variable, without null termination.
+ * Should be 0 for all other types, including DTYPE_STRING_VAR.
+ *
+ * @param attrValue
+ * The attribute value.
+ * The type of attrValue must agree with attrType.
+ *
+ * @param isVlen
+ * True this array is a 2-dimensional array
+ * in which rows may have differing lengths (ragged right edge).
+ *
+ * @param hdfGroup The owning HdfGroup.
+ *
+ * @param hdfFile The global owning HdfFileWriter.
+ */
 
 MsgAttribute(
   String attrName,
@@ -71,28 +165,29 @@ throws HdfException
   this.attrValue = attrValue;
   this.isVlen = isVlen;
 
-  // Find dtype and dataVarDims
-  //xxx old:
-  ///int[] dataInfo = HdfUtil.getDtypeAndDimsOld( isVlen, attrValue);
-  ///dataDtype = dataInfo[0];
-  ///dataVarDims = Arrays.copyOfRange( dataInfo, 1, dataInfo.length);
-
   int[] dataInfo = HdfUtil.getDimLen( attrValue, isVlen);
   dataDtype = dataInfo[0];
   totNumEle = dataInfo[1];
-  dataVarDims = Arrays.copyOfRange( dataInfo, 2, dataInfo.length);
+  elementLen = dataInfo[2];
+  dataVarDims = Arrays.copyOfRange( dataInfo, 3, dataInfo.length);
 
   if (hdfFile.bugs >= 1) {
     prtf("MsgAttribute: actual data:" + "\n"
       + "  attrValue object: " + attrValue + "\n"
       + "  attrValue dtype: " + HdfGroup.dtypeNames[ dataDtype] + "\n"
       + "  attrValue totNumEle: " + totNumEle + "\n"
+      + "  attrValue elementLen: " + elementLen + "\n"
       + "  attrValue rank: " + dataVarDims.length + "\n"
       + "  attrValue type and dims: "
       + HdfUtil.formatDtypeDim( dataDtype, dataVarDims));
     if (attrValue != null)
       prtf("MsgAttribute: attrValue class: " + attrValue.getClass());
   }
+
+  if (totNumEle * elementLen > 65535 - 1000)   // -1000 for hdr, slack, etc.
+    throwerr("Attribute total length too big.  totNumEle: %d"
+      + "  elementLen: %d  attr path: %s",
+      totNumEle, elementLen, getPath());
 
   // Check that the dataDtype and dataVarDims match what the user declared.
   if (attrValue != null) {
@@ -191,6 +286,10 @@ public String toString() {
 
 
 
+/**
+ * Returns the full path name of this attribute; for example
+ * "/someGroup/someVariable/attrName".
+ */
 String getPath()
 {
   String nm = hdfGroup.getPath();
@@ -202,7 +301,12 @@ String getPath()
 
 
 
-// Format everything after the message header
+/**
+ * Extends abstract MsgBase:
+ * formats everything after the message header into fmtBuf.
+ * Called by MsgBase.formatFullMsg and MsgBase.formatNakedMsg.
+ */
+
 void formatMsgCore( int formatPass, HBuffer fmtBuf)
 throws HdfException
 {
@@ -253,7 +357,8 @@ throws HdfException
     // Don't write null attrValue
   }
   else if (isVlen) {
-    // Vlen: format the globalHeap references to hdfFile.bbuf
+    // Vlen: format the globalHeap references to hdfFile.mainGlobalHeap.
+    // Get back heap ref indices, one per VLEN row.
     int[] heapIxs = hdfFile.mainGlobalHeap.putHeapVlenObject(
       hdfGroup,
       msgDataType.dtype,
@@ -282,7 +387,7 @@ throws HdfException
       attrType,
       stgFieldLen,
       attrValue,
-      new Counter(),
+      new HdfModInt(0),
       hdfFile.mainGlobalHeap.blkPosition,  // gcolAddr for DTYPE_STRING_VAR
       hdfFile.mainGlobalHeap,              // gcol for DTYPE_STRING_VAR
       refBuf);
@@ -295,10 +400,16 @@ throws HdfException
       attrType,
       stgFieldLen,
       attrValue,
-      new Counter(),
+      new HdfModInt(0),
       0,                       // gcolAddr for DTYPE_STRING_VAR
       null,                    // gcol for DTYPE_STRING_VAR
       fmtBuf);
+
+    // Kluge: When an attribute is null or length == 0,
+    // the HDF5 C library still writes out a single scalar value: 0.
+    // And the reader reads it.
+    if (totNumEle == 0)
+      fmtBuf.putBufLong( "MsgAttribute: empty attr kluge", 0);
   }
 
 } // end formatMsgCore

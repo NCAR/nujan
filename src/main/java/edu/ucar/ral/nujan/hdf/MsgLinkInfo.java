@@ -29,7 +29,11 @@
 package edu.ucar.ral.nujan.hdf;
 
 
-// Msg 2: variables for "new groups".
+/**
+ * HDF5 message type 2: MsgLinkInfo:
+ * Used for fileVersion 2 to keep info on tracking and indexing
+ * link creation order.
+ */
 
 class MsgLinkInfo extends MsgBase {
 

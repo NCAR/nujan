@@ -87,7 +87,7 @@ for version in $versions; do
     for ifile in $files; do
       inPath=$inDir/$subDir/$ifile
       echo "===== start version $version  compress $compress  inPath $inPath ====="
-      configMsg="./testReal.sh v$version $compress $inDir $subDir $ifile"
+      configMsg="./testNetcdfReal.sh v$version $compress $inDir $subDir $ifile"
 
       /bin/rm -f tempb.nc
       copyCmd="java -cp ${BUILDDIR}:${NCJAR} \

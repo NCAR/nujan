@@ -29,7 +29,10 @@
 package edu.ucar.ral.nujan.hdf;
 
 
-// Msg 10: constants for "new groups".
+/**
+ * HDF5 message type 10: MsgGroupInfo:
+ * Used for fileVersion 2 to keep some group-related constants.
+ */
 
 class MsgGroupInfo extends MsgBase {
 

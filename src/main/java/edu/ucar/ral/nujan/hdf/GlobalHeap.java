@@ -32,9 +32,22 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 
+/**
+ * A misnomer: there can be many GlobalHeaps, each of which
+ * is just a heap.
+ * There are only two uses of GlobalHeaps:<ul>
+ *   <li> The unique GlobalHeap hdfFile.mainGlobalHeap holds all:<ul>
+ *       <li> attributes that are either VLEN and String
+ *       <li> FillValues that are Strings.
+ *     </ul>
+ *   <li> If a variable is DTYPE_STRING_VAR, HdfGroup.gcol holds
+ *        each element of the array as a separate heap item.
+ * </ul>
+ */
 
 class GlobalHeap extends BaseBlk {
 
+//xxx doc all this
 
 // Referenced blocks
 // None.
@@ -68,6 +81,10 @@ GlobalHeap(
 
 
 
+/**
+ * Removes all items from the heap.
+ */
+
 void clear() {
   numItem = 0;
   dataBuf.clear();
@@ -98,7 +115,9 @@ public String toString() {
 
 
 
-// Returns heap index num.
+/**
+ * Adds item to the heap and returns heap index number.
+ */
 
 int putHeapItem(
   String msg,
@@ -150,15 +169,19 @@ int putHeapItem(
 
 
 
-// Add an object to the global heap.
-// The object must be short[][] or int[][] or ...
-//
-// This must be called from within formatBuf
-// since the globalHeap is recreated in formatBufAll
-// for each formatPass.
-// We recreate the globalHeap because it may contain
-// references to other blocks, whose blkPositions are
-// updated as they are formatted.
+/**
+ * Adds a VLEN object to the global heap.
+ * The object must be short[][] or int[][] or ...
+ *
+ * This must be called from within formatBuf
+ * since the globalHeap is recreated in formatBufAll
+ * for each formatPass.
+ * We recreate the globalHeap because it may contain
+ * references to other blocks, whose blkPositions are
+ * updated as they are formatted.
+ *
+ * @return An array of heap reference indices, one per row of objValue.
+ */
 
 int[] putHeapVlenObject(
   HdfGroup hdfGroup,         // used only for error msgs
@@ -285,6 +308,18 @@ throws HdfException
 
 
 
+
+// xxx copy doc everywhere:
+/**
+ * Extends abstract BaseBlk: formats this individual BaseBlk
+ * to fmtBuf.
+ * @param formatPass: <ul>
+ *   <li> 1: Initial formatting to determine the formatted length.
+ *          In HdfGroup we add msgs to hdrMsgList.
+ *   <li> 2: Final formatting.
+ * </ul>
+ * @param fmtBuf  output buffer
+ */
 
 void formatBuf( int formatPass, HBuffer fmtBuf)
 throws HdfException

@@ -29,7 +29,11 @@
 package edu.ucar.ral.nujan.hdf;
 
 
-// Msg 6: link to another group
+/**
+ * HDF5 message type 6: MsgFillValue:
+ * Used by fileVersion 2 to specify a link to another group,
+ * either from parent to child group or from group to variable.
+ */
 
 class MsgLinkit extends MsgBase {
 

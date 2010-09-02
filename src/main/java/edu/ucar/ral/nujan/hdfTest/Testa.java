@@ -28,6 +28,11 @@
 
 package edu.ucar.ral.nujan.hdfTest;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.SimpleTimeZone;
+
 import edu.ucar.ral.nujan.hdf.HdfFileWriter;
 import edu.ucar.ral.nujan.hdf.HdfGroup;
 import edu.ucar.ral.nujan.hdf.HdfException;
@@ -57,6 +62,8 @@ static void badparms( String msg) {
   prtf("  -fileVersion  1 / 2");
   prtf("  -chunked      contig / chunked");
   prtf("  -compress     compression level: 0==none, 1 - 9");
+  prtf("  -utcModTime   either yyyy-mm-dd or yyyy-mm-ddThh:mm:ss");
+  prtf("                or 0, meaning use the current time");
   prtf("  -outFile      <fname>");
   System.exit(1);
 }
@@ -86,6 +93,7 @@ throws HdfException
   String fileVersionStg = null;
   String chunkedStg = null;
   int compressLevel = -1;
+  long utcModTime = -1;
   String outFile = null;
 
   if (args.length % 2 != 0) badparms("parms must be key/value pairs");
@@ -126,6 +134,25 @@ throws HdfException
     else if (key.equals("-fileVersion")) fileVersionStg = val;
     else if (key.equals("-chunked")) chunkedStg = val;
     else if (key.equals("-compress")) compressLevel = Integer.parseInt( val);
+    else if (key.equals("-utcModTime")) {
+      if (val.equals("0")) utcModTime = 0;
+      else {
+        SimpleDateFormat utcSdf = null;
+        if (val.length() == 10)      // yyyy-mm-dd
+          utcSdf = new SimpleDateFormat("yyyy-MM-dd");
+        else if (val.length() == 19)      // yyyy-MM-ddTHH:mm:ss
+          utcSdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+        else badparms("invalid -utcModTime: \"" + val + "\"");
+
+        utcSdf.setTimeZone( new SimpleTimeZone( 0, "UTC"));
+        Date dt = null;
+        try { dt = utcSdf.parse( val); }
+        catch( ParseException exc) {
+          badparms("invalid -utcModTime: \"" + val + "\"");
+        }
+        utcModTime = dt.getTime();
+      }
+    }
     else if (key.equals("-outFile")) outFile = val;
     else badparms("unkown parm: " + key);
   }
@@ -136,6 +163,7 @@ throws HdfException
   if (fileVersionStg == null) badparms("missing parm: -fileVersion");
   if (chunkedStg == null) badparms("missing parm: -chunked");
   if (compressLevel < 0) badparms("missing parm: -compress");
+  if (utcModTime < 0) badparms("missing parm: -utcModTime");
   if (outFile == null) badparms("missing parm: -outFile");
 
   int fileVersion = 0;
@@ -158,10 +186,16 @@ throws HdfException
   prtf("Testa: fileVersion: %s", fileVersion);
   prtf("Testa: chunked: %s", useChunked);
   prtf("Testa: compress: %d", compressLevel);
+
+  SimpleDateFormat utcSdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+  utcSdf.setTimeZone( new SimpleTimeZone( 0, "UTC"));
+  prtf("Testa: utcModTime: %d  %s", utcModTime, utcSdf.format( utcModTime));
+
   prtf("Testa: outFile: \"%s\"", outFile);
 
   HdfFileWriter hfile = new HdfFileWriter(
-    outFile, fileVersion, HdfFileWriter.OPT_ALLOW_OVERWRITE, bugs);
+    outFile, fileVersion, HdfFileWriter.OPT_ALLOW_OVERWRITE,
+    bugs, utcModTime);
 
   HdfGroup rootGroup = hfile.getRootGroup();
 

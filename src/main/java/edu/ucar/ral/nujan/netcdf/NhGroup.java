@@ -119,9 +119,11 @@ public String getPath() {
   String res = "";
   NhGroup grp = this;
   while (grp != null) {
-    res = groupName + "/" + res;
+    if (res.length() != 0) res = "/" + res;
+    res = grp.groupName + res;
     grp = grp.parentGroup;
   }
+  if (res.length() == 0) res = "/";
   return res;
 }
 

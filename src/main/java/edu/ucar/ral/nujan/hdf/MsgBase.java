@@ -29,45 +29,192 @@
 package edu.ucar.ral.nujan.hdf;
 
 
+/**
+ * Base class for Msg*.
+ * Subclasses must implement formatMsgCore.
+ * <pre>
+ *
+ * There are two main routes for calling formatMsgCore.
+ *
+ * 1. Via HdfGroup for its message table:
+ *    HdfGroup.formatBuf (implements BaseBlk.formatBuf):
+ *      If v1: calls MsgBase.formatFullMsg
+ *      If v2: calls layoutVersion2, which calls MsgBase.formatFullMsg
+ *    MsgBase.formatFullMsg:
+ *      Formats msg header, then calls abstract formatMsgCore.
+ *
+ * 2. Via MsgAttribute for its internal MsgDataType and MsgDataSpace:
+ *    MsgAttribute.formatMsgCore
+ *        (which is called from MsgBase.formatFullMsg, from HdfGroup.formatBuf)
+ *      Calls msgDataType.formatNakedMsg.
+ *        This resolves to MsgBase.formatNakedMsg, 
+ *      Calls msgDataSpace.formatNakedMsg similarly.
+ *    MsgBase.formatNakedMsg:
+ *      Calls abstract formatMsgCore, without the msg header.
+ * </pre>
+ */
+
 abstract class MsgBase extends BaseBlk {
 
-// Len of head fields:
-// fileVersion==1:
+// Lengths of header fields, in bytes:
+// If fileVersion==1:
 //   hdrMsgType(2), hdrMsgSize(2), hdrMsgFlag(1), reserved(3)
-// fileVersion==2:
+// If fileVersion==2:
 //   hdrMsgType(1), hdrMsgSize(2), hdrMsgFlag(1), hdrMsgCreOrder(2)
+
 static final int MSG_HDR_LEN_V1 = 8;
 static final int MSG_HDR_LEN_V2 = 6;
 
 // set bit 0 of hdrMsgFlag: value is constant
 static final int FLAG_CONSTANT = 1;
 
+//xxx all v1, v2: fileVersion
 
-
+/**
+ * HDF5 message type 0: MsgNil: NIL msg to be ignored;
+ * not used in this package
+ */
 static final int TP_NIL              =  0;
+
+/**
+ * HDF5 message type 1: MsgDataSpace: contains dimension info
+ */
 static final int TP_DATASPACE        =  1;
+
+/**
+ * HDF5 message type 2: MsgLinkInfo:
+ * Used for fileVersion 2 to keep info on tracking and indexing
+ * link creation order.
+ */
 static final int TP_LINKINFO         =  2;
+
+/**
+ * HDF5 message type 3: MsgDataType:
+ * contains data type info (fixed/float/string/etc, elementLen, etc).
+ */
 static final int TP_DATATYPE         =  3;
+
+/**
+ * HDF5 message type 4: obsolete fill value (not used in this package).
+ */
 static final int TP_OLD_FILL_VALUE   =  4;
+
+/**
+ * HDF5 message type 5: MsgFillValue: specify data fill value.
+ */
 static final int TP_FILL_VALUE       =  5;
+
+/**
+ * HDF5 message type 6: MsgFillValue:
+ * Used by fileVersion 2 to specify a link to another group,
+ * either from parent to child group or from group to variable.
+ */
 static final int TP_LINKIT           =  6;
+
+/**
+ * HDF5 message type 7: not used in this package; HDF5 uses it
+ * for data objects stored in a separate file.
+ */
 static final int TP_EXTERNAL_FILE    =  7;
+
+/**
+ * HDF5 message type 8: MsgLayout:
+ * If fileVersion==1, specifies the Btree that describes the raw data;
+ * if fileVersion==2, specified the rawDataAddr, rawDataLen.
+ */
 static final int TP_LAYOUT           =  8;
+
+/**
+ * HDF5 message type 9: not used in this package; HDF5 uses it
+ * for internal testing.
+ */
 static final int TP_BOGUS            =  9;
+
+/**
+ * HDF5 message type 10: MsgGroupInfo:
+ * Used for fileVersion 2 to keep some group-related constants.
+ */
 static final int TP_GROUPINFO        = 10;
+
+/**
+ * HDF5 message type 11: MsgFilter:
+ * Used to keep info on the encode/decode filter pipeline;
+ * this package uses it only for the DEFLATE (compression) filter.
+ */
 static final int TP_FILTER           = 11;
+
+/**
+ * HDF5 message type 12: MsgAttribute:
+ * Contains both the attribute name and value.
+ */
 static final int TP_ATTRIBUTE        = 12;
+
+/**
+ * HDF5 message type 13: comment.
+ * Not used in this package.
+ */
 static final int TP_COMMENT          = 13;
+
+/**
+ * HDF5 message type 14: obsolete modification time.
+ * Not used in this package.
+ */
 static final int TP_OLD_MOD_TIME     = 14;
+
+/**
+ * HDF5 message type 15: shared message table info.
+ * Not used in this package: we don't use shared messages.
+ */
 static final int TP_SHARED_MESSAGE   = 15;
+
+/**
+ * HDF5 message type 16: object header continuation.
+ * Not used in this package: we keep the headers all in
+ * a contiguous block, so don't need continuations.
+ */
 static final int TP_OBJ_HDR_CONTIN   = 16;
+
+/**
+ * HDF5 message type 17: symbol table.
+ * Used only for fileVersion 1, to point to the symbol table's
+ * root BtreeNode and to the LocalHeap.
+ */
 static final int TP_SYMBOL_TABLE     = 17;
+
+/**
+ * HDF5 message type 18: MsgModTime:
+ * object modification time.
+ */
 static final int TP_MOD_TIME         = 18;
+
+/**
+ * HDF5 message type 19: non-default K values in superblock extension.
+ * Not used in this package: we don't need superblock extensions,
+ * and all K values we use are the defaults declared in the superblock.
+ */
 static final int TP_K_VALUES         = 19;
+
+/**
+ * HDF5 message type 20: file driver info.
+ * Not used in this package: we don't use custom drivers.
+ */
 static final int TP_DRIVER_INFO      = 20;
+
+/**
+ * HDF5 message type 21: MsgAttrInfo:
+ * attribute info (not the Attribute itself - see MsgAttribute).
+ */
 static final int TP_ATTR_INFO        = 21;
+
+/**
+ * HDF5 message type 22: object reference count.
+ * Not used in this package.
+ */
 static final int TP_OBJ_REF_COUNT    = 22;
 
+/**
+ * Names of TP_* constants.
+ */
 static final String[] hdrMsgTypeNames = {
   "Nil",
   "Dataspace",
@@ -124,7 +271,11 @@ int hdrMsgFlag;
 
 
 
-
+/**
+ * @param hdrMsgType One of TP_*.
+ * @param parentGroup The group containing this message.
+ * @param hdfFile The global owning HdfFileWriter.
+ */
 
 MsgBase(
   int hdrMsgType,
@@ -169,19 +320,30 @@ public String toString() {
 
 
 
-
-// Format the msg including the header info:
-//   V1: hdrMsgType, hdrMsgSize, hdrMsgFlag
-//   V2: hdrMsgType, hdrMsgSize, hdrMsgFlag, hdrMsgCreOrder
+/**
+ * Formats this message including the header info:
+ * <ul>
+ *   <li> fileVersion 1: hdrMsgType, hdrMsgSize, hdrMsgFlag
+ *   <li> fileVersion 2: hdrMsgType, hdrMsgSize, hdrMsgFlag, hdrMsgCreOrder
+ * </ul>
+ * Called by HdfGroup.formatBuf, HdfGroup.layoutVersion2 (from formatBuf).
+ */
 
 void formatFullMsg( int formatPass, HBuffer fmtBuf)
 throws HdfException
 {
   hdfFile.indent++;
   if (hdfFile.bugs >= 5) {
-    prtIndent("formatFullMsg: msgType: %d (%s)  size: %d  flag: 0x%x  creOrder: %d",
+    String stg = String.format(
+      "formatFullMsg: msgType: %d (%s)  size: %d  flag: 0x%x  creOrder: %d"
+        + "  in grp: \"%s\"",
       hdrMsgType, hdrMsgTypeNames[hdrMsgType], hdrMsgSize, hdrMsgFlag,
-      hdrMsgCreOrder);
+      hdrMsgCreOrder, hdfGroup.getPath());
+
+    if (this instanceof MsgAttribute)
+      stg += "  attrName: " + ((MsgAttribute) this).attrName;
+
+    prtIndent( stg);
   }
 
   long svPos = fmtBuf.getPos();
@@ -230,7 +392,11 @@ throws HdfException
 
 
 
-// Format the msg without hdrMsgType, hdrMsgSize, hdrMsgFlag
+/**
+ * Formats this message without the header info.
+ * This is used only by MsgAttribute.formatMsgCore
+ * to format the attribute's internal MsgDataType and MsgDataSpace.
+ */
 
 void formatNakedMsg( int formatPass, HBuffer fmtBuf)
 throws HdfException
@@ -253,6 +419,14 @@ throws HdfException
 
 
 
+
+
+/**
+ * Extends abstract BaseBlk: illegal to call formatBuf
+ * for a Msg* class since the Msg* classes are never formatted
+ * alone.  They are always formatted within an HdfGroup
+ * or MsgAttribute.
+ */
 
 void formatBuf( int formatPass, HBuffer fmtBuf)
 throws HdfException

@@ -35,7 +35,7 @@ import edu.ucar.ral.nujan.hdf.HdfGroup;
 
 
 /**
- * Represents one dimension for a NhVariable.
+ * Represents one dimension for an NhVariable.
  */
 
 public class NhDimension {

@@ -26,9 +26,13 @@
 // OTHER DEALINGS IN THE SOFTWARE.
 
 
-package edu.ucar.ral.nujan.netcdfTest;
+package edu.ucar.ral.nujan.netcdfUnitTest;
 
 import java.util.Arrays;
+
+import java.io.File;
+import junit.framework.TestCase;
+import junitx.framework.FileAssert;
 
 import edu.ucar.ral.nujan.netcdf.NhDimension;
 import edu.ucar.ral.nujan.netcdf.NhException;
@@ -37,55 +41,35 @@ import edu.ucar.ral.nujan.netcdf.NhGroup;
 import edu.ucar.ral.nujan.netcdf.NhVariable;
 
 
-/**
- * Test empty data, empty attributes.
- */
+public class TestUnitAlpha extends TestCase {
 
 
-public class TestEmptya {
+public void testa() throws Exception {
+  String nameExpected = "src/testUnitData/test001.nc";
+  String nameActual = "target/temp.test001.nc";
+  createFile( nameActual);
 
-
-static void badparms( String msg) {
-  prtf("Error: %s", msg);
-  prtf("parms:");
-  prtf("  -outFile      <fname>");
-  System.exit(1);
+  File fileExpected = new File( nameExpected);
+  File fileActual = new File( nameActual);
+  FileAssert.assertBinaryEquals("file content mismatch",
+    fileExpected, fileActual);
 }
 
 
 
-public static void main( String[] args) {
-  try { testIt( args); }
-  catch( NhException exc) {
-    exc.printStackTrace();
-    prtf("main: caught: %s", exc);
-    System.exit(1);
-  }
-}
 
 
-static void testIt( String[] args)
+
+static void createFile( String outFile)
 throws NhException
 {
-  int bugs = -1;
-  String outFile = null;
-
-  if (args.length % 2 != 0) badparms("parms must be key/value pairs");
-  for (int iarg = 0; iarg < args.length; iarg += 2) {
-    String key = args[iarg];
-    String val = args[iarg+1];
-    if (key.equals("-bugs")) bugs = Integer.parseInt( val);
-    else if (key.equals("-outFile")) outFile = val;
-    else badparms("unkown parm: " + key);
-  }
-  if (bugs < 0) badparms("missing parm: -bugs");
-  if (outFile == null) badparms("missing parm: -outFile");
-
+  int bugs = 0;
+  int fileVersion = 2;
   NhFileWriter hfile = new NhFileWriter(
-    outFile, NhFileWriter.OPT_OVERWRITE);
-
-  hfile.setDebugLevel( bugs);
-  hfile.setHdfDebugLevel( bugs);
+    outFile, NhFileWriter.OPT_OVERWRITE,
+    fileVersion,
+    bugs, bugs,            // nhBugs, hdfBugs
+    1283444655);           // utcModTime: milliseconds since 1970
 
   NhGroup rootGroup = hfile.getRootGroup();
 
@@ -101,29 +85,48 @@ throws NhException
 
   // Global attributes are added to the rootGroup.
   rootGroup.addAttribute(
-    "emptyRootAttr",
+    "someName",
     NhVariable.TP_STRING_VAR,
-    null);
+    "some long comment");
 
-  Double fillValue = null;
+  // Groups may be nested arbitrarily
+  NhGroup northernGroup = rootGroup.addGroup("northernData");
+
+  northernGroup.addAttribute(
+    "cityIndices",
+    NhVariable.TP_INT,
+    new int[] { 1, 2, 3, 5, 7, 13, 17});
+
+  // Variables may be added to any group.
+  Double fillValue = new Double( -999999);
   int compressLevel = 0;        // compression level: 0==none, 1 - 9
 
-  NhVariable humidityVar = rootGroup.addVariable(
+  NhVariable humidityVar = northernGroup.addVariable(
     "humidity",                 // varName
     NhVariable.TP_DOUBLE,       // nhType
-    null,                       // varDims
+    nhDims,                     // varDims
     fillValue,
     compressLevel);
 
   humidityVar.addAttribute(
-    "emptyVarAttr",
+    "someUnits",
     NhVariable.TP_STRING_VAR,
-    new String[0]);
+    "fathoms per fortnight");
 
   // End the definition stage.
   // All groups, variables, and attributes are created before endDefine.
   // All calls to writeData occur after endDefine.
   hfile.endDefine();
+
+  // The data type must match that declared in the addVariable call.
+  // The data shape must match xdim, ydim.
+  double[][] testData = {
+    { 11, 12, 13, 14, 15},
+    { 21, 22, 23, 24, 25},
+    { 31, 32, 33, 34, 35}
+  };
+
+  humidityVar.writeData( testData);
 
   hfile.close();
 
@@ -149,4 +152,4 @@ static void prtf( String msg, Object... args) {
   System.out.printf("\n");
 }
 
-} // end class TestEmptya
+} // end class

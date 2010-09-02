@@ -28,6 +28,11 @@
 
 package edu.ucar.ral.nujan.hdf;
 
+
+/**
+ * Puts the License in a static String.
+ */
+
 class License {
 
 public final static String license = ""

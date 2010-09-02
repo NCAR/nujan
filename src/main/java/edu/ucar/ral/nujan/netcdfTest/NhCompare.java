@@ -62,8 +62,8 @@ static void badparms( String msg) {
   prtf("  -order      y/n.  Check for identical ordering.");
   prtf("  -skipUnder  y/n.  Skip groups, attrs and vars starting with underbar _");
   prtf("  -verbose    y/n.  Print every data pair difference.");
-  prtf("  -ina        input file name.");
-  prtf("  -inb        input file name.");
+  prtf("  -inFilea    input file name.");
+  prtf("  -inFileb    input file name.");
   prtf("");
   prtf("Example:");
   prtf("java -cp x/classes:x/netcdfAll-4.1.jar edu.ucar.ral.nujan.netcdfTest.NhCompare -bugs 0 -order y -skipUnder y -verbose y -inFilea tempa.nc -inFileb tempb.nc");
@@ -172,8 +172,9 @@ throws Exception
   String grpName = inGroupa.getName();
   if (! inGroupb.getName().equals( grpName))
     throwerr("name mismatch: internal error");
-  prtIndent( indent, grpName, "Start comparison");
+
   if (grpName.equals("")) grpName = "/";      // easier for error msgs
+  prtIndent( indent, grpName, "Start comparison");
 
   Dimension[] dimsa = inGroupa.getDimensions().toArray( new Dimension[0]);
   Dimension[] dimsb = inGroupb.getDimensions().toArray( new Dimension[0]);
@@ -183,8 +184,8 @@ throws Exception
     int kka = 0;
     for (Dimension dima : dimsa) {
       if (dima.getName().startsWith("_"))
-        prtIndent( indent, inGroupa.getName(),
-        "skipping dimension: %s", dima.getName());
+        prtIndent( indent, grpName,
+          "skipping dimension: \"%s\"", dima.getName());
       else tmpDimsa[kka++] = dima;
     }
     dimsa = Arrays.copyOf( tmpDimsa, kka);
@@ -193,8 +194,8 @@ throws Exception
     int kkb = 0;
     for (Dimension dimb : dimsb) {
       if (dimb.getName().startsWith("_"))
-        prtIndent( indent, inGroupb.getName(),
-        "skipping dimension: %s", dimb.getName());
+        prtIndent( indent, grpName,
+        "skipping dimension: \"%s\"", dimb.getName());
       else tmpDimsb[kkb++] = dimb;
     }
     dimsb = Arrays.copyOf( tmpDimsb, kkb);
@@ -227,8 +228,8 @@ throws Exception
     int kka = 0;
     for (Attribute attra : attrsa) {
       if (attra.getName().startsWith("_"))
-        prtIndent( indent, inGroupa.getName(),
-        "skipping attribute: %s", attra.getName());
+        prtIndent( indent, grpName,
+        "skipping attribute: \"%s\"", attra.getName());
       else tmpAttrsa[kka++] = attra;
     }
     attrsa = Arrays.copyOf( tmpAttrsa, kka);
@@ -237,8 +238,8 @@ throws Exception
     int kkb = 0;
     for (Attribute attrb : attrsb) {
       if (attrb.getName().startsWith("_"))
-        prtIndent( indent, inGroupb.getName(),
-        "skipping attribute: %s", attrb.getName());
+        prtIndent( indent, grpName,
+        "skipping attribute: \"%s\"", attrb.getName());
       else tmpAttrsb[kkb++] = attrb;
     }
     attrsb = Arrays.copyOf( tmpAttrsb, kkb);
@@ -273,8 +274,8 @@ throws Exception
     int kka = 0;
     for (Variable vara : varsa) {
       if (vara.getName().startsWith("_"))
-        prtIndent( indent, inGroupa.getName(),
-        "skipping variable: %s", vara.getName());
+        prtIndent( indent, grpName,
+        "skipping variable: \"%s\"", vara.getName());
       else tmpVarsa[kka++] = vara;
     }
     varsa = Arrays.copyOf( tmpVarsa, kka);
@@ -283,8 +284,8 @@ throws Exception
     int kkb = 0;
     for (Variable varb : varsb) {
       if (varb.getName().startsWith("_"))
-        prtIndent( indent, inGroupb.getName(),
-        "skipping variable: %s", varb.getName());
+        prtIndent( indent, grpName,
+        "skipping variable: \"%s\"", varb.getName());
       else tmpVarsb[kkb++] = varb;
     }
     varsb = Arrays.copyOf( tmpVarsb, kkb);
@@ -319,8 +320,8 @@ throws Exception
     int kka = 0;
     for (Group subGroupa : subGroupsa) {
       if (subGroupa.getName().startsWith("_"))
-        prtIndent( indent, inGroupa.getName(),
-        "skipping group: %s", subGroupa.getName());
+        prtIndent( indent, grpName,
+        "skipping group: \"%s\"", subGroupa.getName());
       else tmpSubGroupsa[kka++] = subGroupa;
     }
     subGroupsa = Arrays.copyOf( tmpSubGroupsa, kka);
@@ -329,8 +330,8 @@ throws Exception
     int kkb = 0;
     for (Group subGroupb : subGroupsb) {
       if (subGroupb.getName().startsWith("_"))
-        prtIndent( indent, inGroupb.getName(),
-        "skipping group: %s", subGroupb.getName());
+        prtIndent( indent, grpName,
+        "skipping group: \"%s\"", subGroupb.getName());
       else tmpSubGroupsb[kkb++] = subGroupb;
     }
     subGroupsb = Arrays.copyOf( tmpSubGroupsb, kkb);
@@ -568,7 +569,7 @@ throws Exception
       numDiff += 1;
       prtIndent( indent, grpName,
         "Diff: variable %s  ranks differ:  %d  %d",
-        grpName, vara.getName(), vara.getRank(), varb.getRank());
+        vara.getName(), vara.getRank(), varb.getRank());
     }
     else {        // else ranks match
       boolean isOk = true;
@@ -778,7 +779,7 @@ static void prtIndent(
     indentStg += "  ";
   }
   System.out.printf(
-    indentStg + "Group " + grpName + ": " + msg + "\n",
+    indentStg + "Group \"" + grpName + "\": " + msg + "\n",
     args);
 }
 

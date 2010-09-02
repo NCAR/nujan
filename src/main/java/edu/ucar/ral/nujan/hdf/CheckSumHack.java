@@ -28,10 +28,14 @@
 
 package edu.ucar.ral.nujan.hdf;
 
-// There is so much well published, well established
-// theory for strong checksums.  Why use a hack like this?
-//
-// For the hack details, see the HDF5 file: H5checksum.c
+
+/**
+ * Implements the samed checksum hack as used by the HDF5 C code.
+ * There is so much well published, well established
+ * theory for strong checksums.  Why use a hack like this?
+ * <p>
+ * For the hack details, see the HDF5 file: H5checksum.c
+ */
 
 class CheckSumHack {
 
@@ -66,6 +70,11 @@ void mixFinal() {
   cc ^= bb;  cc -= rotate( bb, 24);
 }
 
+
+/**
+ * Returns the checksum of bytes.
+ * For the hack details, see the HDF5 file: H5checksum.c
+ */
 
 int calcHackSum(
   byte[] bytes)
