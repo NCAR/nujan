@@ -13,7 +13,7 @@
 #   for ii in 0 1 2 3 4 5; do diff <(sed -e '1,/ncdump/ d'  testSynOut/test.int.rank.$ii.out) <(sed -e '1,/ncdump/ d'  testSynOut/test.double.rank.$ii.out) | less; done
 
 
-BUILDDIR=../../../target/classes
+BUILDDIR=../../../target/test-classes:../../../target/classes
 PKGBASE=edu.ucar.ral.nujan
 TESTDIR=.
 H5CHECK=/d1/steves/ftp/hdf5/tdi/bin/h5check
@@ -139,7 +139,7 @@ testOne() {
     /bin/rm -f tempa.h5
 
     cmd="java -cp ${BUILDDIR} \
-      ${PKGBASE}.hdfTest.Testa \
+      ${PKGBASE}.hdfTest.Thdfa \
       -bugs 10 \
       -dtype $dtype \
       -dims $dims \

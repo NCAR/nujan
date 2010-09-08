@@ -14,7 +14,7 @@
 
 
 NCJAR=/d1/steves/ftp/netcdfJava/netcdfAll-4.1.jar
-BUILDDIR=../../../target/classes
+BUILDDIR=../../../target/test-classes:../../../target/classes
 PKGBASE=edu.ucar.ral.nujan
 TESTDIR=.
 
@@ -130,7 +130,7 @@ testOne() {
     /bin/rm -f tempa.nc
 
     cmd="java -cp ${BUILDDIR}:${NCJAR} \
-      ${PKGBASE}.netcdfTest.TestNetcdfa \
+      ${PKGBASE}.netcdfTest.Tnetcdfa \
       -bugs 10 \
       -nhType $nhType \
       -dims $dims \
