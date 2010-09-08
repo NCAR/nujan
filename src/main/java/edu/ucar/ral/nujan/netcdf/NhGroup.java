@@ -29,10 +29,10 @@
 package edu.ucar.ral.nujan.netcdf;
 
 import java.util.ArrayList;
+import java.util.regex.Pattern;
 
 import edu.ucar.ral.nujan.hdf.HdfException;
 import edu.ucar.ral.nujan.hdf.HdfGroup;
-import edu.ucar.ral.nujan.hdf.HdfUtil;
 
 
 
@@ -453,7 +453,7 @@ throws NhException
       + "  type: " + NhVariable.nhTypeNames[atType]);
   }
   if (nhFile.bugs >= 10) {
-    prtf("  attrValue: " + HdfUtil.formatObject( attrValue));
+    prtf("  attrValue: " + attrValue);
   }
   checkName( attrName, "attribute in group \"" + groupName + "\"");
 
@@ -492,19 +492,23 @@ throws NhException
 
 
 
+/**
+ * Checks that a name (for a group or attribute) is legal in HDF5;
+ * else throws an NhException.
+ * Coord with hdf/HdfUtil.checkName.
+ */
+
 public static void checkName(
   String name,
   String loc)
 throws NhException
 {
-  try {
-    HdfUtil.checkName( name, loc);
-  }
-  catch( HdfException exc) {
-    exc.printStackTrace();
-    throwerr( exc.toString());
-  }
+  if (name == null || name.length() == 0)
+    throwerr("Name for %s is empty", loc);
+  if (! Pattern.matches("^[_a-zA-Z][-_a-zA-Z0-9]*$", name))
+    throwerr("Invalid name for %s.  Name: \"%s\"", loc, name);
 }
+
 
 
 

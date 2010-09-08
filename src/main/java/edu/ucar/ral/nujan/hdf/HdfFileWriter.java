@@ -43,41 +43,30 @@ import java.util.ArrayList;
 /**
  * Represents an open output file.
  * There is exactly one HdfFileWriter per output file.
- *
- * <h2> Overall control flow </h2>
- *
- * <pre>
- * User program:
- *   HdfFileWriter hdfFile = new HdfFileWriter("testa.hdf", 2, 0, 0);
- *   HdfGroup rootGroup = hdfFile.getRootGroup();
- *   HdfGroup velocity = rootGroup.addVariable("velocity,...);
- *   velocity.addAttribute("units", HdfGroup.DTYPE_STRING_FIX, 0,
- *     "meters per second", false);
- *   hdfFile.endDefine();
- *   velocity.writeData( velocityArray);
- *   hdfFile.close();
- *
- * HdfFileWriter:
- *   Constructor:
- *     Initialize rootGroup.
- *     Set eofAddr = 0
- *   endDefine:
- *     Call formatBufAll to format all metadata into mainBuf, pass 1 of 2.
- *     Set eofAddr = mainBuf.getPos() == length of formatted metadata
- *
- *   (Here the user's calls to HdfGroup.writeData update our eofAddr).
- *       
- *   close:
- *     Call formatBufAll to format all metadata into mainBuf, pass 2 of 2.
- *     Write mainBuf to outChannel == outFile starting at file offset 0.
- *       The variable data previously written in HdfGroup.writeData
- *       follow the metadata.
- *
- * </pre>
+ * <p>
+ * For an example of use see {@link ExampleSimple}.
  */
+
 
 public class HdfFileWriter extends BaseBlk {
 
+
+// Internal logic:
+// HdfFileWriter:
+//   Constructor:
+//     Initialize rootGroup.
+//     Set eofAddr = 0
+//   endDefine:
+//     Call formatBufAll to format all metadata into mainBuf, pass 1 of 2.
+//     Set eofAddr = mainBuf.getPos() == length of formatted metadata
+//
+//   (Here the user's calls to HdfGroup.writeData update our eofAddr).
+//       
+//   close:
+//     Call formatBufAll to format all metadata into mainBuf, pass 2 of 2.
+//     Write mainBuf to outChannel == outFile starting at file offset 0.
+//       The variable data previously written in HdfGroup.writeData
+//       follow the metadata.
 
 
 /**
@@ -284,7 +273,8 @@ int k_internal = 16;
 /**
  * Creates a new HDF5 output file.
  * @param filePath  The name or disk path of the file to create.
- * @param fileVersion  Either 1 (old HDF5 format) or 2 (new HDF5 format).
+ * @param fileVersion  Either 1 (deprecated HDF5 format)
+ *     or 2 (new HDF5 format).
  *     Using 2 is strongly recommended.
  * @param optFlag  The bitwise OR of one or more OPT_* flags.
  *     Currently the only one implemented is OPT_ALLOW_OVERWRITE.
