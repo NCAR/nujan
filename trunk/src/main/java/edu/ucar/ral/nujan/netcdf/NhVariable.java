@@ -32,7 +32,6 @@ import java.util.Arrays;
 
 import edu.ucar.ral.nujan.hdf.HdfException;
 import edu.ucar.ral.nujan.hdf.HdfGroup;
-import edu.ucar.ral.nujan.hdf.HdfUtil;
 
 
 /**
@@ -411,7 +410,7 @@ throws NhException
       + "  type: " + NhVariable.nhTypeNames[atType]);
   }
   if (nhFile.bugs >= 10) {
-    prtf("  attrValue: " + HdfUtil.formatObject( attrValue));
+    prtf("  attrValue: " + attrValue);
   }
   NhGroup.checkName( attrName, "attribute in variable \"" + varName + "\"");
 
@@ -469,7 +468,7 @@ throws NhException
 {
   if (nhFile.bugs >= 1) {
     prtf("NhVariable.writeData: nhType: " + NhVariable.nhTypeNames[nhType]
-      + "  rawData: " + HdfUtil.formatObject( rawData));
+      + "  rawData: " + rawData);
   }
   if (rawData == null) throwerr("rawData is null");
   Object vdata = null;
@@ -583,8 +582,8 @@ throws NhException
 
   if (bugs >= 10) {
     prtf("getAttrValue: loc: " + loc + "  attrName: " + attrName);
-    prtf("  specd attrValue: " + HdfUtil.formatObject( attrValue));
-    prtf("  final resValue:  " + HdfUtil.formatObject( resValue));
+    prtf("  specd attrValue: " + attrValue);
+    prtf("  final resValue:  " + resValue);
   }
 
   return resValue;
@@ -676,7 +675,7 @@ throws NhException
   }
 
   if (bugs >= 1) {
-    prtf("convertCharsToStrings: new vdata: " + HdfUtil.formatObject( vdata));
+    prtf("convertCharsToStrings: new vdata: " + vdata);
   }
 
   return vdata;

@@ -778,7 +778,7 @@ throws HdfException
 
 
 /**
- * Implements writeData: see writeData doc.
+ * Implements writeData: for doc, see {@link #writeData}.
  */
 
 void writeDataSub( Object vdata)

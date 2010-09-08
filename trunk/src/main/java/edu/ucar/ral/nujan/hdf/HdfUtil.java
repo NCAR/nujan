@@ -41,7 +41,7 @@ import java.util.regex.Pattern;
  * A variety of utility functions.
  */
 
-public class HdfUtil {
+class HdfUtil {
 
 
 
@@ -529,9 +529,10 @@ throws HdfException
 /**
  * Checks that a name (for a group or attribute) is legal in HDF5;
  * else throws an HdfException.
+ * Coord with netcdf/NhGroup.checkName.
  */
 
-public static void checkName(
+static void checkName(
   String name,
   String loc)
 throws HdfException
@@ -556,7 +557,7 @@ throws HdfException
  * returns 0 otherwise.
  */
 
-public static int getMaxStgLen(
+static int getMaxStgLen(
   Object obj)
 throws HdfException
 {
@@ -689,7 +690,7 @@ static String formatDtypeDim(
  * if it's an array.  Calls formatObjectSub to do the real work.
  */
 
-public static String formatObject( Object obj) {
+static String formatObject( Object obj) {
   StringBuilder sbuf = new StringBuilder();
   if (obj == null) sbuf.append("  (null)");
   else {
