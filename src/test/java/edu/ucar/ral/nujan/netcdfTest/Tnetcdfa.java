@@ -43,14 +43,14 @@ import edu.ucar.ral.nujan.netcdf.NhVariable;
 
 import edu.ucar.ral.nujan.hdf.HdfException;  // used for sample data generation
 import edu.ucar.ral.nujan.hdf.HdfGroup;      // used for sample data generation
-import edu.ucar.ral.nujan.hdfTest.TestData;  // used for sample data generation
+import edu.ucar.ral.nujan.hdfTest.GenData;   // used for sample data generation
 
 
 // Test byte / ubyte / short / int / long / float / double / char / vstring,
 // with any number of dimensions.
 
 
-public class TestNetcdfa {
+public class Tnetcdfa {
 
 
 static void badparms( String msg) {
@@ -161,20 +161,20 @@ throws NhException
   else if (fileVersionStg.equals("2")) fileVersion = 2;
   else badparms("unknown fileVersion: " + fileVersionStg);
 
-  prtf("TestNetcdfa: bugs: %d", bugs);
-  prtf("TestNetcdfa: nhType: \"%s\"", NhVariable.nhTypeNames[nhType]);
-  prtf("TestNetcdfa: rank: %d", dims.length);
+  prtf("Tnetcdfa: bugs: %d", bugs);
+  prtf("Tnetcdfa: nhType: \"%s\"", NhVariable.nhTypeNames[nhType]);
+  prtf("Tnetcdfa: rank: %d", dims.length);
   for (int idim : dims) {
-    prtf("  TestNetcdfa: dim: %d", idim);
+    prtf("  Tnetcdfa: dim: %d", idim);
   }
-  prtf("TestNetcdfa: fileVersion: %s", fileVersion);
-  prtf("TestNetcdfa: compress: %d", compressLevel);
+  prtf("Tnetcdfa: fileVersion: %s", fileVersion);
+  prtf("Tnetcdfa: compress: %d", compressLevel);
 
   SimpleDateFormat utcSdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
   utcSdf.setTimeZone( new SimpleTimeZone( 0, "UTC"));
-  prtf("Testa: utcModTime: %d  %s", utcModTime, utcSdf.format( utcModTime));
+  prtf("Tnetcdfa: utcModTime: %d  %s", utcModTime, utcSdf.format( utcModTime));
 
-  prtf("TestNetcdfa: outFile: \"%s\"", outFile);
+  prtf("Tnetcdfa: outFile: \"%s\"", outFile);
 
   final long startTime = System.currentTimeMillis();
   if (numThread == 1)
@@ -270,14 +270,14 @@ throws NhException
   Object vdata = null;
   Object fillValue = null;
   try {
-    vdata = TestData.genHdfData(
+    vdata = GenData.genHdfData(
       dtype,
       stgFieldLen,
       null,           // refGroup
       dims,
       0);             // ival, origin 0.
 
-    fillValue = TestData.genFillValue(
+    fillValue = GenData.genFillValue(
       dtype,
       0);             // stgFieldLen.  If 0 and FIXED, MsgAttribute calcs it.
   }
@@ -470,8 +470,8 @@ throws NhException
       "varaTextValue");
   }
 
-  prtf("TestNetcdfa: parentGroup: %s", parentGroup);
-  prtf("TestNetcdfa: vara: %s", vara);
+  prtf("Tnetcdfa: parentGroup: %s", parentGroup);
+  prtf("Tnetcdfa: vara: %s", vara);
   return vara;
 
 } // end testDefineVariable
