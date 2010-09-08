@@ -1,24 +1,100 @@
 
 <html>
 <head>
-<title> Nujan: NNew/Ucar Java Authoring of NetCDF4/HDF5 xxxtitle </title>
+<title> Nujan: Pure Java NetCDF4 and HDF5 writer </title>
 <style type="text/css">
   table {
     background-color: #e0e0ff;
   }
 </style>
+</head>
 <body>
-<h2> Nujan: NNew/Ucar Java Authoring of NetCDF4/HDF5 </h2>
+<h2> Nujan: Pure Java NetCDF4 and HDF5 writer </h2>
+
+Nujan is an open source pure Java software system for writing files
+in NetCDF4 and HDF5 formats.  The acronyms are:
+
+<table align="center">
+  <tr><th align="right"> Nujan     </th> <td> &nbsp;&nbsp;&nbsp; </td>
+      <td> NNEW/UCAR Java Authoring of NetCDF4/HDF5,
+           <a href="http://www.ral.ucar.edu/~steves/nujan.html">www.ral.ucar.edu/~steves/nujan.html</a>
+      </td></tr>
+  <tr><th align="right"> NNEW       </th> <td> &nbsp;&nbsp;&nbsp; </td>
+      <td> NextGen Network Enabled Weather,
+           <a href="http://www.ral.ucar.edu/projects/nnew/">www.ral.ucar.edu/projects/nnew</a>
+      </td></tr>
+  <tr><th align="right"> UCAR       </th> <td> &nbsp;&nbsp;&nbsp; </td>
+      <td> University Corporation for Atmospheric Research,
+           <a href="http://www.ucar.edu">www.ucar.edu</a>
+      </td></tr>
+  <tr><th align="right"> NetCDF     </th> <td> &nbsp;&nbsp;&nbsp; </td>
+      <td> Network Common Data Form,
+           <a href="http://www.unidata.ucar.edu/">www.unidata.ucar.edu</a>
+      </td></tr>
+  <tr><th align="right"> HDF        </th> <td> &nbsp;&nbsp;&nbsp; </td>
+      <td> Hierarchical Data Format,
+           <a href="http://www.hdfgroup.org/">www.hdfgroup.org</a>
+      </td></tr>
+</table>
 
 
-<h3>Supported features in NetCDF3, NetCDF4, and Nujan. </h3>
+
 <p>
-"y" is yes, "-" is no.
+NetCDF is a file format primarily used for meteorological and
+oceanographic data.  The NetCDF4 format is built on top
+of a subset of HDF5.  The NetCDF format is maintained by
+<a href="http://www.unidata.ucar.edu/">
+Unidata</a>.  Unidata's C, C++, and Fortran implementations
+of NetCDF are available at
+<a href="http://www.unidata.ucar.edu/software/netcdf/">
+Unidata NetCDF</a>,
+and the Unidata Java reader for NetCDF is available at
+<a href="http://www.unidata.ucar.edu/software/netcdf-java/">
+Unidata NetCDF Java</a>.
+
+<p>
+HDF5 is a file format primarily
+used for gridded scientific and engineering data.  The HDF5
+format is maintained by the
+<a href="http://www.hdfgroup.org/">
+HDF Group</a>, which currently has C, C++, and Fortran APIs
+for HDF5 files.
+The HDF group also supports a Java JNI (Java
+Native Interface) to their C code.  While the JNI interface does support
+most of the native HDF5 features, it can be a problem to
+integrate with other Java packages.  Hence the origins
+of Nujan.
+
+
+<!--
+<h3>Download </h3>
+<a href="nujan-0.8.1.jar"> Nujan 0.8.1 </a><br>
+<a href="nujan-0.8.1-javadoc.jar"> Nujan 0.8.1 javaDoc </a><br>
+-->
+
+
+<h3>Supported features in Nujan </h3>
+
+Nujan supports most of the
+commonly used features of NetCDF4 and HDF5.
+The primary differences between the Nujan writer and other
+NetCDF or HDF5 writers are:
+<ul>
+  <li> The Nujan writer only writes new files.  It does not
+    update existing files.
+  <li> The Nujan writer writes all the data for a given variable in
+    a single method call.
+    It is not possible to write a variable incrementally.
+</ul>
+
+<p>
+<h3>Detailed feature list for NetCDF3, NetCDF4, and Nujan:
+("y" is yes, "-" is no)</h3>
 <p>
 
 <table align="center">
 <tr><th> Feature </th><th> NetCDF3<br>(C,Java) </th><th> NetCDF4<br>(C) </th><th> Nujan<br>(Java) </th></tr>
-  <tr><th> Primitive types:            </th><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td></tr>
+  <tr><th> Primitive types<br> (may have any number<br> of dimensions): </th><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td></tr>
   <tr><td> char                        </td><td> y      </td><td> y      </td><td> y      </td></tr>
   <tr><td> byte                        </td><td> y      </td><td> y      </td><td> y      </td></tr>
   <tr><td> short                       </td><td> y      </td><td> y      </td><td> y      </td></tr>
@@ -52,7 +128,7 @@
 </table>
 
 <p>
-See:<br>
+For notes on the NetCDF4 data model see:<br>
 <a href="http://www.unidata.ucar.edu/software/netcdf/docs/faq.html#fv18">
   http://www.unidata.ucar.edu/software/netcdf/docs/faq.html#fv18></a><br>
 <a href="http://www.unidata.ucar.edu/software/netcdf/workshops/2008/netcdf4/Nc4DataModel.html">
@@ -62,46 +138,59 @@ See:<br>
 <h3>Notes on features </h3>
 
 
-<h4>Restrict to the NetCDF4 classic model</h4>
-The NetCDF4 C API offers a flag, CLASSIC_MODEL, that enforces
-that all features the client uses are within the "classic" subset
-of NetCDF4.  The classic subset is shown in the "NetCDF3" column in the table above.
-Restricting to the classic model allows a wider variety of readers to handle the file.
+  <li>
+  Restrict to the NetCDF4 classic model.
+  The NetCDF4 C API offers a flag, CLASSIC_MODEL, that enforces
+  that all features the client uses are within the "classic" subset
+  of NetCDF4.  The classic subset is shown in the "NetCDF3" column
+  in the table above.  Restricting to the classic model allows a
+  wider variety of readers to handle the file.
+  </li>
 
-<h4>Partial writing</h4>
-NetCDF4 allows writing a variable's data incrementally instead of all at
-once.  Nujan does not support this.
+  <li>
+  Partial writing.
+  NetCDF4 allows writing a variable's data incrementally instead of
+  all at once.  Nujan does not support this.
+  </li>
 
-<h4>Datasets (files) over 2 GB total size.</h4>
-This requires two mods to Nujan:
-<ul>
-  <li> Internally, a more complex implementation of chunking.
-    Currently Nujan uses a simple algorithm for chunking.
-  <li> Support for partial writing.
-</ul>
+  <li>
+  Variables over 2 GB total size.  The total file size can exceed 2 GB.
+  </li>
 
-<h4>Compression methods other than gzip, such as szip.</h4>
+  <li>
+  Compression methods other than gzip, such as szip.
+  </li>
 
-<h4>Arbitrary filters, such as checksums, custom compression, etc.</h4>
+  <li>
+  Arbitrary filters, such as checksums, custom compression, etc.
+  </li>
 
-<h4>Any kind of modifications to existing files:</h4>
-<ul>
-  <li> Add/delete/update groups, variables, attributes
-  <li> Change data values
-</ul>
+  <li>
+  Any kind of modifications to existing files:
+  <ul>
+    <li> Add/delete/update groups, variables, attributes
+    <li> Change data values
+  </ul>
+  </li>
 
-<h4>Any kind of modifications after calling endDefine():</h4>
-<ul>
-  <li> Add/delete/update groups, variables, attributes
-</ul>
+  <li>
+  Any kind of modifications after calling endDefine():
+  <ul>
+    <li> Add/delete/update groups, variables, attributes
+  </ul>
+  </li>
 
-<h4>Support for any HDF version other than 1.8.4.</h4>
+  <li>
+  Support for writing any HDF version other than 1.8.5.
+  However, the files created by Nujan should be readable by
+  any subsequent version of the HDF5 and NetCDF libraries.
+  </li>
 
-<h4>Concurrent reading of a file with an active writer.</h4>
+  <li>
+  Concurrent reading of a file with an active writer.
+  </li>
 
-<h4>Multidimensional coordinate variables.</h4>
-This feature is seldom used,
-but occasionally is seen in a lat-lon grid for a non-linear projection.
+
 
 </body>
 </html>

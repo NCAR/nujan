@@ -47,8 +47,6 @@ import edu.ucar.ral.nujan.netcdf.NhFileWriter;
 import edu.ucar.ral.nujan.netcdf.NhGroup;
 import edu.ucar.ral.nujan.netcdf.NhVariable;
 
-import edu.ucar.ral.nujan.hdf.HdfUtil;
-
 
 /**
  * Command line tool to copy a NetCDF4 file (which uses HDF5 format).
