@@ -10,7 +10,7 @@
 #
 
 NCJAR=/d1/steves/ftp/netcdfJava/netcdfAll-4.1.jar
-BUILDDIR=../../../target/classes
+BUILDDIR=../../../target/test-classes:../../../target/classes
 PKGBASE=edu.ucar.ral.nujan
 TESTDIR=.
 
