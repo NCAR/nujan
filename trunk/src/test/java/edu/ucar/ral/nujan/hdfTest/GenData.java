@@ -41,7 +41,7 @@ import edu.ucar.ral.nujan.hdf.HdfException;
 //     and is used by netcdf/TestNetcdfa.java.
 
 
-public class TestData {
+public class GenData {
 
 
 

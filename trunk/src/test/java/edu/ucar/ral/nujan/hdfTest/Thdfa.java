@@ -45,7 +45,7 @@ import edu.ucar.ral.nujan.hdf.HdfException;
  */
 
 
-public class Testa {
+public class Thdfa {
 
 
 static void badparms( String msg) {
@@ -176,22 +176,22 @@ throws HdfException
   else if (chunkedStg.equals("chunked")) useChunked = true;
   else badparms("unknown chunked: " + chunkedStg);
 
-  prtf("Testa: bugs: %d", bugs);
-  prtf("Testa: dtype: %s", HdfGroup.dtypeNames[dtype]);
-  prtf("Testa: stgFieldLen: %d", stgFieldLen);
-  prtf("Testa: rank: %d", dims.length);
+  prtf("Thdfa: bugs: %d", bugs);
+  prtf("Thdfa: dtype: %s", HdfGroup.dtypeNames[dtype]);
+  prtf("Thdfa: stgFieldLen: %d", stgFieldLen);
+  prtf("Thdfa: rank: %d", dims.length);
   for (int idim : dims) {
-    prtf("  Testa: dim: %d", idim);
+    prtf("  Thdfa: dim: %d", idim);
   }
-  prtf("Testa: fileVersion: %s", fileVersion);
-  prtf("Testa: chunked: %s", useChunked);
-  prtf("Testa: compress: %d", compressLevel);
+  prtf("Thdfa: fileVersion: %s", fileVersion);
+  prtf("Thdfa: chunked: %s", useChunked);
+  prtf("Thdfa: compress: %d", compressLevel);
 
   SimpleDateFormat utcSdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
   utcSdf.setTimeZone( new SimpleTimeZone( 0, "UTC"));
-  prtf("Testa: utcModTime: %d  %s", utcModTime, utcSdf.format( utcModTime));
+  prtf("Thdfa: utcModTime: %d  %s", utcModTime, utcSdf.format( utcModTime));
 
-  prtf("Testa: outFile: \"%s\"", outFile);
+  prtf("Thdfa: outFile: \"%s\"", outFile);
 
   HdfFileWriter hfile = new HdfFileWriter(
     outFile, fileVersion, HdfFileWriter.OPT_ALLOW_OVERWRITE,
@@ -199,12 +199,12 @@ throws HdfException
 
   HdfGroup rootGroup = hfile.getRootGroup();
 
-  Object vdata = TestData.genHdfData( dtype, stgFieldLen, rootGroup, dims, 0);
+  Object vdata = GenData.genHdfData( dtype, stgFieldLen, rootGroup, dims, 0);
 
-  Object fillValue = TestData.genFillValue( dtype, stgFieldLen);
+  Object fillValue = GenData.genFillValue( dtype, stgFieldLen);
 
   if (bugs >= 1) {
-    String msg = "Testa: fillValue: ";
+    String msg = "Thdfa: fillValue: ";
     if (fillValue == null) msg += "null";
     else if (fillValue instanceof String)
       msg += String.format("\"%s\"  class: String", fillValue);
@@ -235,8 +235,8 @@ throws HdfException
       fillValue);
   }
 
-  prtf("Testa: rootGroup: %s", rootGroup);
-  prtf("Testa: alpha2: %s", alpha2);
+  prtf("Thdfa: rootGroup: %s", rootGroup);
+  prtf("Thdfa: alpha2: %s", alpha2);
 
   hfile.endDefine();
 
@@ -397,7 +397,7 @@ throws HdfException
       false);          // isVlen
   }
 
-  prtf("Testa: defined vara: %s", vara);
+  prtf("Thdfa: defined vara: %s", vara);
   return vara;
 
 } // end testDefineVariable
