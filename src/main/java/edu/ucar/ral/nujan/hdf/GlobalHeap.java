@@ -47,12 +47,11 @@ import java.util.ArrayList;
 
 class GlobalHeap extends BaseBlk {
 
-//xxx doc all this
 
 // Referenced blocks
 // None.
 
-// Len of signature(4), version(1), reserved(3), heapSize(8)
+// Header len = sum of: signature(4), version(1), reserved(3), heapSize(8)
 static final int GLOB_HEAP_HDR_LEN = 16;
 
 final int signa = 'G';
@@ -309,10 +308,9 @@ throws HdfException
 
 
 
-// xxx copy doc everywhere:
 /**
- * Extends abstract BaseBlk: formats this individual BaseBlk
- * to fmtBuf.
+ * Formats this individual BaseBlk to the output buffer fmtBuf
+ * (extends abstract BaseBlk).
  * @param formatPass: <ul>
  *   <li> 1: Initial formatting to determine the formatted length.
  *          In HdfGroup we add msgs to hdrMsgList.

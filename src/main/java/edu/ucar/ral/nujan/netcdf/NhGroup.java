@@ -399,7 +399,11 @@ throws NhException
 
 
 
-//xxx doc this
+/**
+ * Returns true if an attribute with the given names exists
+ * in this group; false otherwise.
+ */
+
 public boolean attributeExists(
   String attrName)
 {

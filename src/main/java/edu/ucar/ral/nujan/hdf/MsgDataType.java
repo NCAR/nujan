@@ -32,6 +32,9 @@ package edu.ucar.ral.nujan.hdf;
 /**
  * HDF5 message type 3: MsgDataType:
  * contains data type info (fixed/float/string/etc, elementLen, etc).
+ * <p>
+ * Extends abstract MsgBase, so we must implement formatMsgCore -
+ * see the documentation for class {@link MsgBase}.
  */
 
 class MsgDataType extends MsgBase {

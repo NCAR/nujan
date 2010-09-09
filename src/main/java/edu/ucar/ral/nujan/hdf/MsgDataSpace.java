@@ -35,9 +35,12 @@ import java.util.Arrays;
 /**
  * HDF5 message type 1: MsgDataSpace: contains dimension info
  * <p>
- * Note that for empty attributes, only the v2 file format
+ * Extends abstract MsgBase, so we must implement formatMsgCore -
+ * see the documentation for class {@link MsgBase}.
+ * <p>
+ * Note that for empty attributes, only the fileVersion 2 file format
  * has the null dataspace message.
- * The v1 file format does not have a null dataspace.
+ * The fileVersion 1 file format does not have a null dataspace.
  */
 
 class MsgDataSpace extends MsgBase {

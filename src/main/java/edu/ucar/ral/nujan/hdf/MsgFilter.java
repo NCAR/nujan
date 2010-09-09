@@ -33,6 +33,9 @@ package edu.ucar.ral.nujan.hdf;
  * HDF5 message type 11: MsgFilter:
  * Used to keep info on the encode/decode filter pipeline;
  * this package uses it only for the DEFLATE (compression) filter.
+ * <p>
+ * Extends abstract MsgBase, so we must implement formatMsgCore -
+ * see the documentation for class {@link MsgBase}.
  */
 
 class MsgFilter extends MsgBase {

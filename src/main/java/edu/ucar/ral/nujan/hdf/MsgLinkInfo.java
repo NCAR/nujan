@@ -33,6 +33,9 @@ package edu.ucar.ral.nujan.hdf;
  * HDF5 message type 2: MsgLinkInfo:
  * Used for fileVersion 2 to keep info on tracking and indexing
  * link creation order.
+ * <p>
+ * Extends abstract MsgBase, so we must implement formatMsgCore -
+ * see the documentation for class {@link MsgBase}.
  */
 
 class MsgLinkInfo extends MsgBase {

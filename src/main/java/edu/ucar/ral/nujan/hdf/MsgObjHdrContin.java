@@ -29,12 +29,18 @@
 package edu.ucar.ral.nujan.hdf;
 
 
-// Msg 16: object header continuation
+/**
+ * HDF5 message type 16: object header continuation -
+ * not used in this package
+ * <p>
+ * Extends abstract MsgBase, so we must implement formatMsgCore -
+ * see the documentation for class {@link MsgBase}.
+ */
 
 class MsgObjHdrContin extends MsgBase {
 
 long continAddr;              // position of continuation
-long continLen;              // len of continuation
+long continLen;               // len of continuation
 
 
 

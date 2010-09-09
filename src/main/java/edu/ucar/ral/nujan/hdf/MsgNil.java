@@ -32,6 +32,9 @@ package edu.ucar.ral.nujan.hdf;
 /**
  * HDF5 message type 0: MsgNil: NIL msg to be ignored;
  * not used in this package
+ * <p>
+ * Extends abstract MsgBase, so we must implement formatMsgCore -
+ * see the documentation for class {@link MsgBase}.
  */
 
 class MsgNil extends MsgBase {

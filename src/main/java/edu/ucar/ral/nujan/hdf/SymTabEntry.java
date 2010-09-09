@@ -90,8 +90,22 @@ public String toString() {
 
 
 
+/**
+ * Formats this individual BaseBlk to fmtBuf;
+ * calls addWork to add any referenced BaseBlks (the hdfGroup)
+ * to workList; extends abstract BaseBlk.
+ *
+ * @param formatPass: <ul>
+ *   <li> 1: Initial formatting to determine the formatted length.
+ *          In HdfGroup we add msgs to hdrMsgList.
+ *   <li> 2: Final formatting.
+ * </ul>
+ * @param fmtBuf  output buffer
+ */
 
-void formatBuf( int formatPass, HBuffer fmtBuf)
+void formatBuf(
+  int formatPass,
+  HBuffer fmtBuf)
 throws HdfException
 {
   setFormatEntry( formatPass, true, fmtBuf); // BaseBlk: set blkPos, buf pos

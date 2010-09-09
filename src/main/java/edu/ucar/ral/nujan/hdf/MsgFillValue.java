@@ -35,6 +35,9 @@ import java.nio.ByteOrder;
 
 /**
  * HDF5 message type 5: MsgFillValue: specify data fill value.
+ * <p>
+ * Extends abstract MsgBase, so we must implement formatMsgCore -
+ * see the documentation for class {@link MsgBase}.
  */
 
 class MsgFillValue extends MsgBase {
@@ -142,8 +145,6 @@ throws HdfException
     else if (dtype == HdfGroup.DTYPE_STRING_FIX) {
       byte[] bytes = HdfUtil.encodeString( (String) fillValue, true, hdfGroup);
       elementLen = bytes.length;
-      prtf("xxx testaa: fillValue: \"" + fillValue + "\"  elementLen: "
-        + elementLen + "  dtype: " + HdfGroup.dtypeNames[ dtype]);
     }
     else if (dtype == HdfGroup.DTYPE_STRING_VAR) {
       // Element is: len(4), gcolAddr(8), gcolIndex(4)
