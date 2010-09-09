@@ -107,8 +107,22 @@ throws HdfException
 
 
 
+/**
+ * Formats this individual BaseBlk to fmtBuf;
+ * calls addWork to add any referenced BaseBlks (none in this case)
+ * to workList; extends abstract BaseBlk.
+ *
+ * @param formatPass: <ul>
+ *   <li> 1: Initial formatting to determine the formatted length.
+ *          In HdfGroup we add msgs to hdrMsgList.
+ *   <li> 2: Final formatting.
+ * </ul>
+ * @param fmtBuf  output buffer
+ */
 
-void formatBuf( int formatPass, HBuffer fmtBuf)
+void formatBuf(
+  int formatPass,
+  HBuffer fmtBuf)
 throws HdfException
 {
   // Sort entryList by entry.hdfGroup.groupName

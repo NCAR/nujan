@@ -85,7 +85,7 @@ public String toString() {
 
 
 /**
- * Formats the block to output buffer fmtBuf.
+ * Formats this individual BaseBlk to the output buffer fmtBuf.
  * @param formatPass: <ul>
  *   <li> 1: Initial formatting to determine the formatted length.
  *          In HdfGroup we add msgs to hdrMsgList.

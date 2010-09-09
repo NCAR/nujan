@@ -62,8 +62,13 @@ public static final int DTYPE_FIXED64       =  5;
 public static final int DTYPE_FLOAT32       =  6;
 /** dtype value: 64 bit signed float */
 public static final int DTYPE_FLOAT64       =  7;
-//xxx del:
+
+/**
+ * Do not use: for internal testing only by
+ * Thdfa, GenData, and Tnetcdfa to force character generation.
+ */
 public static final int DTYPE_TEST_CHAR     =  8;  // for internal test only
+
 /** dtype value: fixed length string */
 public static final int DTYPE_STRING_FIX    =  9;
 /** dtype value: variable length string */
@@ -151,7 +156,7 @@ boolean isVariable;
 
 /**
  * The local name of this group or variable -
- * does not include the complete path (see getPath() for that).
+ * does not include the complete path (see {@link #getPath} for that).
  */
 String groupName;
 
@@ -216,7 +221,7 @@ int linkCreationOrder = 0;
 /**
  * Creates an HDF5 group that is not a variable (isVariable == false).
  * @param groupName The local name of the new group -
- *   does not include the complete path (see getPath() for that).
+ *   does not include the complete path (see {@link #getPath} for that).
  * @param parentGroup The parent group (null for the rootGroup).
  * @param hdfFile The global owning HdfFileWriter.
  */
@@ -696,7 +701,7 @@ HdfGroup findSubItem( String subName)
   return resGroup;
 }
 
-//xxx recursive searches?
+
 
 
 
@@ -798,11 +803,6 @@ throws HdfException, IOException
   isWritten = true;
 
   // Find dtype and varDims of vdata
-  /// xxx old:
-  ///int[] dataInfo = HdfUtil.getDtypeAndDimsOld( false, vdata);
-  ///int dataDtype = dataInfo[0];
-  ///int[] dataVarDims = Arrays.copyOfRange( dataInfo, 1, dataInfo.length);
-
   // Use isVlen==false: variable length data arrays are not supported,
   // although variable length attributes are.
   int[] dataInfo = HdfUtil.getDimLen( vdata, false);
@@ -833,17 +833,8 @@ throws HdfException, IOException
   // As outbuf fills, it gets written to outChannel.
   HBuffer outbuf = new HBuffer( hdfFile.outChannel, compressionLevel, hdfFile);
 
-
-  // xxx future: DTYPE_VLEN is not supported for datasets.
-  // Only for attributes.
-  // However, DTYPE_STRING_VAR is supported for both attrs and datasets.
-  //
-  // For DTYPE_VLEN we could use a scheme like we do below
-  // for DTYPE_STRING_VAR, writing a new gcol and refBuf.
-
   if (msgDataType.dtype == HdfGroup.DTYPE_VLEN)
     throwerr("DTYPE_VLEN datasets are not supported");
-
 
   // Format and the data to outbuf and write to outChannel.
 
@@ -867,10 +858,6 @@ throws HdfException, IOException
     //   2.  A list of references to the GCOL entries.
     //       The variables rawDataAddr, rawDataSize refer to this
     //       list of references.
-
-    // xxx We cannot write an array of strings whose total length
-    // exceeds 2GB, since the GlobalHeap uses a ByteBuffer internally
-    // to hold the entire heap.
 
     GlobalHeap gcol = new GlobalHeap( hdfFile);
     HBuffer refBuf = new HBuffer( null, compressionLevel, hdfFile);
@@ -950,12 +937,23 @@ throws HdfException, IOException
 
 
 /**
- * Extends abstract BaseBlk: formats this individual BaseBlk
- * to fmtBuf.  If fileVersion==2, calls layoutVersion2 to do
- * the work.
+ * Formats this individual BaseBlk to fmtBuf;
+ * calls addWork to add any referenced BaseBlks (btreeNode, localHeap)
+ * to workList; extends abstract BaseBlk.
+ * <p>
+ * If fileVersion==2, calls layoutVersion2 to do the work.
+ *
+ * @param formatPass: <ul>
+ *   <li> 1: Initial formatting to determine the formatted length.
+ *          In HdfGroup we add msgs to hdrMsgList.
+ *   <li> 2: Final formatting.
+ * </ul>
+ * @param fmtBuf  output buffer
  */
 
-void formatBuf( int formatPass, HBuffer fmtBuf)
+void formatBuf(
+  int formatPass,
+  HBuffer fmtBuf)
 throws HdfException
 {
   setFormatEntry( formatPass, true, fmtBuf); // BaseBlk: set blkPos, buf pos
@@ -1145,8 +1143,9 @@ throws HdfException
 
   fmtBuf.putBufByte("HdfGroup: flags", flag);
 
-  // xxx Caution: HDF5 has a possible year 2038 problem,
-  // using a 4 byte date, if handled as a signed int.
+  // Caution: HDF5 has a possible year 2038 problem.
+  // It uses a 4 byte date, which if handled as a signed int,
+  // wraps in year 2038.
   if ((flag & 32) != 0) {
     fmtBuf.putBufInt(
       "HdfGroup: accessTime", (int) hdfFile.utcModTimeSec);
@@ -1206,7 +1205,8 @@ throws HdfException
  * Formats a regular array of raw data.  Not a ragged (VLEN) array.
  * Called by writeDataSub and MsgAttribute.formatMsgCore.
  * <p>
- * If strings, they are all fixed len: they are padded to elementLen.
+ * If vdata is strings, they are all fixed len,
+ * and are padded to elementLen.
  * <p>
  * vdata may be one of:<ul>
  *   <li> Byte (scalar),      byte[],      [][],  [][][],  etc.
@@ -1241,9 +1241,6 @@ void formatRawData(
   HBuffer fmtBuf)      // output buffer
 throws HdfException
 {
-
-// xxx someday we might validate dtp inside each case clause.
-
   if (vdata == null) throwerr("vdata is null");
 
   if (vdata instanceof Object[]) {
@@ -1260,39 +1257,47 @@ throws HdfException
     }
   }
   else if (vdata instanceof Byte) {
+    checkDtype( DTYPE_SFIXED08, DTYPE_UFIXED08, dtp);
     byte aval = ((Byte) vdata).byteValue();
     fmtBuf.putBufByte("formatRawData", aval);
   }
   else if (vdata instanceof Short) {
+    checkDtype( DTYPE_FIXED16, dtp);
     short aval = ((Short) vdata).shortValue();
     fmtBuf.putBufShort("formatRawData", aval);
   }
   else if (vdata instanceof Integer) {
+    checkDtype( DTYPE_FIXED32, dtp);
     int aval = ((Integer) vdata).intValue();
     fmtBuf.putBufInt("formatRawData", aval);
   }
   else if (vdata instanceof Long) {
+    checkDtype( DTYPE_FIXED64, dtp);
     long aval = ((Long) vdata).longValue();
     fmtBuf.putBufLong("formatRawData", aval);
   }
   else if (vdata instanceof Float) {
+    checkDtype( DTYPE_FLOAT32, dtp);
     float aval = ((Float) vdata).floatValue();
     fmtBuf.putBufFloat("formatRawData", aval);
   }
   else if (vdata instanceof Double) {
+    checkDtype( DTYPE_FLOAT64, dtp);
     double aval = ((Double) vdata).doubleValue();
     fmtBuf.putBufDouble("formatRawData", aval);
   }
 
   else if (vdata instanceof Character) {
-    // xxx Normally we would handle character encoding by
+    // Normally we would handle character encoding by
     // calling HdfUtil.encodeString.
     // However the final length is fixed, so we must
     // do 1 char -> 1 byte encoding.
+    checkDtype( DTYPE_STRING_FIX, dtp);
     fmtBuf.putBufByte("formatRawData", ((Character) vdata).charValue());
   }
 
   else if (vdata instanceof String) {
+    checkDtype( DTYPE_STRING_FIX, DTYPE_STRING_VAR, dtp);
     String aval = (String) vdata;
     if (dtp == DTYPE_STRING_FIX) {
       byte[] bytes = HdfUtil.encodeString( aval, false, this);
@@ -1329,46 +1334,53 @@ throws HdfException
   }
 
   else if (vdata instanceof byte[]) {
+    checkDtype( DTYPE_SFIXED08, DTYPE_UFIXED08, dtp);
     byte[] avec = (byte[]) vdata;
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufByte("formatRawData", 0xff & avec[ii]);
     }
   }
   else if (vdata instanceof short[]) {
+    checkDtype( DTYPE_FIXED16, dtp);
     short[] avec = (short[]) vdata;
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufShort("formatRawData", 0xffff & avec[ii]);
     }
   }
   else if (vdata instanceof int[]) {
+    checkDtype( DTYPE_FIXED32, dtp);
     int[] avec = (int[]) vdata;
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufInt("formatRawData", avec[ii]);
     }
   }
   else if (vdata instanceof long[]) {
+    checkDtype( DTYPE_FIXED64, dtp);
     long[] avec = (long[]) vdata;
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufLong("formatRawData", avec[ii]);
     }
   }
   else if (vdata instanceof float[]) {
+    checkDtype( DTYPE_FLOAT32, dtp);
     float[] avec = (float[]) vdata;
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufFloat("formatRawData", avec[ii]);
     }
   }
   else if (vdata instanceof double[]) {
+    checkDtype( DTYPE_FLOAT64, dtp);
     double[] avec = (double[]) vdata;
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufDouble("formatRawData", avec[ii]);
     }
   }
   else if (vdata instanceof char[]) {
-    // xxx Normally we would handle character encoding by
+    // Normally we would handle character encoding by
     // calling HdfUtil.encodeString.
     // However the final length is fixed, so we must
     // do 1 char -> 1 byte encoding.
+    checkDtype( DTYPE_STRING_FIX, dtp);
     char[] avec = (char[]) vdata;
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufByte("formatRawData", 0xff & avec[ii]);
@@ -1376,6 +1388,36 @@ throws HdfException
   }
   else throwerr("unknown raw data type.  class: " + vdata.getClass());
 } // end formatRawData
+
+
+
+
+
+
+void checkDtype(
+  int expecta,
+  int actual)
+throws HdfException
+{
+  if (actual != expecta)
+    throwerr("data type mismatch.  Expected: %s  Actual: %s",
+      dtypeNames[expecta],
+      dtypeNames[actual]);
+}
+
+
+void checkDtype(
+  int expecta,
+  int expectb,
+  int actual)
+throws HdfException
+{
+  if (actual != expecta && actual != expectb)
+    throwerr("data type mismatch.  Expected: %s or %s  Actual: %s",
+      dtypeNames[expecta],
+      dtypeNames[expectb],
+      dtypeNames[actual]);
+}
 
 
 

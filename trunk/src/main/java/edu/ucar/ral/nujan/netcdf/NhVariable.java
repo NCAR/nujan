@@ -367,7 +367,11 @@ public String getPath() {
 
 
 
-//xxx doc this
+/**
+ * Returns true if an attribute with the given names exists
+ * in this variable; false otherwise.
+ */
+
 public boolean attributeExists(
   String attrName)
 {
@@ -497,7 +501,7 @@ throws NhException
 
 
 
-// xxx Weird.  See anote.
+// Caution ...
 // In Netcdf attributes are handled differently than variables,
 // in particular for char[].
 // In HDF5 attributes can have the same datatypes and dimensions
@@ -522,12 +526,12 @@ static Object getAttrValue(
   int bugs)
 throws NhException
 {
-  if (attrValue == null) return null; //xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-  if (attrValue == null) throwerr("attribute value is null");
   Object resValue = null;
   boolean valOk = true;
 
-  if (attrValue instanceof Byte)
+  if (attrValue == null)
+    resValue = null;
+  else if (attrValue instanceof Byte)
     resValue = new byte[] { ((Byte) attrValue).byteValue() };
   else if (attrValue instanceof Short)
     resValue = new short[] { ((Short) attrValue).shortValue() };
@@ -575,7 +579,7 @@ throws NhException
   }
   else valOk = false;
 
-  if ((! valOk) || resValue == null)
+  if (! valOk)
     throwerr("Invalid type for the value of attribute \"%s\""
       + " in %s.  Type: %s",
       attrName, loc, attrValue.getClass().toString());

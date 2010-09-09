@@ -34,8 +34,8 @@ package edu.ucar.ral.nujan.hdf;
  * HDF5 message type 21: MsgAttrInfo:
  * attribute info (not the Attribute itself - see MsgAttribute).
  * <p>
- * Extends abstract MsgBase, so we must implement formatMsgCore
- * (see doc for class MsgBase).
+ * Extends abstract MsgBase, so we must implement formatMsgCore -
+ * see the documentation for class {@link MsgBase}.
  * <p>
  * A new MsgAttrInfo is created in the HdfGroup constructors.
  */

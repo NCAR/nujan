@@ -33,6 +33,9 @@ package edu.ucar.ral.nujan.hdf;
  * HDF5 message type 17: symbol table.
  * Used only for fileVersion 1, to point to the symbol table's
  * root BtreeNode and to the LocalHeap.
+ * <p>
+ * Extends abstract MsgBase, so we must implement formatMsgCore -
+ * see the documentation for class {@link MsgBase}.
  */
 
 class MsgSymbolTable extends MsgBase {

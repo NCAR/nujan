@@ -205,7 +205,9 @@ throws HdfException
 
 
 /**
- * Formats the block to output buffer fmtBuf - see notes below.
+ * Formats this individual BaseBlk to fmtBuf;
+ * calls addWork to add any referenced BaseBlks (subNode, subTable)
+ * to workList; extends abstract BaseBlk.
  *
  * <pre>
  * The formatted output is always the same, the fileVersion==1 format.
@@ -278,7 +280,9 @@ throws HdfException
  * @param fmtBuf  output buffer
  */
 
-void formatBuf( int formatPass, HBuffer fmtBuf)
+void formatBuf(
+  int formatPass,
+  HBuffer fmtBuf)
 throws HdfException
 {
   setFormatEntry( formatPass, true, fmtBuf); // BaseBlk: set blkPos, buf pos
@@ -359,9 +363,10 @@ throws HdfException
   else if (nodeType == NT_DATA) {
     // Only one format, since fileVersion==2 uses fileVersion==1 format.
 
-    // Format the initial key
+    // Format the initial key.
+    // Caution: the HDF5 "standard" uses only an int for chunkSize.
     fmtBuf.putBufInt("BtreeNode: key chunkSize",
-      (int) hdfGroup.rawDataSize);     // xxx ugh, convert long to int.
+      (int) hdfGroup.rawDataSize);     // convert long to int for chunkSize
 
     // Turn on bit i to skip filter i.
     int mask = 0;                      // use all filters

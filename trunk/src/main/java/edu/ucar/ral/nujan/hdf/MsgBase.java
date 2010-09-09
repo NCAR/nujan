@@ -38,8 +38,9 @@ package edu.ucar.ral.nujan.hdf;
  *
  * 1. Via HdfGroup for its message table:
  *    HdfGroup.formatBuf (implements BaseBlk.formatBuf):
- *      If v1: calls MsgBase.formatFullMsg
- *      If v2: calls layoutVersion2, which calls MsgBase.formatFullMsg
+ *      If fileVersion 1: calls MsgBase.formatFullMsg
+ *      If fileVersion 2: calls layoutVersion2,
+ *        which calls MsgBase.formatFullMsg
  *    MsgBase.formatFullMsg:
  *      Formats msg header, then calls abstract formatMsgCore.
  *
@@ -68,7 +69,6 @@ static final int MSG_HDR_LEN_V2 = 6;
 // set bit 0 of hdrMsgFlag: value is constant
 static final int FLAG_CONSTANT = 1;
 
-//xxx all v1, v2: fileVersion
 
 /**
  * HDF5 message type 0: MsgNil: NIL msg to be ignored;
@@ -249,9 +249,13 @@ int hdrMsgType;                    // see doc in Object Header
 int hdrMsgCreOrder;                // creation order
 
 // Caution:
-// group V1: hdrMsgSize INCLUDES the length of pad to multiple of 8,
+//
+// fileVersion 1 group: hdrMsgSize INCLUDES the length of pad
+//   to a multiple of 8,
 //   unlike MsgAttribute.dataTypeSize and dataSpaceSize.
-// group V2: hdrMsgSize does NOT include the length of pad to multiple of 8.
+//
+// fileVersion 2 group: hdrMsgSize does NOT include the length of pad
+//   to a multiple of 8.
 
 int hdrMsgSize;                    // size of data part of msg, in bytes
 
@@ -288,7 +292,7 @@ MsgBase(
   this.hdfGroup = hdfGroup;
 
   // It looks like the hdrMsgCreationOrder field in the
-  // V2 group header is always 0.
+  // fileVersion 2 group header is always 0.
   // If some day we need to make it count the header messages,
   // have HdfGroup.formatBuf use:
   //    hdfMsgCreOrder = 0;
@@ -422,10 +426,17 @@ throws HdfException
 
 
 /**
- * Extends abstract BaseBlk: illegal to call formatBuf
+ * Extends abstract BaseBlk: it is illegal to call formatBuf
  * for a Msg* class since the Msg* classes are never formatted
  * alone.  They are always formatted within an HdfGroup
  * or MsgAttribute.
+ *
+ * @param formatPass: <ul>
+ *   <li> 1: Initial formatting to determine the formatted length.
+ *          In HdfGroup we add msgs to hdrMsgList.
+ *   <li> 2: Final formatting.
+ * </ul>
+ * @param fmtBuf  output buffer
  */
 
 void formatBuf( int formatPass, HBuffer fmtBuf)

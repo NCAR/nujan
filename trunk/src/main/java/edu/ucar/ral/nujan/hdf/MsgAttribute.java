@@ -37,8 +37,8 @@ import java.util.Arrays;
  * HDF5 message type 12: MsgAttribute:
  * Contains both the attribute name and value.
  * <p>
- * Extends abstract MsgBase, so we must implement formatMsgCore
- * (see doc for class MsgBase).
+ * Extends abstract MsgBase, so we must implement formatMsgCore -
+ * see the documentation for class {@link MsgBase}.
  * <p>
  * A new MsgAttribute is created in HdfGroup.addAttribute.
  */
@@ -118,7 +118,6 @@ int[] dataVarDims;
 int[] dsubTypes = null;
 
 
-//xxx all ///
 
 /**
  * Creates a new MsgAttribute.
@@ -240,10 +239,10 @@ throws HdfException
     hdfFile);
 
   // Create the MsgDataSpace
-  // If totNumEle is 0, use H5S_NULL: null dataspace (only for format v2).
-  // Note that for empty attributes, only the v2 file format
+  // If totNumEle is 0, use H5S_NULL: null dataspace (only for fileVersion 2).
+  // Note that for empty attributes, only the fileVersion 2 file format
   // has the null dataspace message.
-  // The v1 file format does not have a null dataspace.
+  // The fileVersion 1 file format does not have a null dataspace.
   int[] vdims = dataVarDims;
   if (totNumEle == 0) vdims = null;
   msgDataSpace = new MsgDataSpace(

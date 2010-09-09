@@ -32,6 +32,9 @@ package edu.ucar.ral.nujan.hdf;
 /**
  * HDF5 message type 10: MsgGroupInfo:
  * Used for fileVersion 2 to keep some group-related constants.
+ * <p>
+ * Extends abstract MsgBase, so we must implement formatMsgCore -
+ * see the documentation for class {@link MsgBase}.
  */
 
 class MsgGroupInfo extends MsgBase {
