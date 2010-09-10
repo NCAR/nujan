@@ -1,8 +1,6 @@
 // The MIT License
 // 
-// Copyright (c) 2009 University Corporation for Atmospheric
-// Research and Massachusetts Institute of Technology Lincoln
-// Laboratory.
+// Copyright (c) 2010 University Corporation for Atmospheric Research
 // 
 // Permission is hereby granted, free of charge, to any person
 // obtaining a copy of this software and associated documentation
@@ -38,9 +36,7 @@ class License {
 public final static String license = ""
   + " The MIT License"
   + "\n\n"
-  + " Copyright (c) 2009 University Corporation for Atmospheric"
-  + " Research and Massachusetts Institute of Technology Lincoln"
-  + " Laboratory."
+  + " Copyright (c) 2010 University Corporation for Atmospheric Research"
   + "\n\n"
   + " Permission is hereby granted, free of charge, to any person"
   + " obtaining a copy of this software and associated documentation"
