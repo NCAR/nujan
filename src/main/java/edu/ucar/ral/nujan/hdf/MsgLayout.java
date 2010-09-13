@@ -30,7 +30,7 @@ package edu.ucar.ral.nujan.hdf;
 /**
  * HDF5 message type 8: MsgLayout:
  * If fileVersion==1, specifies the Btree that describes the raw data;
- * if fileVersion==2, specified the rawDataAddr, rawDataLen.
+ * if fileVersion==2, specifies the rawDataAddr, rawDataLen.
  */
 
 class MsgLayout extends MsgBase {
