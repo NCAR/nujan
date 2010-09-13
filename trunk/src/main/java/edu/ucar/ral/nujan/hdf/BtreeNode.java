@@ -41,7 +41,7 @@ import java.util.ArrayList;
  *        In this case we have subTableList = list of exactly 1
  *        SymbolTable.  The SymbolTable can contain as many
  *        symbols as needed.
- *   <li> For fileVersion==1 and 2, MsgLayout uses a BtreeNode
+ *   <li> For both fileVersion==1 and 2, MsgLayout uses a BtreeNode
  *     to point to the raw data chunks.
  *     Theoretically we could have a whole tree of chunks, but
  *     we always have exactly 1 chunk.  In general this is like
