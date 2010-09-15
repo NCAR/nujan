@@ -35,10 +35,6 @@ import java.util.Arrays;
  * <p>
  * Extends abstract MsgBase, so we must implement formatMsgCore -
  * see the documentation for class {@link MsgBase}.
- * <p>
- * Note that for empty attributes, only the fileVersion 2 file format
- * has the null dataspace message.
- * The fileVersion 1 file format does not have a null dataspace.
  */
 
 class MsgDataSpace extends MsgBase {
@@ -50,7 +46,6 @@ final int msgVersion = 1;
 
 // Bits for spaceFlag:
 //   0  maxSizes are present (decimal 1)
-//   1  permutations are present (decimal 2)
 int spaceFlag = 0;           // no maxSizes, no permutations
 
 
@@ -146,21 +141,14 @@ public String toString() {
 void formatMsgCore( int formatPass, HBuffer fmtBuf)
 throws HdfException
 {
-  int msgVersion = hdfFile.fileVersion;      // 1 or 2
-  fmtBuf.putBufByte("MsgDataSpace: msgVersion", msgVersion);
+  fmtBuf.putBufByte("MsgDataSpace: msgVersion", 2);
   fmtBuf.putBufByte("MsgDataSpace: rank", rank);
   fmtBuf.putBufByte("MsgDataSpace: spaceFlag", spaceFlag);
-  if (hdfFile.fileVersion == 1) {
-    fmtBuf.putBufByte("MsgDataSpace: reserved", 0);
-    fmtBuf.putBufInt("MsgDataSpace: reserved", 0);
-  }
-  if (hdfFile.fileVersion == 2) {
-    int stype;
-    if (varDims == null) stype = 2;            // H5S_NULL: null dataspace
-    else if (varDims.length == 0) stype = 0;   // scalar
-    else stype = 1;                            // simple dataspace
-    fmtBuf.putBufByte("MsgDataSpace: stype", stype);
-  }
+  int stype;
+  if (varDims == null) stype = 2;            // H5S_NULL: null dataspace
+  else if (varDims.length == 0) stype = 0;   // scalar
+  else stype = 1;                            // simple dataspace
+  fmtBuf.putBufByte("MsgDataSpace: stype", stype);
 
   for (int ii = 0; ii < rank; ii++) {
     fmtBuf.putBufLong("MsgDataSpace: varDims", varDims[ii]);
@@ -168,13 +156,6 @@ throws HdfException
   if ((spaceFlag & 1) != 0) {       // if maxSizes are present
     for (int ii = 0; ii < rank; ii++) {
       fmtBuf.putBufLong("MsgDataSpace: dimMaxSizes", dimMaxSizes[ii]);
-    }
-  }
-  if ((spaceFlag & 2) != 0) {       // if permutations are present
-    if (hdfFile.fileVersion != 1) throwerr("spaceFlag version mismatch");
-    for (int ii = 0; ii < rank; ii++) {
-      fmtBuf.putBufLong(
-        "MsgDataSpace: dimPermuations", dimPermuations[ii]);
     }
   }
 }

@@ -78,7 +78,6 @@ public static final String[] statusNames = {
 
 String path;
 int optFlag;                     // zero or more OPT_* bit options
-int fileVersion;
 
 
 int fileStatus;                 // one of ST_*
@@ -103,7 +102,7 @@ public NhFileWriter(
   String path)
 throws NhException
 {
-  this( path, 0, 2, 0, 0, 0);  // optFlag = 0, fileVersion = 2,
+  this( path, 0, 0, 0, 0);  // optFlag = 0
                                // bugs = 0, 0
                                // utcModTime = 0 (use current time)
 }
@@ -122,7 +121,7 @@ public NhFileWriter(
   int optFlag)                    // zero or more OPT_* bit options
 throws NhException
 {
-  this( path, optFlag, 2, 0, 0, 0);  // fileVersion = 2, bugs = 0, 0,
+  this( path, optFlag, 0, 0, 0);  // bugs = 0, 0,
                                      // utcModTime = 0 (use current time)
 }
 
@@ -137,8 +136,6 @@ throws NhException
 // 
 // @param path Name or path of the file to create.
 // @param optFlag 0 or the bitwise "or" of OPT_* flags.
-// @param fileVersion The output file HDF structure version, 1 or 2.
-//                   (2 is recommended).
 // @param nhDebugLevel  Debug level for package edu.ucar.ral.nujan.netcdf.
 // @param hdfDebugLevel  Debug level for package edu.ucar.ral.nujan.hdf.
 
@@ -149,7 +146,6 @@ throws NhException
 public NhFileWriter(
   String path,
   int optFlag,                   // zero or more OPT_* bit options
-  int fileVersion,
   int nhDebugLevel,
   int hdfDebugLevel,
   long utcModTime)           // milliSecs since 1970, or if 0 use current time
@@ -157,7 +153,6 @@ throws NhException
 {
   this.path = path;
   this.optFlag = optFlag;
-  this.fileVersion = fileVersion;
   this.bugs = nhDebugLevel;
 
   fileStatus = ST_DEFINING;
@@ -166,8 +161,7 @@ throws NhException
     if ((optFlag & OPT_OVERWRITE) != 0)
       hdfOptFlag |= HdfFileWriter.OPT_ALLOW_OVERWRITE;
     hdfFile = new HdfFileWriter(
-      path, fileVersion, hdfOptFlag, hdfDebugLevel,
-      utcModTime);
+      path, hdfOptFlag, hdfDebugLevel, utcModTime);
     rootGroup = new NhGroup( "", null, this);
       // rootName, parent, nhFileWriter
     rootGroup.hdfGroup = hdfFile.getRootGroup();
@@ -184,8 +178,8 @@ throws NhException
 
 
 public String toString() {
-  String res = String.format("path: \"%s\"  fileVersion: %d  status: %s",
-    path, fileVersion, fileStatus);
+  String res = String.format("path: \"%s\"  status: %s",
+    path, fileStatus);
   return res;
 }
 
@@ -229,14 +223,6 @@ public int getOptFlag() {
   return optFlag;
 }
 
-
-/**
- * Returns the fileVersion parameter specified in the constructor.
- */
-
-public int getFileVersion() {
-  return fileVersion;
-}
 
 
 /**

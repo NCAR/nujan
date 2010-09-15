@@ -29,8 +29,7 @@ package edu.ucar.ral.nujan.hdf;
 
 /**
  * HDF5 message type 8: MsgLayout:
- * If fileVersion==1, specifies the Btree that describes the raw data;
- * if fileVersion==2, specifies the rawDataAddr, rawDataLen.
+ * Specifies the raw data addr or the Btree that describes the raw data.
  */
 
 class MsgLayout extends MsgBase {
@@ -97,7 +96,7 @@ throws HdfException
   fmtBuf.putBufByte("MsgLayout: layoutClass", layoutClass);
 
   if (layoutClass == LY_COMPACT) {     // if compact
-    throwerr("compact not yet tested");
+    throwerr("compact not yet implemented");
     //fmtBuf.putBufShort("MsgLayout: compactSize", compactSize);
     //for (int ii = 0; ii < compactSize; ii++) {
     //  fmtBuf.putBufByte("MsgLayout: compactData", compactData[ii]);
@@ -128,9 +127,5 @@ throws HdfException
   }
   else throwerr("unknown layoutClass: %d", layoutClass);
 }
-
-
-
-
 
 } // end class

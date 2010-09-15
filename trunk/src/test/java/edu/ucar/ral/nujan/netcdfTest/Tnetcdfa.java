@@ -57,7 +57,6 @@ static void badparms( String msg) {
   prtf("  -bugs         <int>");
   prtf("  -nhType       byte / ubyte / short / int / long / float / double / char / vstring");
   prtf("  -dims         <int,int,...>   or \"0\" if a scalar");
-  prtf("  -fileVersion  1 / 2");
   prtf("  -compress     compression level: 0==none, 1 - 9");
   prtf("  -utcModTime   either yyyy-mm-dd or yyyy-mm-ddThh:mm:ss");
   prtf("                or 0, meaning use the current time");
@@ -83,7 +82,6 @@ throws NhException
   int bugs = -1;
   int nhType = -1;
   int[] dims = null;
-  String fileVersionStg = null;
   int compressLevel = -1;
   long utcModTime = -1;
   int numThread = -1;
@@ -117,7 +115,6 @@ throws NhException
         }
       }
     }
-    else if (key.equals("-fileVersion")) fileVersionStg = val;
     else if (key.equals("-compress")) compressLevel = Integer.parseInt( val);
     else if (key.equals("-utcModTime")) {
       if (val.equals("0")) utcModTime = 0;
@@ -146,7 +143,6 @@ throws NhException
   if (bugs < 0) badparms("missing parm: -bugs");
   if (nhType < 0) badparms("missing parm: -nhType");
   if (dims == null) badparms("missing parm: -dims");
-  if (fileVersionStg == null) badparms("missing parm: -fileVersion");
   if (compressLevel < 0) badparms("missing parm: -compress");
   if (utcModTime < 0) badparms("missing parm: -utcModTime");
   if (numThread < 0) badparms("missing parm: -numThread");
@@ -154,18 +150,12 @@ throws NhException
 
   if (numThread < 1 || numThread > 100) badparms("invalid numThread");
 
-  int fileVersion = 0;
-  if (fileVersionStg.equals("1")) fileVersion = 1;
-  else if (fileVersionStg.equals("2")) fileVersion = 2;
-  else badparms("unknown fileVersion: " + fileVersionStg);
-
   prtf("Tnetcdfa: bugs: %d", bugs);
   prtf("Tnetcdfa: nhType: \"%s\"", NhVariable.nhTypeNames[nhType]);
   prtf("Tnetcdfa: rank: %d", dims.length);
   for (int idim : dims) {
     prtf("  Tnetcdfa: dim: %d", idim);
   }
-  prtf("Tnetcdfa: fileVersion: %s", fileVersion);
   prtf("Tnetcdfa: compress: %d", compressLevel);
 
   SimpleDateFormat utcSdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
@@ -176,8 +166,7 @@ throws NhException
 
   final long startTime = System.currentTimeMillis();
   if (numThread == 1)
-    testOne( bugs, nhType, dims, fileVersion, compressLevel,
-      utcModTime, outFile);
+    testOne( bugs, nhType, dims, compressLevel, utcModTime, outFile);
   else {
     Thread[] threads = new Thread[numThread];
     for (int ii = 0; ii < numThread; ii++) {
@@ -186,7 +175,6 @@ throws NhException
       final int bugsFinal = bugs;
       final int nhTypeFinal = nhType;
       final int[] dimsFinal = dims;
-      final int fileVersionFinal = fileVersion;
       final int compressLevelFinal = compressLevel;
       final long utcModTimeFinal = utcModTime;
       threads[ii] = new Thread() {
@@ -198,7 +186,6 @@ throws NhException
               bugsFinal,
               nhTypeFinal,
               dimsFinal,
-              fileVersionFinal,
               compressLevelFinal,
               utcModTimeFinal,
               fnameFinal);
@@ -237,14 +224,13 @@ static void testOne(
   int bugs,
   int nhType,
   int[] dims,
-  int fileVersion,
   int compressLevel,
   long utcModTime,           // milliSecs since 1970, or if 0 use current time
   String fname)
 throws NhException
 {
   NhFileWriter hfile = new NhFileWriter(
-    fname, NhFileWriter.OPT_OVERWRITE, fileVersion,
+    fname, NhFileWriter.OPT_OVERWRITE,
     bugs, bugs,            // nhBugs, hdfBugs
     utcModTime);           // utcModTime: use current time.
 

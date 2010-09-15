@@ -36,9 +36,7 @@ package edu.ucar.ral.nujan.hdf;
  *
  * 1. Via HdfGroup for its message table:
  *    HdfGroup.formatBuf (implements BaseBlk.formatBuf):
- *      If fileVersion 1: calls MsgBase.formatFullMsg
- *      If fileVersion 2: calls layoutVersion2,
- *        which calls MsgBase.formatFullMsg
+ *      calls layoutVersion2, which calls MsgBase.formatFullMsg
  *    MsgBase.formatFullMsg:
  *      Formats msg header, then calls abstract formatMsgCore.
  *
@@ -56,12 +54,8 @@ package edu.ucar.ral.nujan.hdf;
 abstract class MsgBase extends BaseBlk {
 
 // Lengths of header fields, in bytes:
-// If fileVersion==1:
-//   hdrMsgType(2), hdrMsgSize(2), hdrMsgFlag(1), reserved(3)
-// If fileVersion==2:
 //   hdrMsgType(1), hdrMsgSize(2), hdrMsgFlag(1), hdrMsgCreOrder(2)
 
-static final int MSG_HDR_LEN_V1 = 8;
 static final int MSG_HDR_LEN_V2 = 6;
 
 // set bit 0 of hdrMsgFlag: value is constant
@@ -81,8 +75,8 @@ static final int TP_DATASPACE        =  1;
 
 /**
  * HDF5 message type 2: MsgLinkInfo:
- * Used for fileVersion 2 to keep info on tracking and indexing
- * link creation order.
+ * Used to keep info on tracking and indexing
+ * the link creation order.
  */
 static final int TP_LINKINFO         =  2;
 
@@ -103,8 +97,8 @@ static final int TP_OLD_FILL_VALUE   =  4;
 static final int TP_FILL_VALUE       =  5;
 
 /**
- * HDF5 message type 6: MsgFillValue:
- * Used by fileVersion 2 to specify a link to another group,
+ * HDF5 message type 6: MsgLinkit:
+ * Used by to specify a link to another group,
  * either from parent to child group or from group to variable.
  */
 static final int TP_LINKIT           =  6;
@@ -117,8 +111,7 @@ static final int TP_EXTERNAL_FILE    =  7;
 
 /**
  * HDF5 message type 8: MsgLayout:
- * If fileVersion==1, specifies the Btree that describes the raw data;
- * if fileVersion==2, specified the rawDataAddr, rawDataLen.
+ * Specifies the raw data addr or the Btree that describes the raw data.
  */
 static final int TP_LAYOUT           =  8;
 
@@ -130,7 +123,7 @@ static final int TP_BOGUS            =  9;
 
 /**
  * HDF5 message type 10: MsgGroupInfo:
- * Used for fileVersion 2 to keep some group-related constants.
+ * Used to keep some group-related constants.
  */
 static final int TP_GROUPINFO        = 10;
 
@@ -174,8 +167,9 @@ static final int TP_OBJ_HDR_CONTIN   = 16;
 
 /**
  * HDF5 message type 17: symbol table.
- * Used only for fileVersion 1, to point to the symbol table's
+ * Used in obsolete fileVersion 1 to point to the symbol table's
  * root BtreeNode and to the LocalHeap.
+ * Not used in this package.
  */
 static final int TP_SYMBOL_TABLE     = 17;
 
@@ -247,13 +241,7 @@ int hdrMsgType;                    // see doc in Object Header
 int hdrMsgCreOrder;                // creation order
 
 // Caution:
-//
-// fileVersion 1 group: hdrMsgSize INCLUDES the length of pad
-//   to a multiple of 8,
-//   unlike MsgAttribute.dataTypeSize and dataSpaceSize.
-//
-// fileVersion 2 group: hdrMsgSize does NOT include the length of pad
-//   to a multiple of 8.
+// hdrMsgSize does NOT include the length of pad to a multiple of 8.
 
 int hdrMsgSize;                    // size of data part of msg, in bytes
 
@@ -290,7 +278,7 @@ MsgBase(
   this.hdfGroup = hdfGroup;
 
   // It looks like the hdrMsgCreationOrder field in the
-  // fileVersion 2 group header is always 0.
+  // group header is always 0.
   // If some day we need to make it count the header messages,
   // have HdfGroup.formatBuf use:
   //    hdfMsgCreOrder = 0;
@@ -325,8 +313,7 @@ public String toString() {
 /**
  * Formats this message including the header info:
  * <ul>
- *   <li> fileVersion 1: hdrMsgType, hdrMsgSize, hdrMsgFlag
- *   <li> fileVersion 2: hdrMsgType, hdrMsgSize, hdrMsgFlag, hdrMsgCreOrder
+ *   <li> hdrMsgType, hdrMsgSize, hdrMsgFlag, hdrMsgCreOrder
  * </ul>
  * Called by HdfGroup.formatBuf, HdfGroup.layoutVersion2 (from formatBuf).
  */
@@ -351,37 +338,19 @@ throws HdfException
   long svPos = fmtBuf.getPos();
   blkPosition = svPos;     // not needed for internal block
 
-  if (hdfFile.fileVersion == 1) {
-    fmtBuf.putBufShort("MsgBase: hdrMsgType", hdrMsgType);
-    if (hdrMsgSize % 8 != 0) throwerr("hdrMsgSize % 8 != 0");
-    fmtBuf.putBufShort("MsgBase: hdrMsgSize", hdrMsgSize);
-    fmtBuf.putBufByte("MsgBase: hdrMsgFlag", hdrMsgFlag);
-    fmtBuf.putBufByte("MsgBase: reserved", 0);
-    fmtBuf.putBufShort("MsgBase: reserved", 0);
-  }
-  if (hdfFile.fileVersion == 2) {
-    fmtBuf.putBufByte("MsgBase: hdrMsgType", hdrMsgType);
-    fmtBuf.putBufShort("MsgBase: hdrMsgSize", hdrMsgSize);
-    fmtBuf.putBufByte("MsgBase: hdrMsgFlag", hdrMsgFlag);
-    fmtBuf.putBufShort("MsgBase: hdrMsgCreOrder", hdrMsgCreOrder);
-  }
+  fmtBuf.putBufByte("MsgBase: hdrMsgType", hdrMsgType);
+  fmtBuf.putBufShort("MsgBase: hdrMsgSize", hdrMsgSize);
+  fmtBuf.putBufByte("MsgBase: hdrMsgFlag", hdrMsgFlag);
+  fmtBuf.putBufShort("MsgBase: hdrMsgCreOrder", hdrMsgCreOrder);
 
   long svCore = fmtBuf.getPos();
 
   // Write the msg.  Implemented by subclass like MsgModTime.
   formatMsgCore( formatPass, fmtBuf);
 
-  if (hdfFile.fileVersion == 1) {
-    // Pad length up to multiple of 8
-    while ((fmtBuf.getPos() - svPos) % 8 != 0) {
-      fmtBuf.putBufByte("MsgBase: msgPad", 0);
-    }
-  }
-
   hdrMsgSize = (int) (fmtBuf.getPos() - svCore);
   int specHdrLen = 0;
-  if (hdfFile.fileVersion == 1) specHdrLen = MSG_HDR_LEN_V1;
-  if (hdfFile.fileVersion == 2) specHdrLen = MSG_HDR_LEN_V2;
+  specHdrLen = MSG_HDR_LEN_V2;
   if (fmtBuf.getPos() != svPos + specHdrLen + hdrMsgSize)
     throwerr("formatFullMsg: len mismatch."
       + "  svPos: 0x%x  HLEN: 0x%x  hmsgSize: 0x%x  curPos: 0x%x",

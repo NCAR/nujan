@@ -237,10 +237,7 @@ throws HdfException
     hdfFile);
 
   // Create the MsgDataSpace
-  // If totNumEle is 0, use H5S_NULL: null dataspace (only for fileVersion 2).
-  // Note that for empty attributes, only the fileVersion 2 file format
-  // has the null dataspace message.
-  // The fileVersion 1 file format does not have a null dataspace.
+  // If totNumEle is 0, use H5S_NULL: null dataspace.
   int[] vdims = dataVarDims;
   if (totNumEle == 0) vdims = null;
   msgDataSpace = new MsgDataSpace(
@@ -308,47 +305,28 @@ void formatMsgCore( int formatPass, HBuffer fmtBuf)
 throws HdfException
 {
   byte[] nameBytes = HdfUtil.encodeString( attrName, false, hdfGroup);
-  if (hdfFile.fileVersion == 1) {
-    fmtBuf.putBufByte("MsgAttribute: attrVersion", 1);
-    fmtBuf.putBufByte("MsgAttribute: reserved", 0);
-    // Name must have null termination
-    fmtBuf.putBufShort(
-      "MsgAttribute: nameSize", nameBytes.length + 1);   // +1 for null term
-    fmtBuf.putBufShort(
-      "MsgAttribute: dataTypeSize", msgDataType.hdrMsgSize);
-    fmtBuf.putBufShort(
-      "MsgAttribute: dataSpaceSize", msgDataSpace.hdrMsgSize);
+  fmtBuf.putBufByte("MsgAttribute: attrVersion", 3);
 
-    fmtBuf.putBufBytes("MsgAttribute: attr name", nameBytes);
-    fmtBuf.putBufByte("MsgAttribute: attr name null term", 0);
-    fmtBuf.alignPos( "attr align", 8);
-  }
-  if (hdfFile.fileVersion == 2) {
-    fmtBuf.putBufByte("MsgAttribute: attrVersion", 3);
+  // Flag bits:
+  //   0  datatype is shared
+  //   1  dataspace is shared
+  fmtBuf.putBufByte("MsgAttribute: flag", 0);
 
-    // Flag bits:
-    //   0  datatype is shared
-    //   1  dataspace is shared
-    fmtBuf.putBufByte("MsgAttribute: flag", 0);
+  // Name must have null termination
+  fmtBuf.putBufShort(
+    "MsgAttribute: nameSize", nameBytes.length + 1);   // +1 for null term
+  fmtBuf.putBufShort(
+    "MsgAttribute: dataTypeSize", msgDataType.hdrMsgSize);
+  fmtBuf.putBufShort(
+    "MsgAttribute: dataSpaceSize", msgDataSpace.hdrMsgSize);
+  fmtBuf.putBufByte("MsgAttribute: encoding", 0);
 
-    // Name must have null termination
-    fmtBuf.putBufShort(
-      "MsgAttribute: nameSize", nameBytes.length + 1);   // +1 for null term
-    fmtBuf.putBufShort(
-      "MsgAttribute: dataTypeSize", msgDataType.hdrMsgSize);
-    fmtBuf.putBufShort(
-      "MsgAttribute: dataSpaceSize", msgDataSpace.hdrMsgSize);
-    fmtBuf.putBufByte("MsgAttribute: encoding", 0);
-
-    fmtBuf.putBufBytes("MsgAttribute: attr name", nameBytes);
-    fmtBuf.putBufByte("MsgAttribute: attr name null term", 0);
-  }
+  fmtBuf.putBufBytes("MsgAttribute: attr name", nameBytes);
+  fmtBuf.putBufByte("MsgAttribute: attr name null term", 0);
 
   msgDataType.formatNakedMsg( formatPass, fmtBuf);
-  if (hdfFile.fileVersion == 1) fmtBuf.alignPos( "attr align", 8);
 
   msgDataSpace.formatNakedMsg( formatPass, fmtBuf);
-  if (hdfFile.fileVersion == 1) fmtBuf.alignPos( "attr align", 8);
 
   if (attrValue == null) {
     // Don't write null attrValue

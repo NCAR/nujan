@@ -57,7 +57,6 @@ static void badparms( String msg) {
   prtf("                           null termination");
   prtf("                        reference compound");
   prtf("  -dims         <int,int,...>   or \"0\" if scalar");
-  prtf("  -fileVersion  1 / 2");
   prtf("  -chunked      contig / chunked");
   prtf("  -compress     compression level: 0==none, 1 - 9");
   prtf("  -utcModTime   either yyyy-mm-dd or yyyy-mm-ddThh:mm:ss");
@@ -88,7 +87,6 @@ throws HdfException
   int dtype = -1;
   int stgFieldLen = 0;
   int[] dims = null;
-  String fileVersionStg = null;
   String chunkedStg = null;
   int compressLevel = -1;
   long utcModTime = -1;
@@ -129,7 +127,6 @@ throws HdfException
         }
       }
     }
-    else if (key.equals("-fileVersion")) fileVersionStg = val;
     else if (key.equals("-chunked")) chunkedStg = val;
     else if (key.equals("-compress")) compressLevel = Integer.parseInt( val);
     else if (key.equals("-utcModTime")) {
@@ -158,16 +155,10 @@ throws HdfException
   if (bugs < 0) badparms("missing parm: -bugs");
   if (dtype < 0) badparms("missing parm: -dtype");
   if (dims == null) badparms("missing parm: -dims");
-  if (fileVersionStg == null) badparms("missing parm: -fileVersion");
   if (chunkedStg == null) badparms("missing parm: -chunked");
   if (compressLevel < 0) badparms("missing parm: -compress");
   if (utcModTime < 0) badparms("missing parm: -utcModTime");
   if (outFile == null) badparms("missing parm: -outFile");
-
-  int fileVersion = 0;
-  if (fileVersionStg.equals("1")) fileVersion = 1;
-  else if (fileVersionStg.equals("2")) fileVersion = 2;
-  else badparms("unknown fileVersion: " + fileVersionStg);
 
   boolean useChunked = false;
   if (chunkedStg.equals("contig")) useChunked = false;
@@ -181,7 +172,6 @@ throws HdfException
   for (int idim : dims) {
     prtf("  Thdfa: dim: %d", idim);
   }
-  prtf("Thdfa: fileVersion: %s", fileVersion);
   prtf("Thdfa: chunked: %s", useChunked);
   prtf("Thdfa: compress: %d", compressLevel);
 
@@ -192,7 +182,7 @@ throws HdfException
   prtf("Thdfa: outFile: \"%s\"", outFile);
 
   HdfFileWriter hfile = new HdfFileWriter(
-    outFile, fileVersion, HdfFileWriter.OPT_ALLOW_OVERWRITE,
+    outFile, HdfFileWriter.OPT_ALLOW_OVERWRITE,
     bugs, utcModTime);
 
   HdfGroup rootGroup = hfile.getRootGroup();
