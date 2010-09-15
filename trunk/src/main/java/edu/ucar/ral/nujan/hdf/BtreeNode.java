@@ -195,25 +195,25 @@ public String toString() {
 
 
 
-xxx
-chunkDim = 0 or whatever
-chunkLen = rawDataSize / dimSize, round up to mult of 8
-chunkAddr = rawDataAddr
-for ii = 0; < dimSize
-  format initial key
-xxx
-
-chunkAddr = rawDataAddr
-chunkDelta = chunks[ndim-1] * elementLen, round up.
-
-for (dim0 = 0; dim0 < dims[0]; dim0 += chunks[0]) {
-  for (dim1 = 0; dim1 < dims[1]; dim1 += chunks[1]) {
-    write key: [dim0, dim1]
-    write chunkAddr
-    chunkAddr += chunkDelta;
-
-  }
-}
+// xxx
+// chunkDim = 0 or whatever
+// chunkLen = rawDataSize / dimSize, round up to mult of 8
+// chunkAddr = rawDataAddr
+// for ii = 0; < dimSize
+//   format initial key
+// xxx
+// 
+// chunkAddr = rawDataAddr
+// chunkDelta = chunks[ndim-1] * elementLen, round up.
+// 
+// for (dim0 = 0; dim0 < dims[0]; dim0 += chunks[0]) {
+//   for (dim1 = 0; dim1 < dims[1]; dim1 += chunks[1]) {
+//     write key: [dim0, dim1]
+//     write chunkAddr
+//     chunkAddr += chunkDelta;
+// 
+//   }
+// }
 
 
 
