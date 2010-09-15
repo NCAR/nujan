@@ -120,23 +120,12 @@ HdfGroup rootGroup;
  */
 GlobalHeap mainGlobalHeap = null;
 
-/**
- * For fileVersion==1, the symbol table entry pointing
- * to the rootGroup.
- */
-SymTabEntry symTabEntry;
-
-
 
 /**
  * The file path (name) of the output file on disk.
  */
 String filePath;
 
-/**
- * Internal HDF5 version: 1==old, 2==new.
- */
-int fileVersion;
 
 /**
  * Options passed to the constructor.
@@ -252,38 +241,18 @@ long eofAddr;
 
 
 /**
- * Used by fileVersion==1 only:
- * A leaf btree node (a symbol table) should have:<br>
- *   k_leaf &lt;= numUsedEntries &lt;= 2 * k_leaf
- */
-int k_leaf = 4;          // This is set in SymbolTable.addSymName
-
-/**
- * Used by fileVersion==1 only:
- * An internal btree node should have:<br>
- *   k_internal &lt;= numUsedEntries &lt;= 2 * k_internal
- */
-int k_internal = 16;
-
-
-
-/**
  * Creates a new HDF5 output file.
  * @param filePath  The name or disk path of the file to create.
- * @param fileVersion  Either 1 (deprecated HDF5 format)
- *     or 2 (new HDF5 format).
- *     Using 2 is strongly recommended.
  * @param optFlag  The bitwise OR of one or more OPT_* flags.
  *     Currently the only one implemented is OPT_ALLOW_OVERWRITE.
  */
 
 public HdfFileWriter(
   String filePath,               // file to create
-  int fileVersion,
   int optFlag)                   // zero or more OPT_* bit options
 throws HdfException
 {
-  this( filePath, fileVersion, optFlag, 0, 0);   // debug = 0, modTime = 0
+  this( filePath, optFlag, 0, 0);   // debug = 0, modTime = 0
 }
 
 
@@ -293,8 +262,6 @@ throws HdfException
  * Do not use: for internal testing only.
  * Creates a new HDF5 output file.
  * @param filePath  The name or disk path of the file to create.
- * @param fileVersion  Either 1 (old HDF5 format) or 2 (new HDF5 format).
- *     Using 2 is strongly recommended.
  * @param optFlag  The bitwise OR of one or more OPT_* flags.
  *     Currently the only one implemented is OPT_ALLOW_OVERWRITE.
  * @param debugLevel  Level for logging debug messages to stdout:<ul>
@@ -310,7 +277,6 @@ throws HdfException
 
 public HdfFileWriter(
   String filePath,           // file to create
-  int fileVersion,
   int optFlag,               // zero or more OPT_* bit options
   int debugLevel,
   long utcModTime)           // milliSecs since 1970, or if 0 use current time
@@ -319,13 +285,10 @@ throws HdfException
   super("HdfFileWriter", null);  // BaseBlk: hdfFile = null
   this.hdfFile = this;
   this.filePath = filePath;
-  this.fileVersion = fileVersion;
   this.optFlag = optFlag;
   this.debugLevel = debugLevel;
   this.bugs = debugLevel;
 
-  if (fileVersion != 1 && fileVersion != 2)
-    throwerr("invalid fileVersion: %d", fileVersion);
   fileStatus = ST_DEFINING;
   utcModTimeMilliSec = utcModTime;
   if (utcModTimeMilliSec == 0)
@@ -336,19 +299,6 @@ throws HdfException
   // Make rootGroup
   String rootName = "";
   rootGroup = new HdfGroup( rootName, null, this);
-  if (fileVersion == 1) {
-    int grpOffset = rootGroup.localHeap.putHeapItem("rootName",
-      HdfUtil.encodeString( rootName, false, null));
-    symTabEntry = new SymTabEntry(
-      grpOffset,
-      rootGroup,
-      this);
-
-    // Special symTabEntry for SuperBlock has scratchpad info
-    symTabEntry.cacheType = 1;
-    symTabEntry.scratchBtree = rootGroup.btreeNode;
-    symTabEntry.scratchHeap = rootGroup.localHeap;
-  }
 
   try {
     if ( ((optFlag & OPT_ALLOW_OVERWRITE) == 0)
@@ -368,7 +318,6 @@ throws HdfException
 public String toString() {
   String res = super.toString();
   res += "  filePath: " + filePath;
-  res += "  fileVersion: " + fileVersion;
   res += "  optFlag: " + optFlag;
   res += "  status: " + statusNames[fileStatus];
   return res;
@@ -445,12 +394,6 @@ throws HdfException
   if (bugs >= 2)
     prtf("HdfFileWriter.endDefine: after pass 1: mainBuf pos: %d",
       mainBuf.getPos());
-
-  if (fileVersion == 1) {
-    // Set Btree and Heap addresses in superBlock's SymTabEntry scratchPad.
-    symTabEntry.scratchBtree = rootGroup.btreeNode;
-    symTabEntry.scratchHeap  = rootGroup.localHeap;
-  }
 
   // Set eofAddr in superBlock
   eofAddr = mainBuf.getPos();
@@ -639,43 +582,21 @@ throws HdfException
   fmtBuf.putBufByte("HdfFileWriter: signg", signg);
   fmtBuf.putBufByte("HdfFileWriter: signh", signh);
 
-  int superBlockVersion = 0;
-  if (fileVersion == 1) superBlockVersion = 0;
-  if (fileVersion == 2) superBlockVersion = 2;
+  int superBlockVersion = 2;
   fmtBuf.putBufByte("HdfFileWriter: superBlockVersion", superBlockVersion);
 
-  if (fileVersion == 1) {
-    fmtBuf.putBufByte("HdfFileWriter: freeSpaceVersion", 0);
-    fmtBuf.putBufByte("HdfFileWriter: symTabEntryVersion", 0);
-    fmtBuf.putBufByte("HdfFileWriter: reserved", 0);
-    fmtBuf.putBufByte("HdfFileWriter: sharedHdrMsgVersion", 0);
-    fmtBuf.putBufByte("HdfFileWriter: OFFSET_SIZE", OFFSET_SIZE);
-    fmtBuf.putBufByte("HdfFileWriter: LENGTH_SIZE", OFFSET_SIZE);
-    fmtBuf.putBufByte("HdfFileWriter: reserved", 0);
-    fmtBuf.putBufShort("HdfFileWriter: k_leaf", k_leaf);
-    fmtBuf.putBufShort("HdfFileWriter: k_internal", k_internal);
-    fmtBuf.putBufInt("HdfFileWriter: consistencyFlag", consistencyFlag);
-    fmtBuf.putBufLong("HdfFileWriter: baseAddress", baseAddress);
-    fmtBuf.putBufLong("HdfFileWriter: freeSpaceInfo", UNDEFINED_ADDR);
-    fmtBuf.putBufLong("HdfFileWriter: eofAddr", eofAddr);
-    fmtBuf.putBufLong("HdfFileWriter: driverInfoAddr", UNDEFINED_ADDR);
-    // Internal block
-    symTabEntry.formatBuf( formatPass, fmtBuf);
-  }
-  if (fileVersion == 2) {
-    fmtBuf.putBufByte("HdfFileWriter: OFFSET_SIZE", OFFSET_SIZE);
-    fmtBuf.putBufByte("HdfFileWriter: LENGTH_SIZE", OFFSET_SIZE);
-    fmtBuf.putBufByte("HdfFileWriter: consistencyFlag", consistencyFlag);
-    fmtBuf.putBufLong("HdfFileWriter: baseAddress", baseAddress);
-    fmtBuf.putBufLong("HdfFileWriter: superblockExtensionAddress",
-      superblockExtensionAddress);
-    fmtBuf.putBufLong("HdfFileWriter: eofAddr", eofAddr);
-    fmtBuf.putBufLong("HdfFileWriter: rootGroupAddr", rootGroup.blkPosition);
-    long endPos = fmtBuf.getPos();
-    byte[] chkBytes = fmtBuf.getBufBytes( startPos, endPos);
-    int checkSumHack = new CheckSumHack().calcHackSum( chkBytes);
-    fmtBuf.putBufInt("HdfFileWriter: checkSumHack", checkSumHack);
-  }
+  fmtBuf.putBufByte("HdfFileWriter: OFFSET_SIZE", OFFSET_SIZE);
+  fmtBuf.putBufByte("HdfFileWriter: LENGTH_SIZE", OFFSET_SIZE);
+  fmtBuf.putBufByte("HdfFileWriter: consistencyFlag", consistencyFlag);
+  fmtBuf.putBufLong("HdfFileWriter: baseAddress", baseAddress);
+  fmtBuf.putBufLong("HdfFileWriter: superblockExtensionAddress",
+    superblockExtensionAddress);
+  fmtBuf.putBufLong("HdfFileWriter: eofAddr", eofAddr);
+  fmtBuf.putBufLong("HdfFileWriter: rootGroupAddr", rootGroup.blkPosition);
+  long endPos = fmtBuf.getPos();
+  byte[] chkBytes = fmtBuf.getBufBytes( startPos, endPos);
+  int checkSumHack = new CheckSumHack().calcHackSum( chkBytes);
+  fmtBuf.putBufInt("HdfFileWriter: checkSumHack", checkSumHack);
 
   // External block
   addWork("HdfFileWriter", rootGroup);

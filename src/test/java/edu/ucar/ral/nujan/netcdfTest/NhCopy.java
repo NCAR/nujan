@@ -80,13 +80,12 @@ static void badparms( String msg) {
   prtf("Parms:");
   prtf("  -bugs       debug level.  Default is 0.");
   prtf("  -compress   compressionLevel for outFile.  0: none,  9: max");
-  prtf("  -fileVersion  output file version, 1 or 2.  2 is recommended.");
   prtf("  -inFile     input file name.");
   prtf("  -outFile    output file name.");
   prtf("");
   prtf("Example:");
   prtf("java -cp tdcls:netcdfAll-4.0.jar testpk.NhCopy"
-    + " -compress 0 -fileVersion 2 -inFile ta.nc -outFile tb.nc");
+    + " -compress 0 -inFile ta.nc -outFile tb.nc");
   System.exit(1);
 }
 
@@ -101,7 +100,6 @@ throws NhException
 {
   int bugs = 0;
   int compressionLevel = -1;
-  int fileVersion = -1;
   String inFile = null;
   String outFile = null;
   int iarg = 0;
@@ -115,23 +113,16 @@ throws NhException
       if (compressionLevel < 0 || compressionLevel > 9)
         badparms("invalid compress: " + compressionLevel);
     }
-    else if (key.equals("-fileVersion")) {
-      fileVersion = Integer.parseInt( val);
-      if (fileVersion != 1 && fileVersion != 2)
-        badparms("invalid fileVersion: " + fileVersion);
-    }
     else if (key.equals("-inFile")) inFile = val;
     else if (key.equals("-outFile")) outFile = val;
     else badparms("unknown parm: \"" + key + "\"");
   }
   if (compressionLevel < 0) badparms("parm not specified: -compress");
-  if (fileVersion < 0) badparms("parm not specified: -fileVersion");
   if (inFile == null) badparms("parm not specified: -inFile");
   if (outFile == null) badparms("parm not specified: -outFile");
 
   if (bugs >= 1) {
     prtf("copyIt: compress: %d", compressionLevel);
-    prtf("copyIt: fileVersion: %d", fileVersion);
     prtf("copyIt: inFile: \"%s\"", inFile);
     prtf("copyIt: outFile: \"%s\"", outFile);
   }
@@ -143,7 +134,6 @@ throws NhException
     outCdf = new NhFileWriter(
       outFile,
       NhFileWriter.OPT_OVERWRITE,
-      fileVersion,
       bugs,          // Netcdf debug level
       bugs,          // HDF5 debug level
       0);            // utcModTime: use current time.

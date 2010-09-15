@@ -22,7 +22,6 @@ H5CHECK=/d1/steves/ftp/hdf5/tdi/bin/h5check
 badparms() {
   echo Error: $1
   echo Parms:
-  echo "  version:   all / v1 / v2"
   echo "  chunkSpec: all / contig / chunked"
   echo "  compress:  all / compressLevel (0==none, 1 - 9)"
   echo "  dtype:     all / sfixed08 / ufixed08 /fixed16,32,64"
@@ -35,10 +34,10 @@ badparms() {
   echo "               update: update verification results - Caution"
   echo ""
   echo "Examples:"
-  echo "./testHdfSyn.sh v1  contig  0 fixed16  1"
-  echo "./testHdfSyn.sh v1  chunked 0 string14 2"
-  echo "./testHdfSyn.sh v2  contig  0 vstring  all"
-  echo "./testHdfSyn.sh all all     0 all      all"
+  echo "./testHdfSyn.sh  contig  0 fixed16  1"
+  echo "./testHdfSyn.sh  chunked 0 string14 2"
+  echo "./testHdfSyn.sh  contig  0 vstring  all"
+  echo "./testHdfSyn.sh  all     0 all      all"
   exit 1
 }
 
@@ -52,21 +51,14 @@ if [ $# -eq 1 ]; then
 fi
 
 
-if [ $# -ne 5 -a $# -ne 6 ]; then badparms "wrong num parms"; fi
+if [ $# -ne 4 -a $# -ne 5 ]; then badparms "wrong num parms"; fi
 
-versionSpec=$1
-chunkSpec=$2
-compressSpec=$3
-dtypeSpec=$4
-rankSpec=$5
+chunkSpec=$1
+compressSpec=$2
+dtypeSpec=$3
+rankSpec=$4
 bugs=none
-if [ $# -eq 6 ]; then bugs=$6; fi
-
-if [ "$versionSpec" == "all" ]; then versions="1 2"
-elif [ "$versionSpec" == "v1" ]; then versions="1"
-elif [ "$versionSpec" == "v2" ]; then versions="2"
-else badparms "invalid ver"
-fi
+if [ $# -eq 5 ]; then bugs=$5; fi
 
 if [ "$chunkSpec" == "all" ]; then chunks="contig chunked"
 else chunks="$chunkSpec"
@@ -87,7 +79,6 @@ fi
 
 
 
-echo "versions: $versions"
 echo "chunks: $chunks"
 echo "compressVals: $compressVals"
 echo "dtypes: $dtypes"
@@ -98,16 +89,15 @@ echo "ranks: $ranks"
 
 
 testOne() {
-  if [ $# -ne 5 ]; then
+  if [ $# -ne 4 ]; then
     badparms "wrong num parms"
   fi
-  fileVersion=$1
-  chunk=$2
-  compress=$3
-  dtype=$4
-  rank=$5
+  chunk=$1
+  compress=$2
+  dtype=$3
+  rank=$4
   if [ "$bugs" != "none" ]; then
-    echo "testOne: vers: $fileVersion  chunk: $chunk  compress: $compress"
+    echo "testOne: chunk: $chunk  compress: $compress"
     echo "  dtype: $dtype  rank: $rank"
   fi
 
@@ -143,14 +133,13 @@ testOne() {
       -bugs 10 \
       -dtype $dtype \
       -dims $dims \
-      -fileVersion $fileVersion \
       -chunked $chunk \
       -compress $compress \
       -utcModTime 0 \
       -outFile tempa.h5"
 
     if [ "$bugs" != "none" ]; then echo "cmd: $cmd"; fi
-    configMsg="./testHdfSyn.sh v$fileVersion $chunk $compress $dtype $rank"
+    configMsg="./testHdfSyn.sh $chunk $compress $dtype $rank"
 
     $cmd > tempa.log
     if [ "$?" -ne "0" ]; then
@@ -170,7 +159,8 @@ testOne() {
       exit 1
     fi
 
-    oldTxt=${TESTDIR}/testHdfSynOut.v$fileVersion/test.$dtype.rank.$rank.out.gz
+    oldTxt=${TESTDIR}/testHdfSynOut.v2/test.$dtype.rank.$rank.out.gz
+    #xxx rename above to del v2; get rid of all v1 files
 
     dumpCmd="h5dump -p -w 10000 tempa.h5"
     $dumpCmd > tempout.newa
@@ -243,15 +233,13 @@ testOne() {
 
 
 
-for version in $versions; do
-  for chunk in $chunks; do
-    for compress in $compressVals; do
-      for dtype in $dtypes; do
-        for rank in $ranks; do
+for chunk in $chunks; do
+  for compress in $compressVals; do
+    for dtype in $dtypes; do
+      for rank in $ranks; do
 
-          testOne $version $chunk $compress $dtype $rank
+        testOne $chunk $compress $dtype $rank
 
-        done
       done
     done
   done

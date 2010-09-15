@@ -62,10 +62,8 @@ static void createFile( String outFile)
 throws NhException
 {
   int bugs = 0;
-  int fileVersion = 2;
   NhFileWriter hfile = new NhFileWriter(
     outFile, NhFileWriter.OPT_OVERWRITE,
-    fileVersion,
     bugs, bugs,            // nhBugs, hdfBugs
     1283444655);           // utcModTime: milliseconds since 1970
 

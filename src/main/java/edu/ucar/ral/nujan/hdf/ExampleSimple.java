@@ -63,10 +63,8 @@ throws Exception
   if (! args[0].equals("-outFile")) badParms("missing parm: -outFile");
   String fileName = args[1];
 
-  int fileVersion = 2;
   int option = HdfFileWriter.OPT_ALLOW_OVERWRITE;
-  HdfFileWriter hdfFile = new HdfFileWriter(
-    fileName, fileVersion, option);
+  HdfFileWriter hdfFile = new HdfFileWriter( fileName, option);
   HdfGroup rootGroup = hdfFile.getRootGroup();
   int numx = 10;
   int numy = 5;

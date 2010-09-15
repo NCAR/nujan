@@ -22,7 +22,6 @@ TESTDIR=.
 badparms() {
   echo Error: $1
   echo Parms:
-  echo "  version:   all / v1 / v2"
   echo "  compress:  all / compressLevel (0==none, 1 - 9)"
   echo "  nhType:    sbyte ubyte short int long float double char vstring"
   echo "  rank:      all/0/1/2/3/4/5"
@@ -33,28 +32,21 @@ badparms() {
   echo "               update: update verification results - Caution"
   echo ""
   echo "Examples:"
-  echo "./testNetcdfSyn.sh v1 0 short 1"
-  echo "./testNetcdfSyn.sh v2 5 all 2"
+  echo "./testNetcdfSyn.sh 0 short 1"
+  echo "./testNetcdfSyn.sh 5 all 2"
   exit 1
 }
 
 
 
-if [ $# -ne 4 -a $# -ne 5 ]; then badparms "main: wrong num parms"; fi
+if [ $# -ne 3 -a $# -ne 4 ]; then badparms "main: wrong num parms"; fi
 
-versionSpec=$1
-compressSpec=$2
-nhTypeSpec=$3
-rankSpec=$4
+compressSpec=$1
+nhTypeSpec=$2
+rankSpec=$3
 bugs=none
-if [ $# -eq 5 ]; then bugs=$5; fi
+if [ $# -eq 4 ]; then bugs=$4; fi
 
-
-if [ "$versionSpec" == "all" ]; then versions="1 2"
-elif [ "$versionSpec" == "v1" ]; then versions="1"
-elif [ "$versionSpec" == "v2" ]; then versions="2"
-else badparms "main: invalid version"
-fi
 
 if [ "$compressSpec" == "all" ]; then compressVals="0 5"
 else compressVals="$compressSpec"
@@ -71,7 +63,6 @@ fi
 
 
 
-echo "versions: $versions"
 echo "compressVals: $compressVals"
 echo "nhTypes: $nhTypes"
 echo "ranks: $ranks"
@@ -91,15 +82,14 @@ exitUnlessContinue() {
 
 
 testOne() {
-  if [ $# -ne 4 ]; then
+  if [ $# -ne 3 ]; then
     badparms "testOne: wrong num parms"
   fi
-  fileVersion=$1
-  compress=$2
-  nhType=$3
-  rank=$4
+  compress=$1
+  nhType=$2
+  rank=$3
   if [ "$bugs" != "none" ]; then
-    echo "testOne: vers: $fileVersion  compress: $compress"
+    echo "testOne: compress: $compress"
     echo "  nhType: $nhType  rank: $rank"
   fi
 
@@ -134,14 +124,13 @@ testOne() {
       -bugs 10 \
       -nhType $nhType \
       -dims $dims \
-      -fileVersion $fileVersion \
       -compress $compress \
       -utcModTime 0 \
       -numThread 1 \
       -outFile tempa.nc"
 
     if [ "$bugs" != "none" ]; then echo "cmd: $cmd"; fi
-    configMsg="./testNetcdfSyn.sh v$fileVersion $compress $nhType $rank"
+    configMsg="./testNetcdfSyn.sh $compress $nhType $rank"
 
     $cmd > tempa.log
     if [ "$?" -ne "0" ]; then
@@ -165,7 +154,8 @@ testOne() {
     ###  -skipUnder y \
     ###  -verbose n \
     ###  -inFilea tempa.nc \
-    ###  -inFileb testNetcdfSynOut/test.v$fileVersion.$nhType.compress.$compress.rank.$rank.nc"
+    ###  -inFileb testNetcdfSynOut/test.v2.$nhType.compress.$compress.rank.$rank.nc"
+    #xxx rename above to del v2; get rid of all v1 files
 
     ###if [ "$bugs" != "none" ]; then echo "compareCmd: $compareCmd"; fi
     ###$compareCmd > tempb.log
@@ -185,7 +175,8 @@ testOne() {
       echo "  copyCmd: $copyCmd"
       exitUnlessContinue $bugs
     fi
-    ############xxxxx /bin/cp tempa.nc testNetcdfSynOut/test.v$fileVersion.$nhType.compress.$compress.rank.$rank.nc
+    ############xxxxx /bin/cp tempa.nc testNetcdfSynOut/test.v2.$nhType.compress.$compress.rank.$rank.nc
+    #xxx rename above to del v2; get rid of all v1 files
 
     # Test NhCopy
     useNhCopy=0
@@ -195,7 +186,6 @@ testOne() {
         ${PKGBASE}.netcdfTest.NhCopy \
         -bugs 0 \
         -compress $compress \
-        -fileVersion $fileVersion \
         -inFile tempa.nc \
         -outFile tempb.nc"
       if [ "$bugs" != "none" ]; then echo "copyCmd: $copyCmd"; fi
@@ -228,14 +218,12 @@ testOne() {
 
 
 
-for version in $versions; do
-  for compress in $compressVals; do
-    for nhType in $nhTypes; do
-      for rank in $ranks; do
+for compress in $compressVals; do
+  for nhType in $nhTypes; do
+    for rank in $ranks; do
 
-        testOne $version $compress $nhType $rank
+      testOne $version $compress $nhType $rank
 
-      done
     done
   done
 done

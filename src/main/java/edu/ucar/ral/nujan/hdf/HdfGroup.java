@@ -88,7 +88,6 @@ public static final String[] dtypeNames = {
   "STRING_FIX", "STRING_VAR", "REFERENCE",
   "VLEN", "COMPOUND"};
 
-// Signature is used for fileVersion==2 only.
 /** HdfGroup signature byte 0 */
 final int signa = 'O';
 /** HdfGroup signature byte 1 */
@@ -110,10 +109,6 @@ ArrayList<HdfGroup> subGroupList = null;
  * contained in this group.
  */
 ArrayList<HdfGroup> subVariableList = null;
-
-// fileVersion==1 only:
-BtreeNode btreeNode;
-LocalHeap localHeap;
 
 
 
@@ -138,12 +133,6 @@ MsgAttrInfo msgAttrInfo;
 
 /** An HDF5 filter message, contained in our hdrMsgList. */
 MsgFilter msgFilter;
-
-/**
- * An HDF5 symbolTable message, contained in our hdrMsgList
- * (used only for fileVersion==1).
- */
-MsgSymbolTable msgSymbolTable;
 
 
 /**
@@ -208,7 +197,6 @@ long rawDataSize;
  */
 boolean isWritten = false;
 
-// fileVersion==2 only:
 int linkCreationOrder = 0;
 
 
@@ -251,16 +239,8 @@ throws HdfException
   hdrMsgList = new ArrayList<MsgBase>();
   hdrMsgList.add( msgModTime);
 
-  if (hdfFile.fileVersion == 1) {
-    localHeap = new LocalHeap( hdfFile);
-    btreeNode = new BtreeNode( localHeap, hdfFile);
-    msgSymbolTable = new MsgSymbolTable( btreeNode, localHeap, this, hdfFile);
-    hdrMsgList.add( msgSymbolTable);
-  }
-  else if (hdfFile.fileVersion == 2) {
-    msgAttrInfo = new MsgAttrInfo( this, hdfFile);
-    hdrMsgList.add( msgAttrInfo);
-  }
+  msgAttrInfo = new MsgAttrInfo( this, hdfFile);
+  hdrMsgList.add( msgAttrInfo);
 }
 
 
@@ -389,10 +369,8 @@ throws HdfException
     hdrMsgList.add( msgFilter);
   }
 
-  if (hdfFile.fileVersion == 2) {
-    msgAttrInfo = new MsgAttrInfo( this, hdfFile);
-    hdrMsgList.add( msgAttrInfo);
-  }
+  msgAttrInfo = new MsgAttrInfo( this, hdfFile);
+  hdrMsgList.add( msgAttrInfo);
 }
 
 
@@ -659,10 +637,6 @@ throws HdfException
 {
   if (subGroup.isVariable) subVariableList.add( subGroup);
   else subGroupList.add( subGroup);
-
-  if (hdfFile.fileVersion == 1) {
-    btreeNode.addTreeName( subGroup);
-  }
 }
 
 
@@ -939,7 +913,8 @@ throws HdfException, IOException
  * calls addWork to add any referenced BaseBlks (btreeNode, localHeap)
  * to workList; extends abstract BaseBlk.
  * <p>
- * If fileVersion==2, calls layoutVersion2 to do the work.
+ * Calls layoutVersion2 twice: to get the length, then
+ * to format to fmtBuf.
  *
  * @param formatPass: <ul>
  *   <li> 1: Initial formatting to determine the formatted length.
@@ -958,139 +933,71 @@ throws HdfException
 
   // We need to use version 2 to support the
   // messages: link, link info, group info
-  int groupVersion = hdfFile.fileVersion;     // 1 or 2
 
   // Write it out
-  if (hdfFile.fileVersion == 1) {
+
+
+  if (formatPass == 1) {
     if (! isVariable) {
-      hdfFile.addWork("HdfGroup", btreeNode);
-      hdfFile.addWork("HdfGroup", localHeap);
+      hdrMsgList.add( new MsgGroupInfo( this, hdfFile));
+      hdrMsgList.add( new MsgLinkInfo( this, hdfFile));
     }
-
-    fmtBuf.putBufByte("HdfGroup: groupVersion", groupVersion);
-    fmtBuf.putBufByte("HdfGroup: reserved", 0);
-    fmtBuf.putBufShort("HdfGroup: numMsg", hdrMsgList.size());
-
-    // The refCount must be > 0 for object references to work.
-    // Otherwise the code at the following stack trace
-    // fails to find the object:
-    //   #0  H5O_link_oh  at H5O.c:1501
-    //   #1  H5O_link  at H5O.c:1545
-    //   #2  H5R_dereference  at H5R.c:418
-    //   #3  H5Rdereference  at H5R.c:532
-    //   #4  h5tools_str_sprint  at h5tools_str.c:952
-    //   #5  h5tools_dump_simple_data  at h5tools.c:945
-    //   #6  h5tools_dump_simple_dset at h5tools.c:2480
-    //   #7  h5tools_dump_dset at h5tools.c:2656
-    //   #8  dump_data at h5dump.c:2532
-    //   #9  dump_dataset at h5dump.c:2266
-    //   #10 dump_all_cb at h5dump.c:1678
-    //   #11 H5G_iterate_cb  at H5G.c:1470
-    //   #12 H5G_node_iterate at H5Gnode.c:1008
-    //   #13 H5B_iterate_helper  at H5B.c:1223
-    //   #14 H5B_iterate  at H5B.c:1301
-    //   #15 H5G_stab_iterate  at H5Gstab.c:521
-    //   #16 H5G_obj_iterate  at H5Gobj.c:598
-    //   #17 H5G_iterate  at H5G.c:1531
-    //   #18 H5Literate at H5L.c:1183
-    //   #19 dump_group at h5dump.c:2184
-    //   #20 main at h5dump.c:4473
-
-    int refCount = 1;     // link or reference count; must be > 0.
-    fmtBuf.putBufInt("HdfGroup: refCount", refCount);
-
-    // Set headSize to the sum of msg sizes
-    // On the first pass all hdrMsgSize are 0, so leave headSize = 0.
-    int headSize = 0;
-    if (formatPass == 2) {
-      for (MsgBase hmsg : hdrMsgList) {
-        if (hmsg.hdrMsgSize % 8 != 0) throwerr("hmsg.hdrMsgSize % 8 != 0");
-        if (hmsg.hdrMsgSize > 0)
-          headSize += MsgBase.MSG_HDR_LEN_V1 + hmsg.hdrMsgSize;
+    if (subGroupList != null) {
+      for (HdfGroup subGroup : subGroupList) {
+        hdrMsgList.add( new MsgLinkit(
+          linkCreationOrder++,
+          subGroup,
+          this,
+          hdfFile));
       }
     }
-    fmtBuf.putBufInt("HdfGroup: headSize", headSize);
-    fmtBuf.putBufInt("HdfGroup: reserved", 0);
-    long endPos = fmtBuf.getPos() + headSize;
-
-    for (MsgBase hmsg : hdrMsgList) {
-      // Internal block
-      hmsg.formatFullMsg( formatPass, fmtBuf);
-      if (hdfFile.bugs >= 5) {
-        prtIndent(
-          "Group write: above hmsg type: 0x%x == %d  size: 0x%x == %d",
-          hmsg.hdrMsgType, hmsg.hdrMsgType, hmsg.hdrMsgSize,
-          hmsg.hdrMsgSize);
+    if (subVariableList != null) {
+      for (HdfGroup subGroup : subVariableList) {
+        hdrMsgList.add( new MsgLinkit(
+          linkCreationOrder++,
+          subGroup,
+          this,
+          hdfFile));
       }
     }
-  } // if fileVersion == 1
+  }
 
+  // There is some needlessly twisted code
+  // in the HDF5 H5Odbg.c.
+  // It requires that the length of the chunklen field
+  // be "appropriate" for the chunk0Len value, meaning
+  // if  0 <= chunk0Len <= 255 the chunklen field must be
+  // exactly 1 byte, if chunk0Len <= 65535 the field must be
+  // exactly 2 bytes, etc.
+  //
+  // So we cannot always specify that the chunklen field size = 8.
+  // This implies we must know chunk0Len before laying out
+  // chunk0 ... as I said, a bit twisted.
+  //
+  // So we lay out the HdfGroup twice on each formatPass.
+  // The first layout uses a temp HBuffer and just gets
+  // us the chunk0Len.
+  // The second layout is for real and uses fmtBuf.
 
-  if (hdfFile.fileVersion == 2) {
+  HBuffer tempHbuf = new HBuffer(
+    null,                 // outChannel
+    0,                    // compressionLevel
+    hdfFile);
 
-    if (formatPass == 1) {
-      if (! isVariable) {
-        hdrMsgList.add( new MsgGroupInfo( this, hdfFile));
-        hdrMsgList.add( new MsgLinkInfo( this, hdfFile));
-      }
-      if (subGroupList != null) {
-        for (HdfGroup subGroup : subGroupList) {
-          hdrMsgList.add( new MsgLinkit(
-            linkCreationOrder++,
-            subGroup,
-            this,
-            hdfFile));
-        }
-      }
-      if (subVariableList != null) {
-        for (HdfGroup subGroup : subVariableList) {
-          hdrMsgList.add( new MsgLinkit(
-            linkCreationOrder++,
-            subGroup,
-            this,
-            hdfFile));
-        }
-      }
-    }
+  int svIndent = hdfFile.indent;
+  hdfFile.indent += 6;
+  if (hdfFile.bugs >= 5) prtIndent("Start HdfGroup temp layout");
 
-    // For fileVersion==2 there is some needlessly twisted code
-    // in the HDF5 H5Odbg.c.
-    // It requires that the length of the chunklen field
-    // be "appropriate" for the chunk0Len value, meaning
-    // if  0 <= chunk0Len <= 255 the chunklen field must be
-    // exactly 1 byte, if chunk0Len <= 65535 the field must be
-    // exactly 2 bytes, etc.
-    //
-    // So we cannot always specify that the chunklen field size = 8.
-    // This implies we must know chunk0Len before laying out
-    // chunk0 ... as I said, a bit twisted.
-    //
-    // So we lay out the HdfGroup twice on each formatPass.
-    // The first layout uses a temp HBuffer and just gets
-    // us the chunk0Len.
-    // The second layout is for real and uses fmtBuf.
+  // Find chunk0Len
+  // Use formatPass = 0 so MsgLayout and MsgLinkit don't call addWork.
+  long chunk0Len = 0;
+  chunk0Len = layoutVersion2(
+    0, chunk0Len, tempHbuf);  // formatPass = 0
+  if (hdfFile.bugs >= 5) prtIndent("End HdfGroup temp layout");
+  hdfFile.indent = svIndent;
 
-    HBuffer tempHbuf = new HBuffer(
-      null,                 // outChannel
-      0,                    // compressionLevel
-      hdfFile);
-
-    int svIndent = hdfFile.indent;
-    hdfFile.indent += 6;
-    if (hdfFile.bugs >= 5) prtIndent("Start HdfGroup temp layout");
-
-    // Find chunk0Len
-    // Use formatPass = 0 so MsgLayout and MsgLinkit don't call addWork.
-    long chunk0Len = 0;
-    chunk0Len = layoutVersion2(
-      0, groupVersion, chunk0Len, tempHbuf);  // formatPass = 0
-    if (hdfFile.bugs >= 5) prtIndent("End HdfGroup temp layout");
-    hdfFile.indent = svIndent;
-
-    // Layout for real
-    layoutVersion2( formatPass, groupVersion, chunk0Len, fmtBuf);
-
-  } // if fileVersion == 2
+  // Layout for real
+  layoutVersion2( formatPass, chunk0Len, fmtBuf);
 
   noteFormatExit( fmtBuf);         // BaseBlk: print debug
 } // end formatBuf
@@ -1107,7 +1014,6 @@ throws HdfException
 
 long layoutVersion2(
   int formatPass,
-  int groupVersion,
   long prevChunk0Len,
   HBuffer fmtBuf)
 throws HdfException
@@ -1119,7 +1025,7 @@ throws HdfException
   fmtBuf.putBufByte("HdfGroup: signc", signc);
   fmtBuf.putBufByte("HdfGroup: signd", signd);
 
-  fmtBuf.putBufByte("HdfGroup: groupVersion", groupVersion);
+  fmtBuf.putBufByte("HdfGroup: groupVersion", 2);
 
   // Flags:
   //   bits  mask  desc
