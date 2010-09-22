@@ -66,6 +66,9 @@ public class HdfFileWriter extends BaseBlk {
 //       follow the metadata.
 
 
+
+static String softwareVersion = "0.9.1";
+
 /**
  * Bit flag for optFlag: allow overwrite of an existing file.
  */
@@ -289,6 +292,11 @@ throws HdfException
   this.debugLevel = debugLevel;
   this.bugs = debugLevel;
 
+  if (bugs >= 1) {
+    prtf("HdfFileWriter.const: filePath: \"%s\"\n  softwareVersion: %s\n",
+      filePath, softwareVersion);
+  }
+
   fileStatus = ST_DEFINING;
   utcModTimeMilliSec = utcModTime;
   if (utcModTimeMilliSec == 0)
@@ -439,15 +447,17 @@ throws HdfException
   findAllGroups( rootGroup, grpList);
   String errMsg = "";
   for (HdfGroup grp : grpList) {
-    if (grp.isVariable
-      && (! grp.isWritten)
-      && grp.msgDataSpace.totNumEle != 0)
-    {
-      errMsg += "  " + grp.getPath();
+    if (grp.isVariable && grp.msgDataSpace.totNumEle != 0) {
+      for (HdfChunk chunk : grp.hdfChunks) {
+        if (chunk.chunkDataAddr == 0)
+          errMsg += "  " + grp.getPath()
+            + "  chunk indices: "
+            + HdfUtil.formatInts( chunk.chunkStartIxs) + "\n";
+      }
     }
   }
   if (errMsg.length() > 0)
-    throwerr("close: the following dataset(s) still need to written: %s",
+    throwerr("close: the following dataset chunks still need to written:\n%s",
       errMsg);
 
   // Format metadata to buffer, pass 2 of 2  (pass 1 is in endDefine)

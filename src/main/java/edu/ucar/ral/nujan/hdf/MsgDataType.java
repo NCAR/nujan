@@ -150,7 +150,10 @@ int typeFlag;                      // combo of 3 bytes: bits 0-7, 18-5, 16.23
 //     1  dataset region reference
 
 
-int elementLen;                      // element len in bytes
+/**
+ * Element length in bytes.
+ */
+int elementLen;
 
 // Class 00: fixed point
 int fixptBitOffset;                  // num low order pad bits

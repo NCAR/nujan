@@ -241,6 +241,8 @@ throws HdfException
   int[] vdims = dataVarDims;
   if (totNumEle == 0) vdims = null;
   msgDataSpace = new MsgDataSpace(
+    dataVarDims.length,      // rank
+    totNumEle,
     vdims,
     hdfGroup,
     hdfFile);

@@ -84,8 +84,10 @@ throws NhException
   // Usually dimensions are added to the rootGroup, not a subGroup.
   int rank = 2;             // 2 dimensional data: x, y
   NhDimension[] nhDims = new NhDimension[ rank];
-  nhDims[0] = rootGroup.addDimension( "xdim", 3);
-  nhDims[1] = rootGroup.addDimension( "ydim", 5);
+  int numx = 10;
+  int numy = 10;
+  nhDims[0] = rootGroup.addDimension( "xdim", numx);
+  nhDims[1] = rootGroup.addDimension( "ydim", numy);
 
   // Attributes may be added to any group and any variable.
   // Attribute values may be either a String or a 1 dimensional
@@ -108,33 +110,68 @@ throws NhException
   // Variables may be added to any group.
   Double fillValue = new Double( -999999);
   int compressLevel = 0;        // compression level: 0==none, 1 - 9
+  int[] chunkLens = null;       // chunk lengths (contiguous, not chunked)
 
-  NhVariable humidityVar = northernGroup.addVariable(
+  // Add a variable with contiguous storage
+  NhVariable humidity = northernGroup.addVariable(
     "humidity",                 // varName
     NhVariable.TP_DOUBLE,       // nhType
     nhDims,                     // varDims
+    chunkLens,                  // chunk lengths
     fillValue,
     compressLevel);
 
-  humidityVar.addAttribute(
+  // Add an attribute to the variable.
+  humidity.addAttribute(
     "someUnits",
     NhVariable.TP_STRING_VAR,
-    "fathoms per fortnight");
+    "celsius");
+
+  // Add a variable with chunked storage
+  chunkLens = new int[] { 5, 10};
+  NhVariable temperature = northernGroup.addVariable(
+    "temperature",              // varName
+    NhVariable.TP_DOUBLE,       // nhType
+    nhDims,                     // varDims
+    chunkLens,                  // chunk lengths
+    fillValue,
+    compressLevel);
 
   // End the definition stage.
   // All groups, variables, and attributes are created before endDefine.
   // All calls to writeData occur after endDefine.
   hfile.endDefine();
 
-  // The data type must match that declared in the addVariable call.
-  // The data shape must match xdim, ydim.
-  double[][] testData = {
-    { 11, 12, 13, 14, 15},
-    { 21, 22, 23, 24, 25},
-    { 31, 32, 33, 34, 35}
-  };
+  // Fill the humidityData array.
+  // The type and dimensions must match those declared
+  // in addVariable above.
+  double[][] humidityData = new double[numx][numy];
+  for (int ix = 0; ix < numx; ix++) {
+    for (int iy = 0; iy < numy; iy++) {
+      humidityData[ix][iy] = 100 * ix + iy;
+    }
+  }
 
-  humidityVar.writeData( testData);
+  // Fill the temperatureData arrays, one for each chunk.
+  // The size must match the declared CHUNK, not dimension, lengths.
+  double[][] temperatureDataChunk0 = new double[chunkLens[0]][chunkLens[1]];
+  double[][] temperatureDataChunk1 = new double[chunkLens[0]][chunkLens[1]];
+  for (int ix = 0; ix < chunkLens[0]; ix++) {
+    for (int iy = 0; iy < chunkLens[1]; iy++) {
+      temperatureDataChunk0[ix][iy] = 100 * ix + iy + 1000;
+      temperatureDataChunk1[ix][iy] = 100 * ix + iy + 2000;
+    }
+  }
+
+  // Write out the humidityData array in one call.
+  int[] startIxs = null;
+  humidity.writeData( startIxs, humidityData);
+
+  // Write out the temperatureData array in two chunks.
+  startIxs = new int[] {0, 0};
+  temperature.writeData( startIxs, temperatureDataChunk0);
+  startIxs[0] = 5;
+  temperature.writeData( startIxs, temperatureDataChunk1);
 
   hfile.close();
 

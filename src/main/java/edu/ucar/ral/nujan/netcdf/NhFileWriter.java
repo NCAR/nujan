@@ -284,8 +284,8 @@ throws NhException
             HdfGroup.DTYPE_FLOAT32,    // dtype
             0,                         // string length, incl null termination
             new int[] {dim.dimLen},    // varDims
+            null,                      // chunkDims
             new Float(0),              // fillValue
-            false,                     // isChunked
             0);                        // compressionLevel
 
           // netcdf-4.0.1/libsrc4/nc4hdf.c:
@@ -435,10 +435,11 @@ void findGroupsAndVars(
 void writeTreeDimData( NhGroup nhGroup)
 throws NhException
 {
+  int[] startIxs = null;
   for (NhDimension nhdim : nhGroup.dimensionList) {
     if (nhdim.coordVar == null) {
       float[] dimData = new float[ nhdim.dimLen];
-      try { nhdim.hdfDimVar.writeData( dimData); }
+      try { nhdim.hdfDimVar.writeData( startIxs, dimData); }
       catch( HdfException exc) {
         exc.printStackTrace();
         throwerr("caught: " + exc);

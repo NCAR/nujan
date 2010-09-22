@@ -635,6 +635,32 @@ static void formatObjectSub(
 
 
 
+
+
+/**
+ * Formats an array of ints.
+ */
+
+static String formatInts(
+  int[] vals)
+{
+  String res = "";
+  if (vals == null) res = "(null)";
+  else {
+    for (int ii = 0; ii < vals.length; ii++) {
+      if (ii > 0) res += " ";
+      res += vals[ii];
+    }
+  }
+  return res;
+}
+
+
+
+
+
+
+
 /**
  * Returns an indentation string having length 2*indent.
  */

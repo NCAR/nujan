@@ -172,6 +172,7 @@ NhVariable(
   String varName,            // variable name
   int nhType,                // one of TP_*
   NhDimension[] nhDims,      // shared dimensions
+  int[] chunkLens,
   Object fillValue,
   int compressionLevel,      // 0: no compression;  9: max compression
   NhGroup parentGroup,
@@ -269,19 +270,14 @@ throws NhException
   if ((dimLens == null || dimLens.length == 0) && compressionLevel > 0)
     throwerr("cannot use compression with scalar data");
 
-  // HDF5 must be chunked for compression.
-  boolean isChunked;
-  if (compressionLevel == 0) isChunked = false;
-  else isChunked = true;
-
   try {
     hdfVar = parentGroup.hdfGroup.addVariable(
       varName,
       dtype,
       stgFieldLen,          // max stg len, including null termination
       dimLens,              // dimension lengths
+      chunkLens,
       hdfFillValue,
-      isChunked,
       compressionLevel);
   }
   catch( HdfException exc) {
@@ -460,11 +456,16 @@ throws NhException
  * See {@link HdfGroup#addVariable} for documentation on the legal
  * types of rawData.
  * <p>
+ * @param startIxs  The indices of the starting point (lower left corner)
+ *    of the hyperslab to be written.  For contiguous storage,
+ *    startIxs should be all zeros.
+ *    Must have startIxs.length == varDims.length.
  * @param rawData the data array or Object (for a scalar variable)
  *  to be written.
  */
 
 public void writeData(
+  int[] startIxs,
   Object rawData)
 throws NhException
 {
@@ -488,7 +489,7 @@ throws NhException
     vdata = convertCharsToStrings( dimLens, rawData, nhFile.bugs);
   else vdata = rawData;
 
-  try { hdfVar.writeData( vdata); }
+  try { hdfVar.writeData( startIxs, vdata); }
   catch( HdfException exc) {
     exc.printStackTrace();
     throwerr("caught: " + exc);

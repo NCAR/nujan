@@ -338,6 +338,12 @@ throws NhException
  * @param nhType The type of the new variable: one of NhVariable.TP_*.
  * @param nhDims The dimensions of the data array for the variable.
  *    A scalar variable is represented by nhDims = new int[0].
+ * @param chunkLens len of each side of a chunk hyperslab.
+ *        Must have chunkLens.length == nhDims.length.
+ *        If chunkLens == null use contiguous storage.
+ *        If chunkLens == nhDims values,
+ *          use chunked storage with just one chunk.
+ *        If nhDims == null or nhDims.length == 0, chunkLens must be null.
  * @param fillValue The fill value.  The type must agree with nhType
  *    as shown in the table above.
  * @param compressionLevel  Desired level of compression.  0 is no
@@ -350,6 +356,7 @@ public NhVariable addVariable(
   String varName,
   int nhType,
   NhDimension[] nhDims,
+  int[] chunkLens,
   Object fillValue,
   int compressionLevel)      // 0: no compression;  9: max compression
 throws NhException
@@ -386,6 +393,7 @@ throws NhException
     varName,
     nhType,
     nhDims,
+    chunkLens,
     fillValue,
     compressionLevel,
     this,

@@ -96,11 +96,13 @@ throws NhException
   // Variables may be added to any group.
   Double fillValue = new Double( -999999);
   int compressLevel = 0;        // compression level: 0==none, 1 - 9
+  int[] chunkLens = null;
 
   NhVariable humidityVar = northernGroup.addVariable(
     "humidity",                 // varName
     NhVariable.TP_DOUBLE,       // nhType
     nhDims,                     // varDims
+    chunkLens,
     fillValue,
     compressLevel);
 
@@ -122,7 +124,8 @@ throws NhException
     { 31, 32, 33, 34, 35}
   };
 
-  humidityVar.writeData( testData);
+  int[] startIxs = null;
+  humidityVar.writeData( startIxs, testData);
 
   hfile.close();
 

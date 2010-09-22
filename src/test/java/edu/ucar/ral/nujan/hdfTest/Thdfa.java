@@ -228,8 +228,11 @@ throws HdfException
 
   hfile.endDefine();
 
+  int[] startIxs;
+  if (useChunked) startIxs = new int[dims.length];
+  else startIxs = null;
   for (int ivar = 0; ivar < numVar; ivar++) {
-    testVars[ivar].writeData( vdata);
+    testVars[ivar].writeData( startIxs, vdata);
   }
 
   hfile.close();
@@ -259,13 +262,16 @@ throws HdfException
 {
   int rank = dims.length;
 
+  int[] chunkLens;
+  if (useChunked) chunkLens = dims;
+  else chunkLens = null;
   HdfGroup vara = parentGroup.addVariable(
     varName,                   // varName
     dtype,                     // dtype
     stgFieldLen,               // string length, without null termination
     dims,                      // varDims
+    chunkLens,
     fillValue,
-    useChunked,                // isChunked
     compressLevel);            // compressionLevel
 
   int numAttr = 2;

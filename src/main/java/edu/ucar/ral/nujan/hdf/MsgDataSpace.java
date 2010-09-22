@@ -66,35 +66,27 @@ long[] dimPermuations;
 
 
 /**
+ * @param rank Dimensionality == varDims.length == chunkDims.length
+ * @param totNumEle Total num elements, calculated from varDims
  * @param varDims The length of each dimension.
  * @param hdfGroup The owning HdfGroup.
  * @param hdfFile The global owning HdfFileWriter.
  */
 
 MsgDataSpace(
+  int rank,
+  long totNumEle,
   int[] varDims,
   HdfGroup hdfGroup,                    // the owning group
   HdfFileWriter hdfFile)
 {
   super( TP_DATASPACE, hdfGroup, hdfFile);
-  if (varDims == null) {
-    this.varDims = null;
-    rank = 0;
-    totNumEle = 0;
-  }
-  else {
-    this.varDims = Arrays.copyOf( varDims, varDims.length);
-    rank = varDims.length;
-    if (varDims.length == 0) {
-      totNumEle = 0;
-    }
-    else {
-      totNumEle = 1;
-      for (int ii : varDims) {
-        totNumEle *= ii;
-      }
-    }
-  }
+  this.rank = rank;
+  this.totNumEle = totNumEle;
+
+  if (varDims == null) this.varDims = null;
+  else this.varDims = Arrays.copyOf( varDims, varDims.length);
+
   this.dimMaxSizes = this.varDims;
   if (hdfFile.bugs >= 5) prtf("MsgDataSpace: " + this);
 }

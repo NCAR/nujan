@@ -349,10 +349,12 @@ throws NhException
     }
   }
 
+  int[] chunkLens = null;
   NhVariable outVar = outGroup.addVariable(
     inVar.getShortName(),
     nhType,
     nhDims,
+    chunkLens,
     fillValue,
     compressionLevel);
 
@@ -508,7 +510,8 @@ throws NhException
 
   Object rawData = decodeArray( arr, bugs);
 
-  nhVar.writeData( rawData);
+  int[] startIxs = null;
+  nhVar.writeData( startIxs, rawData);
 }
 
 

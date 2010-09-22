@@ -159,6 +159,38 @@ HdfGroup parentGroup;
 int stgFieldLen;
 
 /**
+ * Dimensions for this variable.  varDims may be null
+ *        or may have length 0 in odd cases where a variable has
+ *        no data.  For example a variable may have attributes
+ *        without data.  If varDims is null or length 0, must have
+ *        chunkDims==null and compressionLevel==0.
+ */
+int[] varDims;
+
+/**
+ * Len of each side of a chunk hyperslab.
+ *        Must have chunkDims.length == varDims.length,
+ *        or null if using contiguous storage.
+ */
+int[] chunkDims;
+
+/**
+ * rank == dimensionality == varDims.length == chunkDims.length
+ */
+int rank;
+
+/**
+ * total num elements, calculated from varDims
+ */
+long totNumEle;
+
+/**
+ * Element length in bytes.
+ */
+int elementLen;
+
+
+/**
  * Zip compression level: 0==Uncompressed; 1 - 9 are increasing compression.
  */
 int compressionLevel;
@@ -177,25 +209,19 @@ int dtype;                       // one of DTYPE*
 
 
 /**
- * When isVariable==true,
- * the offset in the output file (HdfFileWriter.outStream)
- * of the raw data for this variable.
+ * totChunkNums = number of chunks represented by any level
+ * of the startIxs indices, so in calcChunkIxs we can do ...
+ *   ichunk = sum( startIxs[ii] * totChunkNums[ii]);
  */
-long rawDataAddr;
+int[] totChunkNums;
+
 
 /**
- * When isVariable==true,
- * the length (in bytes) in the output file (HdfFileWriter.outStream)
- * of the raw data for this variable.
+ * Description of each chunk, or if contiguous, the contiguous area.
+ * For a multidimensional array the chunks are put in a linear
+ * array, with the last dimension varying the fastest.
  */
-long rawDataSize;
-
-/**
- * When isVariable==true,
- * has this variable been written?  That is,
- * did the client call writeData?
- */
-boolean isWritten = false;
+HdfChunk[] hdfChunks;
 
 int linkCreationOrder = 0;
 
@@ -260,7 +286,12 @@ throws HdfException
  *        or may have length 0 in odd cases where a variable has
  *        no data.  For example a variable may have attributes
  *        without data.  If varDims is null or length 0, must have
- *        isChunked==false and compressionLevel==0.
+ *        chunkDims==null and compressionLevel==0.
+ * @param chunkDims len of each side of a chunk hyperslab.
+ *        Must have chunkDims.length == varDims.length.
+ *        If chunkDims == null use contiguous storage.
+ *        If chunkDims == varDims, use chunked storage with just one chunk.
+ *        If varDims == null or varDims.length == 0, chunkDims must be null.
  * @param fillValue Fill value of appropriate type for this variable.
  *        May be null.
  *        <p>
@@ -278,10 +309,8 @@ throws HdfException
  * </table>
  *        <p>
  *
- * @param isChunked If false, use contiguous data storage;
- *        if true use chunked.
  * @param compressionLevel Zip compression level:
- *        0==Uncompressed; 1 - 9 are increasing compression.
+ *        0 is uncompressed; 1 - 9 are increasing compression.
  * @param hdfFile The global owning HdfFileWriter.
  */
 
@@ -299,9 +328,9 @@ HdfGroup(
                              // including DTYPE_STRING_VAR.
 
   int[] varDims,
+  int[] chunkDims,
   Object fillValue,          // null, Byte, Short, Int, Long,
                              // Float, Double, String, etc.
-  boolean isChunked,
   int compressionLevel,      // Zip compression level: 0==Uncompressed;
                              // 1 - 9 are increasing compression.
   HdfFileWriter hdfFile)
@@ -317,32 +346,170 @@ throws HdfException
 
   if (hdfFile.bugs >= 1) {
     prtf("HdfGroup: new dataset at path: \"" + getPath() + "\""
-      + "  type: " + HdfUtil.formatDtypeDim( dtype, varDims));
+      + "  type: " + HdfUtil.formatDtypeDim( dtype, varDims)
+      + "  chunkDims: " + HdfUtil.formatInts( chunkDims));
   }
   HdfUtil.checkName( groupName,
     "dataset in group \"" + parentGroup.groupName + "\"");
 
+
+  if (varDims == null) this.varDims = null;
+  else this.varDims = Arrays.copyOf( varDims, varDims.length);
+
+  // Set up chunkDims.
+
+  int layoutClass;
+  if (chunkDims == null) {
+    layoutClass = MsgLayout.LY_CONTIGUOUS;
+    this.chunkDims = null;
+  }
+  else {
+    layoutClass = MsgLayout.LY_CHUNKED;
+    this.chunkDims = Arrays.copyOf( chunkDims, chunkDims.length);
+  }
+
+
   if (varDims == null) {
-    if (isChunked) throwerr("cannot use chunked with null data");
+    if (chunkDims != null)
+      throwerr("varDims == null but chunkDims != null");
     if (compressionLevel > 0)
       throwerr("cannot use compression with null data");
   }
   else if (varDims.length == 0) {
-    if (isChunked) throwerr("cannot use chunked with scalar data");
+    if (chunkDims != null)
+      throwerr("varDims len == 0 but chunkDims != null");
     if (compressionLevel > 0)
       throwerr("cannot use compression with scalar data");
   }
-  if (compressionLevel > 0 && ! isChunked) {
-    throwerr("if compressed, must use chunked");
+  else {
+    this.varDims = Arrays.copyOf( varDims, varDims.length);
   }
 
+  // Set rank
+  rank = 0;
+  if (varDims != null) rank = varDims.length;
+
+  // Set totNumEle
+  if (varDims == null) {
+    totNumEle = 0;
+  }
+  else {
+    if (varDims.length == 0) totNumEle = 0;
+    else {
+      totNumEle = 1;
+      for (int ii : varDims) {
+        totNumEle *= ii;
+      }
+    }
+  }
+  if (hdfFile.bugs >= 1)
+    prtf("HdfGroup: rank: %d  totNumEle: %d", rank, totNumEle);
+
+
+  if (chunkDims != null) {
+    if (chunkDims.length != varDims.length)
+      throwerr("chunkDims len != varDims len");
+    for (int ii = 0; ii < rank; ii++) {
+      if (chunkDims[ii] <= 0) throwerr("invalid chunkDims");
+      if (chunkDims[ii] > varDims[ii]) throwerr("chunkDims > varDims");
+    }
+  }
+
+  if (compressionLevel > 0 && layoutClass != MsgLayout.LY_CHUNKED)
+    throwerr("if compressed, must use chunked");
+
+
+
+  // Calc numDimChunks = num chunks in each dimension,
+  //   which is varDims[ii] / chunkDims[ii], round up.
+  // Calc totNumChunks = total number of chunks = product of numDimChunks[*].
+  // If contiguous, we have one chunk.
+
+  int[] numDimChunks = new int[rank];
+  int totNumChunks = 1;
+  for (int ii = 0; ii < rank; ii++) {
+    if (chunkDims == null) numDimChunks[ii] = 1;
+    else {
+      numDimChunks[ii] = varDims[ii] / chunkDims[ii];
+      if (numDimChunks[ii] * chunkDims[ii] != varDims[ii])
+        numDimChunks[ii]++;
+    }
+    totNumChunks *= numDimChunks[ii];
+    if (hdfFile.bugs >= 1) prtf("HdfGroup: %s: numDimChunks[%d]: %d",
+      getPath(), ii, numDimChunks[ii]);
+  }
+  if (hdfFile.bugs >= 1) prtf("HdfGroup: %s: totNumChunks: %d",
+    getPath(), totNumChunks);
+
+  // Calc totChunkNums = number of chunks represented by any level
+  // of the startIxs indices, so in calcChunkIxs we can do ...
+  //   ichunk = sum( (startIxs[ii]/chunkDims[ii]) * totChunkNums[ii]);
+
+  totChunkNums = new int[rank];
+  if (rank > 0) {
+    totChunkNums[rank - 1] = 1;
+    for (int ii = rank - 2; ii >= 0; ii--) {
+      totChunkNums[ii] = numDimChunks[ii+1] * totChunkNums[ii+1];
+      if (hdfFile.bugs >= 1) prtf("HdfGroup: %s: totChunkNums[%d]: %d",
+        getPath(), ii, totChunkNums[ii]);
+    }
+  }
+
+  // Initialize chunks.
+  // We keep chunks in a LINEAR array for ease of use later.
+
+
+
+
+  hdfChunks = new HdfChunk[ totNumChunks];
+  int[] startIxs = new int[rank];
+  if (chunkDims == null) {
+    hdfChunks[0] = new HdfChunk( startIxs, varDims);
+  }
+  else {
+    for (int ichunk = 0; ichunk < totNumChunks; ichunk++) {
+      if (hdfFile.bugs >= 1)
+        prtf("HdfGroup: %s: ichunk: %d  calcChunkIx: %d  startIxs: %s",
+          getPath(), ichunk, calcChunkIx( startIxs),
+          HdfUtil.formatInts( startIxs));
+      if (calcChunkIx( startIxs) != ichunk) throwerr("calcChunkIx error");
+
+      // Set userDims = chunkDims, but the edge chunks
+      // in a dimension ii may be shorter if varDims[ii]
+      // is not a multiple of chunkDims[ii].
+
+      int[] userDims = new int[rank];
+      for (int ii = 0; ii < rank; ii++) {
+        if (chunkDims == null) userDims[ii] = varDims[ii];
+        else {
+          userDims[ii] = Math.min(
+            chunkDims[ii],
+            varDims[ii] - startIxs[ii]);
+        }
+      }
+      if (hdfFile.bugs >= 1)
+        prtf("HdfGroup: %s: ichunk: %d  userDims: %s",
+          getPath(), ichunk, HdfUtil.formatInts( userDims));
+
+      hdfChunks[ichunk] = new HdfChunk( startIxs, userDims);
+
+      // Increment startIxs
+      for (int ii = rank - 1; ii >= 0; ii--) {
+        startIxs[ii] += chunkDims[ii];
+        if (startIxs[ii] < varDims[ii]) break;
+        startIxs[ii] = 0;
+      }
+    }
+  } // else chunkDims != null
+
+  // Initialize various messages
   msgDataType = new MsgDataType(
     dtype, dsubTypes, subNames, stgFieldLen, this, hdfFile);
+  elementLen = msgDataType.elementLen;
 
-  msgDataSpace = new MsgDataSpace( varDims, this, hdfFile);
+  msgDataSpace = new MsgDataSpace( rank, totNumEle, varDims, this, hdfFile);
 
-  int layoutClass = MsgLayout.LY_CONTIGUOUS;
-  if (isChunked) layoutClass = MsgLayout.LY_CHUNKED;
+
   msgLayout = new MsgLayout( layoutClass, compressionLevel, this, hdfFile);
 
   boolean isFillExtant = false;
@@ -371,7 +538,7 @@ throws HdfException
 
   msgAttrInfo = new MsgAttrInfo( this, hdfFile);
   hdrMsgList.add( msgAttrInfo);
-}
+} // end constructor for variables
 
 
 
@@ -418,7 +585,12 @@ throws HdfException
  *        or may have length 0 in odd cases where a variable has
  *        no data.  For example a variable may have attributes
  *        without data.  If varDims is null or length 0, must have
- *        isChunked==false and compressionLevel==0.
+ *        chunkDims==null and compressionLevel==0.
+ * @param chunkDims len of each side of a chunk hyperslab.
+ *        Must have chunkDims.length == varDims.length.
+ *        If chunkDims == null use contiguous storage.
+ *        If chunkDims == varDims, use chunked storage with just one chunk.
+ *        If varDims == null or varDims.length == 0, chunkDims must be null.
  * @param fillValue Fill value of appropriate type for this variable.
  *        May be null.
  *        <p>
@@ -436,8 +608,6 @@ throws HdfException
  * </table>
  *        <p>
  *
- * @param isChunked If false, use contiguous data storage;
- *        if true use chunked.
  * @param compressionLevel Zip compression level:
  *        0==Uncompressed; 1 - 9 are increasing compression.
  */
@@ -451,8 +621,8 @@ public HdfGroup addVariable(
                              // including DTYPE_STRING_VAR.
 
   int[] varDims,             // dimension lengths
+  int[] chunkDims,
   Object fillValue,          // fill value or null
-  boolean isChunked,
   int compressionLevel)
 throws HdfException
 {
@@ -479,14 +649,14 @@ throws HdfException
     subNames,
     stgFieldLen,
     varDims,
+    chunkDims,
     fillValue,
-    isChunked,
     compressionLevel,
     hdfFile);
 
   addSubGroup( var);
   return var;
-} // endVariable
+} // end addVariable
 
 
 
@@ -570,7 +740,7 @@ throws HdfException
         attrType, msgAttr.dataVarDims) + "\n"
       + "  isVlen: " + isVlen);
   }
-}
+} // end addAttribute
 
 
 
@@ -740,13 +910,19 @@ int getNumAttribute()
  * </table>
  *        <p>
  *
+ * @param startIxs  The indices of the starting point (lower left corner)
+ *    of the hyperslab to be written.  For contiguous storage,
+ *    startIxs should be all zeros.
+ *    Must have startIxs.length == varDims.length.
  * @param vdata  The data to be written.
  */
 
-public void writeData( Object vdata)
+public void writeData(
+  int[] startIxs,
+  Object vdata)
 throws HdfException
 {
-  try { writeDataSub( vdata); }
+  try { writeDataSub( startIxs, vdata); }
   catch( IOException exc) {
     exc.printStackTrace();
     throwerr("caught: %s", exc);
@@ -754,58 +930,92 @@ throws HdfException
 }
 
 
+
+
+
+
+
+
+
 /**
  * Implements writeData: for doc, see {@link #writeData}.
  */
 
-void writeDataSub( Object vdata)
+void writeDataSub(
+  int[] startIxs,
+  Object vdata)
 throws HdfException, IOException
 {
+  hdfFile.outChannel.position( HdfUtil.alignLong( 8, hdfFile.eofAddr));
+
   if (hdfFile.bugs >= 1) {
-    prtf("HdfGroup.writeData entry: group: " + getPath() + "\n"
+    prtf("HdfGroup.writeData entry: path: " + getPath() + "\n"
       + "  specified type: "
-      + HdfUtil.formatDtypeDim( dtype, msgDataSpace.varDims) + "\n"
-      + "  eofAddr: %d", hdfFile.eofAddr);
+      + HdfUtil.formatDtypeDim( dtype, varDims) + "\n"
+      + "  eofAddr: " + hdfFile.eofAddr
+      + "  new pos: " + hdfFile.outChannel.position()
+      + "  startIxs: " + HdfUtil.formatInts( startIxs));
   }
 
   if (hdfFile.fileStatus != HdfFileWriter.ST_WRITEDATA)
     throwerr("must call endDefine first");
   if (! isVariable) throwerr("cannot write data to a group");
-  if (isWritten) throwerr("variable has already been written: ", getPath());
-  isWritten = true;
 
   // Find dtype and varDims of vdata
   // Use isVlen==false: variable length data arrays are not supported,
   // although variable length attributes are.
   int[] dataInfo = HdfUtil.getDimLen( vdata, false);
   int dataDtype = dataInfo[0];
-  int totNumEle = dataInfo[1];
-  int elementLen = dataInfo[2];
-  int[] dataVarDims = Arrays.copyOfRange( dataInfo, 3, dataInfo.length);
+  int dataTotNumEle = dataInfo[1];
+  int dataElementLen = dataInfo[2];
+  int[] dataDims = Arrays.copyOfRange( dataInfo, 3, dataInfo.length);
 
   if (hdfFile.bugs >= 1) {
     prtf("HdfGroup.writeData: actual data:" + "\n"
       + "  vdata object: " + vdata + "\n"
       + "  vdata class: " + vdata.getClass() + "\n"
-      + "  vdata dtype: " + dtypeNames[ dataDtype] + "\n"
-      + "  vdata totNumEle: " + totNumEle + "\n"
-      + "  vdata rank: " + dataVarDims.length + "\n"
+      + "  dtype:  declared: " + dtypeNames[ dtype]
+        + "  actual: " + dtypeNames[ dataDtype] + "\n"
+      + "  totNumEle:  declared: " + totNumEle
+        + "  actual: " + dataTotNumEle + "\n"
+      + "  elementLen:  declared: " + elementLen
+        + "  actual: " + dataElementLen + "\n"
+      + "  rank:  declared: " + rank
+        + "  actual: " + dataDims.length + "\n"
       + "  vdata type and dims: "
-      + HdfUtil.formatDtypeDim( dataDtype, dataVarDims));
+      + HdfUtil.formatDtypeDim( dataDtype, dataDims));
   }
 
-  // Check that dtype and varDims match what the user
-  // declared in the earlier addVariable call.
-  HdfUtil.checkTypeMatch( getPath(), msgDataType.dtype, dataDtype,
-    msgDataSpace.varDims, dataVarDims);
+  // Find the chunk
+  int ichunk = 0;
+  if (startIxs == null) {
+    if (chunkDims != null) throwerr("startIxs == null but chunkDims != null");
+    ichunk = 0;
+  }
+  else {
+    if (chunkDims == null) throwerr("startIxs != null but chunkDims == null");
+    ichunk = calcChunkIx( startIxs);
+  }
 
-  rawDataAddr = HdfUtil.alignLong( 8, hdfFile.eofAddr);
-  hdfFile.outChannel.position( rawDataAddr);
+  HdfChunk chunk = hdfChunks[ichunk];
+  if (hdfFile.bugs >= 1) {
+    prtf("HdfGroup.writeData: ichunk: %d  chunk: %s", ichunk, chunk);
+  }
+
+  // Check that dtype and dataDims match what the user
+  // declared in the earlier addVariable call.
+
+  HdfUtil.checkTypeMatch( getPath(), dtype, dataDtype,
+    chunk.chunkUserDims, dataDims);
+
+  if (chunk.chunkDataAddr != 0)
+    throwerr("chunk has already been written.  path: %s  startIxs: %s",
+      getPath(), HdfUtil.formatInts( chunk.chunkStartIxs));
 
   // As outbuf fills, it gets written to outChannel.
   HBuffer outbuf = new HBuffer( hdfFile.outChannel, compressionLevel, hdfFile);
 
-  if (msgDataType.dtype == HdfGroup.DTYPE_VLEN)
+  if (dtype == HdfGroup.DTYPE_VLEN)
     throwerr("DTYPE_VLEN datasets are not supported");
 
   // Format and the data to outbuf and write to outChannel.
@@ -828,12 +1038,13 @@ throws HdfException, IOException
     //       There is a separate gcol for each DTYPE_STRING_VAR variable.
     //       The term "global heap" is a misnomer.
     //   2.  A list of references to the GCOL entries.
-    //       The variables rawDataAddr, rawDataSize refer to this
+    //       The variables chunkDataAddr, chunkDataSize refer to this
     //       list of references.
 
     GlobalHeap gcol = new GlobalHeap( hdfFile);
     HBuffer refBuf = new HBuffer( null, compressionLevel, hdfFile);
     long gcolAddr = hdfFile.outChannel.position();
+    prtf("xxxxxx testcc: gcolAddr: " + gcolAddr);
 
     formatRawData(
       dtype,
@@ -849,58 +1060,98 @@ throws HdfException, IOException
       prtf("  writeDataSub.STRING_VAR: refBuf: %s", refBuf);
     }
 
+    // Write gcol to outChannel
     gcol.formatBuf( 0, outbuf);       // formatPass = 0
     outbuf.flush();                   // write remaining data to outChannel
 
-    rawDataAddr = HdfUtil.alignLong( 8, hdfFile.outChannel.position());
-    hdfFile.outChannel.position( rawDataAddr);
+    // Save addr; write refBuf to outChannel
+    chunk.chunkDataAddr = HdfUtil.alignLong( 8, hdfFile.outChannel.position());
+    hdfFile.outChannel.position( chunk.chunkDataAddr);
 
     refBuf.writeChannel( hdfFile.outChannel);
-    long endPos = hdfFile.outChannel.position();
-    rawDataSize = endPos - rawDataAddr;
   }
 
-  else {          // else not DTYPE_STRING_VAR
+  else {                   // else not DTYPE_STRING_VAR
+    chunk.chunkDataAddr = HdfUtil.alignLong( 8, hdfFile.eofAddr);
+    hdfFile.outChannel.position( chunk.chunkDataAddr);
+
     formatRawData(
       dtype,
       stgFieldLen,
       vdata,
       new HdfModInt(0),
-      -1,               // gcolAddr for DTYPE_STRING_VAR
-      null,             // gcol for DTYPE_STRING_VAR
+      -1,                  // gcolAddr for DTYPE_STRING_VAR
+      null,                // gcol for DTYPE_STRING_VAR
       outbuf);
 
     outbuf.flush();        // write remaining data to outChannel
+  }
 
-    long endPos = hdfFile.outChannel.position();
+  // Set chunk.chunkDataSize.
+  // For non-compressed numeric data we could use something like ...
+  //   chunkDataSize = elementLen;
+  //   for (int ii = 0; ii < rank; ii++) {
+  //     chunkDataSize *= chunk.chunkUserDims[ii];
+  //   }
+  //
+  // However compressed data can be any length,
+  // so we just use the output length.
 
-    // Set rawDataSize
-    // For non-compressed data we could use something like ...
-    //   rawDataSize = msgDataType.elementLen;
-    //   for (int ii = 0; ii < msgDataSpace.varDims.length; ii++) {
-    //     long isize = msgDataSpace.varDims[ii];
-    //     if (hdfFile.bugs >= 5) prtf("  dimension %d len: %d", ii, isize);
-    //     rawDataSize *= isize;
-    //   }
-    //
-    // However compressed data can be any length,
-    // so we just use the output length.
+  long endPos = hdfFile.outChannel.position();
+  chunk.chunkDataSize = endPos - chunk.chunkDataAddr;
 
-    rawDataSize = endPos - rawDataAddr;
-
-    if (hdfFile.bugs >= 5) {
-      prtf("HdfGroup.writeData: rawDataAddr: %d  endPos: %d  rawDataSize: %d",
-        rawDataAddr, endPos, rawDataSize);
-      prtf("HdfGroup.writeData: old eofAddr: %d", hdfFile.eofAddr);
-    }
+  if (hdfFile.bugs >= 2) {
+    prtf("HdfGroup.writeData exit: path: " + getPath());
+    prtf("  chunkDataAddr: %d  endPos: %d  chunkDataSize: %d",
+      chunk.chunkDataAddr, endPos, chunk.chunkDataSize);
+    prtf("  old eofAddr: %d", hdfFile.eofAddr);
   }
 
   hdfFile.eofAddr = hdfFile.outChannel.position();
-  if (hdfFile.bugs >= 2)
-    prtf("HdfGroup.writeData.end: new eofAddr: %d", hdfFile.eofAddr);
+
+  if (hdfFile.bugs >= 2) {
+    prtf("  new eofAddr: %d", hdfFile.eofAddr);
+  }
 
 } // end writeDataSub
 
+
+
+
+
+
+/**
+ * Given starting indices, returns the index of the
+ * appropriate chunk in hdfChunks.
+ * Also checks for startIxs validity.
+ */
+
+int calcChunkIx( int[] startIxs)
+throws HdfException
+{
+  int ichunk = 0;
+  for (int ii = 0; ii < rank; ii++) {
+    if (startIxs[ii] < 0)
+      throwerr("startIxs[%d] == %d is < 0: %d", ii, startIxs[ii]);
+    if (startIxs[ii] >= varDims[ii])
+      throwerr("startIxs[%d] == %d is >= varDims[%d] == %d",
+        ii, startIxs[ii], ii, varDims[ii]);
+    if (chunkDims == null) {
+      if (startIxs[ii] != 0) throwerr("startIxs != 0 for chunkDims == null");
+    }
+    else {
+      if (startIxs[ii] % chunkDims[ii] != 0)
+        throwerr("startIxs[%d] == %d is not a multiple of chunkDims[%d] == %d",
+          ii, startIxs[ii], ii, chunkDims[ii]);
+      ichunk += (startIxs[ii] / chunkDims[ii]) * totChunkNums[ii];
+    }
+  }
+  prtf("xxx calcChunkIx: startIxs: %s", HdfUtil.formatInts( startIxs));
+  prtf("xxx calcChunkIx: totChunkNums: %s", HdfUtil.formatInts( totChunkNums));
+  prtf("xxx calcChunkIx: ichunk: %d", ichunk);
+  if (ichunk < 0 || ichunk >= hdfChunks.length) throwerr("invalid ichunk");
+  return ichunk;
+}
 
 
 
@@ -1123,14 +1374,14 @@ throws HdfException
  *   <li> String (scalar),    String[],    [][],  [][][],  etc.
  *   <li> HdfGroup (scalar),  HdfGroup[],  [][],  [][][],  etc.  (reference)
  * </ul>
- *
+ * <p>
  * The scalar types (Short, Integer, Float, etc)
  * and the 1 dimensional types (short[], int[], float[], etc)
  * are handled explicitly below.
- *
+ * <p>
  * The higher dimension types, [][], [][][], etc, are handled
  * by recursive calls in the test: if vdata instanceof Object[].
- *
+ * <p>
  * String[] is handled recursively as Object[], then as scalar String.
  * Similarly for HdfGroup[].
  */
