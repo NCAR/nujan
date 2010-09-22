@@ -50,12 +50,6 @@ import java.util.ArrayList;
 class BtreeNode extends BaseBlk {
 
 
-/**
- * List of our children (numKid of them).
- */
-ArrayList<BtreeNode> subNodeList = null;
-
-
 HdfGroup hdfGroup;
 
 ArrayList<byte[]> keyList;
@@ -68,7 +62,6 @@ final int signc = 'E';
 final int signd = 'E';
 
 int nodeLevel;
-int numKid;                // num children of this node
 
 
 
@@ -95,7 +88,6 @@ BtreeNode(
   super("BtreeNode", hdfFile);
   this.compressionLevel = compressionLevel;
   this.hdfGroup = hdfGroup;
-  numKid = 1;                // num Btree entries used
 }
 
 
@@ -106,7 +98,6 @@ BtreeNode(
 public String toString() {
   String res = super.toString();
   res += "  nodeLevel: " + nodeLevel;
-  res += "  numKid: " + numKid;
   res += "  group: \"" + hdfGroup.groupName + "\"";
   return res;
 }
@@ -123,8 +114,9 @@ public String toString() {
  *
  * <pre>
  * The formatted output is always the same, the fileVersion==1 format.
- * Oddly fileVersion==2 only uses Btrees for the chunked data,
- * but requires fileVersion==1 Btrees for data chunks.
+ * Oddly fileVersion==2 only uses Btrees for the chunked data
+ * (not for group names), but still requires fileVersion==1 Btrees
+ * for data chunks.
  *
  * We must format all the entries to fill out the btree node,
  * even if some are empty.
@@ -195,26 +187,6 @@ public String toString() {
 
 
 
-// xxx
-// chunkDim = 0 or whatever
-// chunkLen = rawDataSize / dimSize, round up to mult of 8
-// chunkAddr = rawDataAddr
-// for ii = 0; < dimSize
-//   format initial key
-// xxx
-// 
-// chunkAddr = rawDataAddr
-// chunkDelta = chunks[ndim-1] * elementLen, round up.
-// 
-// for (dim0 = 0; dim0 < dims[0]; dim0 += chunks[0]) {
-//   for (dim1 = 0; dim1 < dims[1]; dim1 += chunks[1]) {
-//     write key: [dim0, dim1]
-//     write chunkAddr
-//     chunkAddr += chunkDelta;
-// 
-//   }
-// }
-
 
 
 
@@ -232,7 +204,7 @@ throws HdfException
 
   fmtBuf.putBufByte("BtreeNode: nodeType", 1);   // data node
   fmtBuf.putBufByte("BtreeNode: nodeLevel", nodeLevel);
-  fmtBuf.putBufShort("BtreeNode: numKid", numKid);
+  fmtBuf.putBufShort("BtreeNode: numChunk", hdfGroup.hdfChunks.length);
 
   fmtBuf.putBufLong("BtreeNode: leftSibling.pos",
     HdfFileWriter.UNDEFINED_ADDR);
@@ -240,35 +212,33 @@ throws HdfException
   fmtBuf.putBufLong("BtreeNode: rightSibling.pos",
     HdfFileWriter.UNDEFINED_ADDR);
 
-  // Calc a safe k_value for empty padding.
-  // See doc at method start.
-  int safe_k_value = 128;     // >= HDF5_BTREE_CHUNK_IK_DEF == 32
 
   // Only one format, since fileVersion==2 uses fileVersion==1 format.
 
-  // Format the initial key.
-  // Caution: the HDF5 "standard" uses only an int for chunkSize.
-  fmtBuf.putBufInt("BtreeNode: key chunkSize",
-    (int) hdfGroup.rawDataSize);     // convert long to int for chunkSize
-
   // Turn on bit i to skip filter i.
-  int mask = 0;                      // use all filters
+  int filterMask = 0;                      // use all filters
 
-  fmtBuf.putBufInt("BtreeNode: key mask", mask);
-  for (int ii = 0; ii < hdfGroup.msgDataSpace.rank; ii++) {
-    fmtBuf.putBufLong("BtreeNode: key dimOffset", 0);
+  // For each chunk, format: chunkSize, key, diskAddr
+  for (int ichunk = 0; ichunk < hdfGroup.hdfChunks.length; ichunk++) {
+    HdfChunk chunk = hdfGroup.hdfChunks[ichunk];
+
+    fmtBuf.putBufInt("BtreeNode: chunkSize",
+      (int) chunk.chunkDataSize);     // xxx convert long to int
+    fmtBuf.putBufInt("BtreeNode: key filterMask", filterMask);
+    for (int ii = 0; ii < hdfGroup.rank; ii++) {
+      fmtBuf.putBufLong("BtreeNode: key startIx", chunk.chunkStartIxs[ii]);
+    }
+    fmtBuf.putBufLong("BtreeNode: key eleLen offset", 0);
+
+    // Format the child pointer
+    fmtBuf.putBufLong("BtreeNode: chunk addr", chunk.chunkDataAddr);
   }
-  fmtBuf.putBufLong("BtreeNode: key eleLen offset", 0);
-
-  // Format the child pointer
-  fmtBuf.putBufLong("BtreeNode: chunk addr", hdfGroup.rawDataAddr);
 
   // Format the final key
   fmtBuf.putBufInt("BtreeNode: final key chunkSize", 0);
-  fmtBuf.putBufInt("BtreeNode: final key mask", 0);
-  for (int jj = 0; jj < hdfGroup.msgDataSpace.rank; jj++) {
-    fmtBuf.putBufLong("BtreeNode: final key dimOffset",
-      hdfGroup.msgDataSpace.varDims[jj]);
+  fmtBuf.putBufInt("BtreeNode: final key filterMask", filterMask);
+  for (int jj = 0; jj < hdfGroup.rank; jj++) {
+    fmtBuf.putBufLong("BtreeNode: final key dimOffset", hdfGroup.varDims[jj]);
   }
   fmtBuf.putBufLong("BtreeNode: final key eleLen offset",
     hdfGroup.msgDataType.elementLen);
@@ -276,18 +246,18 @@ throws HdfException
   // We must format all the entries to fill out the btree node,
   // even if some are empty.
   // See doc at method start.
-
+  int safe_k_value = 128;     // >= HDF5_BTREE_CHUNK_IK_DEF == 32
   for (int ii = 0; ii < 2 * safe_k_value - 1; ii++) {
     // Format the fake child pointer
-    fmtBuf.putBufLong("BtreeNode: fake chunk addr", 0);
+    fmtBuf.putBufLong("BtreeNode: fill chunk addr", 0);
 
-    // Format the fake key
-    fmtBuf.putBufInt("BtreeNode: fake key chunkSize", 0);
-    fmtBuf.putBufInt("BtreeNode: fake key mask", 0);
+    // Format the fill key
+    fmtBuf.putBufInt("BtreeNode: fill key chunkSize", 0);
+    fmtBuf.putBufInt("BtreeNode: fill key mask", 0);
     for (int jj = 0; jj < hdfGroup.msgDataSpace.rank; jj++) {
-      fmtBuf.putBufLong("BtreeNode: fake key dimOffset", 0);
+      fmtBuf.putBufLong("BtreeNode: fill key dimOffset", 0);
     }
-    fmtBuf.putBufLong("BtreeNode: fake key eleLen offset", 0);
+    fmtBuf.putBufLong("BtreeNode: fill key eleLen offset", 0);
   } // for ii
 
 

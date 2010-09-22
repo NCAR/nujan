@@ -77,8 +77,10 @@ throws HdfException
 public String toString() {
   String res = super.toString();
   res += "  layoutClass: " + layoutClass;
-  res += "  grp.rawDataAddr: " + hdfGroup.rawDataAddr;
-  res += "  grp.rawDataSize: " + hdfGroup.rawDataSize;
+  for (HdfChunk chunk : hdfGroup.hdfChunks) {
+    res += "  chunk: addr: " + chunk.chunkDataAddr
+      + " size: " + chunk.chunkDataSize;
+  }
   return res;
 }
 
@@ -105,25 +107,23 @@ throws HdfException
   else if (layoutClass == LY_CONTIGUOUS) {     // if contiguous
     // Data block
     fmtBuf.putBufLong("MsgLayout: contig rawDataAddr",
-      hdfGroup.rawDataAddr);
+      hdfGroup.hdfChunks[0].chunkDataAddr);
     fmtBuf.putBufLong("MsgLayout: contig rawDataSize",
-      hdfGroup.rawDataSize);
+      hdfGroup.hdfChunks[0].chunkDataSize);
   }
   else if (layoutClass == LY_CHUNKED) {     // if chunked
-    int rank = hdfGroup.msgDataSpace.rank;
-    fmtBuf.putBufByte("MsgLayout: chunk rank+1", rank + 1);
+    fmtBuf.putBufByte("MsgLayout: chunk rank+1", hdfGroup.rank + 1);
 
     // External block
     fmtBuf.putBufLong(
       "MsgLayout: chunkBtree.pos", chunkBtree.blkPosition);
     if (formatPass != 0) hdfFile.addWork("MsgLayout", chunkBtree);
 
-    for (int ii = 0; ii < rank; ii++) {
+    for (int ii = 0; ii < hdfGroup.rank; ii++) {
       fmtBuf.putBufInt("MsgLayout: chunk dim",
-        hdfGroup.msgDataSpace.varDims[ii]);
+        hdfGroup.chunkDims[ii]);
     }
-    fmtBuf.putBufInt("MsgLayout: chunk elementLen",
-      hdfGroup.msgDataType.elementLen);
+    fmtBuf.putBufInt("MsgLayout: chunk elementLen", hdfGroup.elementLen);
   }
   else throwerr("unknown layoutClass: %d", layoutClass);
 }

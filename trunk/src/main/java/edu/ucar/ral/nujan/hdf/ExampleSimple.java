@@ -64,38 +64,75 @@ throws Exception
   String fileName = args[1];
 
   int option = HdfFileWriter.OPT_ALLOW_OVERWRITE;
-  HdfFileWriter hdfFile = new HdfFileWriter( fileName, option);
+  //xxxHdfFileWriter hdfFile = new HdfFileWriter( fileName, option);
+  HdfFileWriter hdfFile = new HdfFileWriter( fileName, option, 10, 0);
   HdfGroup rootGroup = hdfFile.getRootGroup();
   int numx = 10;
-  int numy = 5;
-  int[] dims = {numx, numy};         // dimension lengths
-  HdfGroup temperature = rootGroup.addVariable(
-    "temperature",                 // variable name
-    HdfGroup.DTYPE_FLOAT64,        // double precision float
-    0,                             // stgFieldLen
-    dims,                          // dimension lengths
-    new Double(-999999),           // fill value or null
-    false,                         // isChunked
-    0);                            // compression: 0 is none, 9 is max
+  int numy = 10;
+  int[] dims = {numx, numy};      // dimension lengths
 
-  temperature.addAttribute("units", HdfGroup.DTYPE_STRING_FIX, 0,
+  // Add a variable with contiguous storage
+  int[] chunkLens = null;         // chunk lengths (contiguous, not chunked)
+  HdfGroup humidity = rootGroup.addVariable(
+    "humidity",                   // variable name
+    HdfGroup.DTYPE_FLOAT64,       // double precision float
+    0,                            // stgFieldLen
+    dims,                         // dimension lengths
+    chunkLens,                    // chunk lengths
+    new Double(-999999),          // fill value or null
+    0);                           // compression: 0 is none, 9 is max
+
+  // Add an attribute to the variable.
+  humidity.addAttribute("units", HdfGroup.DTYPE_STRING_FIX, 0,
     "celsius", false);
+
+  // Add a variable with chunked storage
+  chunkLens = new int[] {5, 10};  // divide x into 2 sections of 5 each,
+                                  // leave y entire
+  HdfGroup temperature = rootGroup.addVariable(
+    "temperature",                // variable name
+    HdfGroup.DTYPE_FLOAT64,       // double precision float
+    0,                            // stgFieldLen
+    dims,                         // dimension lengths
+    chunkLens,                    // chunk lengths
+    new Double(-999999),          // fill value or null
+    0);                           // compression: 0 is none, 9 is max
 
   // End the definition stage.
   // All groups, variables, and attributes are created before endDefine.
   // All calls to writeData occur after endDefine.
   hdfFile.endDefine();
 
-  // Fill the data array.
-  double[][] data = new double[numx][numy];
+  // Fill the humidityData array.
+  // The type and dimensions must match those declared
+  // in addVariable above.
+  double[][] humidityData = new double[numx][numy];
   for (int ix = 0; ix < numx; ix++) {
     for (int iy = 0; iy < numy; iy++) {
-      data[ix][iy] = 1000 * ix + iy;
+      humidityData[ix][iy] = 100 * ix + iy;
     }
   }
 
-  // Write out the data array
-  temperature.writeData( data);
+  // Fill the temperatureData arrays, one for each chunk.
+  // The size must match the declared CHUNK, not dimension, lengths.
+  double[][] temperatureDataChunk0 = new double[chunkLens[0]][chunkLens[1]];
+  double[][] temperatureDataChunk1 = new double[chunkLens[0]][chunkLens[1]];
+  for (int ix = 0; ix < chunkLens[0]; ix++) {
+    for (int iy = 0; iy < chunkLens[1]; iy++) {
+      temperatureDataChunk0[ix][iy] = 100 * ix + iy + 1000;
+      temperatureDataChunk1[ix][iy] = 100 * ix + iy + 2000;
+    }
+  }
+
+  // Write out the humidityData array in one call.
+  int[] startIxs = null;
+  humidity.writeData( startIxs, humidityData);
+
+  // Write out the temperatureData array in two chunks.
+  startIxs = new int[] {0, 0};
+  temperature.writeData( startIxs, temperatureDataChunk0);
+  startIxs[0] = 5;
+  temperature.writeData( startIxs, temperatureDataChunk1);
 
   hdfFile.close();
 } // end testIt
