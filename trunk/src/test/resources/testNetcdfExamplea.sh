@@ -10,7 +10,7 @@ TESTDIR=.
 H5CHECK=/d1/steves/ftp/hdf5/tdi/bin/h5check
 
 cmd="java -cp ${BUILDDIR} \
-  ${PKGBASE}.hdf.ExampleSimple \
+  ${PKGBASE}.netcdf.NhExamplea \
   -outFile tempa.h5"
 
 if [ "$bugs" != "none" ]; then echo "cmd: $cmd"; fi
