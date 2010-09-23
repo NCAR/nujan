@@ -458,9 +458,6 @@ throws HdfException
   // Initialize chunks.
   // We keep chunks in a LINEAR array for ease of use later.
 
-
-
-
   hdfChunks = new HdfChunk[ totNumChunks];
   int[] startIxs = new int[rank];
   if (chunkDims == null) {
@@ -492,6 +489,10 @@ throws HdfException
           getPath(), ichunk, HdfUtil.formatInts( userDims));
 
       hdfChunks[ichunk] = new HdfChunk( startIxs, userDims);
+      if (hdfFile.bugs >= 1) {
+        prtf("HdfGroup: %s: hdfChunks[%d]: %s",
+          getPath(), ichunk, hdfChunks[ichunk]);
+      }
 
       // Increment startIxs
       for (int ii = rank - 1; ii >= 0; ii--) {
@@ -750,13 +751,11 @@ throws HdfException
 
 
 public String toString() {
-  String res = "HdfGroup: " + getPath()
-    + "  isVariable: " + isVariable + "\n"
-    + "  blkPosition: " + blkPosition + "\n";
+  String res = "path: \"" + getPath() + "\""
+    + "  isVariable: " + isVariable;
   if (isVariable) {
-    res += "  dtype: " + dtypeNames[ dtype] + "\n"
-      + "  msgDataType: " + msgDataType + "\n"
-      + "  msgDataSpace: " + msgDataSpace;
+    res += "  dtype: " + dtypeNames[ dtype]
+      + "  dataSpace: " + msgDataSpace;
   }
   else {
     res += "  subGroupList: (";
@@ -1044,7 +1043,6 @@ throws HdfException, IOException
     GlobalHeap gcol = new GlobalHeap( hdfFile);
     HBuffer refBuf = new HBuffer( null, compressionLevel, hdfFile);
     long gcolAddr = hdfFile.outChannel.position();
-    prtf("xxxxxx testcc: gcolAddr: " + gcolAddr);
 
     formatRawData(
       dtype,
@@ -1146,9 +1144,6 @@ throws HdfException
       ichunk += (startIxs[ii] / chunkDims[ii]) * totChunkNums[ii];
     }
   }
-  prtf("xxx calcChunkIx: startIxs: %s", HdfUtil.formatInts( startIxs));
-  prtf("xxx calcChunkIx: totChunkNums: %s", HdfUtil.formatInts( totChunkNums));
-  prtf("xxx calcChunkIx: ichunk: %d", ichunk);
   if (ichunk < 0 || ichunk >= hdfChunks.length) throwerr("invalid ichunk");
   return ichunk;
 }

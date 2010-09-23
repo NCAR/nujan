@@ -353,6 +353,7 @@ throws NhException
   hfile.endDefine();
 
   int[] startIxs = null;
+  if (compressLevel > 0) startIxs = new int[rank];
   for (int ii = 0; ii < numVar; ii++) {
     testVars[ii].writeData( startIxs, vdata);
   }
@@ -431,6 +432,12 @@ throws NhException
 {
   int rank = nhDims.length;
   int[] chunkLens = null;
+  if (compressLevel > 0) {
+    chunkLens = new int[rank];
+    for (int ii = 0; ii < rank; ii++) {
+      chunkLens[ii] = nhDims[ii].getLength();
+    }
+  }
 
   NhVariable vara = parentGroup.addVariable(
     varName,             // varName

@@ -64,8 +64,9 @@ throws Exception
   String fileName = args[1];
 
   int option = HdfFileWriter.OPT_ALLOW_OVERWRITE;
-  //xxxHdfFileWriter hdfFile = new HdfFileWriter( fileName, option);
-  HdfFileWriter hdfFile = new HdfFileWriter( fileName, option, 10, 0);
+  HdfFileWriter hdfFile = new HdfFileWriter( fileName, option);
+  prtln("hdfFile: " + hdfFile);
+
   HdfGroup rootGroup = hdfFile.getRootGroup();
   int numx = 10;
   int numy = 10;
@@ -81,6 +82,7 @@ throws Exception
     chunkLens,                    // chunk lengths
     new Double(-999999),          // fill value or null
     0);                           // compression: 0 is none, 9 is max
+  prtln("humidity: " + humidity);
 
   // Add an attribute to the variable.
   humidity.addAttribute("units", HdfGroup.DTYPE_STRING_FIX, 0,
@@ -97,6 +99,7 @@ throws Exception
     chunkLens,                    // chunk lengths
     new Double(-999999),          // fill value or null
     0);                           // compression: 0 is none, 9 is max
+  prtln("temperature: " + temperature);
 
   // End the definition stage.
   // All groups, variables, and attributes are created before endDefine.
@@ -135,6 +138,8 @@ throws Exception
   temperature.writeData( startIxs, temperatureDataChunk1);
 
   hdfFile.close();
+  prtln("All done");
+
 } // end testIt
 
 

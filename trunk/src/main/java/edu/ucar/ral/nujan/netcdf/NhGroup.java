@@ -66,6 +66,12 @@ NhGroup(
   NhFileWriter nhFile)
 throws HdfException
 {
+  if (nhFile.bugs >= 1) {
+    String parentName = "(null)";
+    if (parentGroup != null) parentName = parentGroup.getPath();
+    prtf("NhGroup.const: groupName: \"%s\"  parent: \"%s\"  file: \"%s\"",
+      groupName, parentName, nhFile.getPath());
+  }
   this.groupName = groupName;
   this.parentGroup = parentGroup;
   this.nhFile = nhFile;
@@ -80,8 +86,8 @@ throws HdfException
 
 public String toString() {
   String res = String.format(
-    "name: \"%s\"  path: \"%s\"  nSubGrp: %d  nDim: %d  nVar: %d",
-    groupName, getPath(),
+    "path: \"%s\"  numSubGrp: %d  numDim: %d  numVar: %d",
+    getPath(),
     subGroupList.size(),
     dimensionList.size(),
     variableList.size());
@@ -261,8 +267,8 @@ public NhGroup addGroup(
 throws NhException
 {
   if (nhFile.bugs >= 1) {
-    prtf("NhGroup.addGroup: group: \"" + groupName + "\""
-      + "  subGroup: \"" + subName + "\"");
+    prtf("NhGroup.addGroup: this: \"%s\"  subName: \"%s\"  file: \"%s\"",
+      getPath(), subName, nhFile.getPath());
   }
   checkName( subName, "subGroup in group \"" + groupName + "\"");
   NhGroup subGrp = null;
@@ -291,9 +297,8 @@ public NhDimension addDimension(
 throws NhException
 {
   if (nhFile.bugs >= 1) {
-    prtf("NhGroup.addDimension: group: \"" + groupName + "\""
-      + "  dimName: \"" + dimName + "\""
-      + "  dimLen: " + dimLen + "");
+    prtf("NhGroup.addDimension: this: \"%s\"  dimName: \"%s\"  dimLen: %d",
+      getPath(), dimName, dimLen);
   }
   checkName( dimName, "dimension in group \"" + groupName + "\"");
   NhDimension nhDim = new NhDimension( dimName, dimLen, this);
@@ -362,9 +367,9 @@ public NhVariable addVariable(
 throws NhException
 {
   if (nhFile.bugs >= 1) {
-    String msg = "NhGroup.addVariable: group: \"" + groupName + "\""
+    String msg = "NhGroup.addVariable: this: \"" + getPath() + "\""
       + "  var name: \"" + varName + "\"\n"
-      + "  type: " + NhVariable.nhTypeNames[ nhType] + "\n"
+      + "  nhType: " + NhVariable.nhTypeNames[ nhType] + "\n"
       + "  dims: ";
     if (nhDims == null) msg += "(null)";
     else {
@@ -373,6 +378,7 @@ throws NhException
       }
     }
     msg += "\n";
+    msg += "  chunkLens: " + formatInts( chunkLens) + "\n";
     msg += "  fill: " + fillValue + "\n";
     msg += "  compressionLevel: " + compressionLevel;
     prtf( msg);
@@ -458,8 +464,8 @@ public void addAttribute(
 throws NhException
 {
   if (nhFile.bugs >= 1) {
-    prtf("NhGroup.addAttribute: grp: \"" + groupName + "\""
-      + "  nm: \"" + attrName + "\""
+    prtf("NhGroup.addAttribute: this: \"" + getPath() + "\""
+      + "  attrName: \"" + attrName + "\""
       + "  type: " + NhVariable.nhTypeNames[atType]);
   }
   if (nhFile.bugs >= 10) {
@@ -518,6 +524,30 @@ throws NhException
   if (! Pattern.matches("^[_a-zA-Z][-_a-zA-Z0-9]*$", name))
     throwerr("Invalid name for %s.  Name: \"%s\"", loc, name);
 }
+
+
+
+
+
+
+/**
+ * Formats an array of ints.
+ */
+
+static String formatInts(
+  int[] vals)
+{
+  String res = "";
+  if (vals == null) res = "(null)";
+  else {
+    for (int ii = 0; ii < vals.length; ii++) {
+      if (ii > 0) res += " ";
+      res += vals[ii];
+    }
+  }
+  return res;
+}
+
 
 
 

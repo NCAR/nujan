@@ -188,6 +188,24 @@ throws NhException
   this.parentGroup = parentGroup;
   this.nhFile = nhFile;
 
+  if (nhFile.bugs >= 1) {
+    String msg = "NhVariable.const:"
+      + "  var name: \"" + varName + "\"\n"
+      + "  nhType: " + NhVariable.nhTypeNames[ nhType] + "\n"
+      + "  dims: ";
+    if (nhDims == null) msg += "(null)";
+    else {
+      for (NhDimension dm : nhDims) {
+        msg += "  \"" + dm.dimName + "\"(" + dm.dimLen + ")";
+      }
+    }
+    msg += "\n";
+    msg += "  chunkLens: " + NhGroup.formatInts( chunkLens) + "\n";
+    msg += "  fill: " + fillValue + "\n";
+    msg += "  compressionLevel: " + compressionLevel;
+    prtf( msg);
+  }
+
   if (nhDims == null) rank = 0;
   else rank = nhDims.length;
 
@@ -300,8 +318,8 @@ throws NhException
 
 public String toString() {
   String res = String.format(
-    "name: \"%s\"  type: %s  compress: %d  rank: %d  dims: (",
-    varName, nhTypeNames[nhType], compressionLevel, rank);
+    "path: \"%s\"  type: %s  compress: %d  rank: %d  dims: (",
+    getPath(), nhTypeNames[nhType], compressionLevel, rank);
   for (NhDimension nd : nhDims) {
     res += "  " + nd.dimName + "(" + nd.dimLen + ")";
   }
