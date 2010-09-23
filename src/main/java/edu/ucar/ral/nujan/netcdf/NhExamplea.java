@@ -44,9 +44,9 @@ public class NhExamplea {
 
 
 static void badparms( String msg) {
-  prtf("Error: %s", msg);
-  prtf("parms:");
-  prtf("  -outFile      <fname>");
+  prtln("Error: " + msg);
+  prtln("Parms:");
+  prtln("  -outFile      <fname>");
   System.exit(1);
 }
 
@@ -56,10 +56,12 @@ public static void main( String[] args) {
   try { testIt( args); }
   catch( NhException exc) {
     exc.printStackTrace();
-    prtf("main: caught: %s", exc);
+    prtln("main: caught: " + exc);
     System.exit(1);
   }
 }
+
+
 
 
 static void testIt( String[] args)
@@ -78,6 +80,7 @@ throws NhException
 
   NhFileWriter hfile = new NhFileWriter(
     outFile, NhFileWriter.OPT_OVERWRITE);
+  prtln("hfile: " + hfile);
 
   NhGroup rootGroup = hfile.getRootGroup();
 
@@ -120,6 +123,7 @@ throws NhException
     chunkLens,                  // chunk lengths
     fillValue,
     compressLevel);
+  prtln("humidity: " + humidity);
 
   // Add an attribute to the variable.
   humidity.addAttribute(
@@ -136,6 +140,7 @@ throws NhException
     chunkLens,                  // chunk lengths
     fillValue,
     compressLevel);
+  prtln("temperature: " + temperature);
 
   // End the definition stage.
   // All groups, variables, and attributes are created before endDefine.
@@ -174,6 +179,7 @@ throws NhException
   temperature.writeData( startIxs, temperatureDataChunk1);
 
   hfile.close();
+  prtln("All done");
 
 } // end testit
 
@@ -192,9 +198,8 @@ throws NhException
 
 
 
-static void prtf( String msg, Object... args) {
-  System.out.printf( msg, args);
-  System.out.printf("\n");
+static void prtln( String msg) {
+  System.out.println( msg);
 }
 
 } // end class NhExamplea

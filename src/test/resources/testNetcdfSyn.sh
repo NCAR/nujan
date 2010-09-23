@@ -34,6 +34,7 @@ badparms() {
   echo "Examples:"
   echo "./testNetcdfSyn.sh 0 short 1"
   echo "./testNetcdfSyn.sh 5 all 2"
+  echo "./testNetcdfSyn.sh all all all"
   exit 1
 }
 

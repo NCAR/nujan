@@ -155,6 +155,12 @@ throws NhException
   this.optFlag = optFlag;
   this.bugs = nhDebugLevel;
 
+  if (bugs >= 1) {
+    prtf("NhFileWriter.const: path: \"%s\"\n  optFlag: %d"
+      + "  softwareVersion: %s",
+      path, optFlag, HdfFileWriter.getSoftwareVersion());
+  }
+
   fileStatus = ST_DEFINING;
   try {
     int hdfOptFlag = 0;
@@ -178,10 +184,22 @@ throws NhException
 
 
 public String toString() {
-  String res = String.format("path: \"%s\"  status: %s",
-    path, fileStatus);
+  String res = "path: \"" + path + "\""
+    + "  status: " + statusNames[ fileStatus]
+    + "  softwareVersion: " + HdfFileWriter.getSoftwareVersion();
   return res;
 }
+
+
+
+
+
+
+static public String getSoftwareVersion() {
+  return HdfFileWriter.getSoftwareVersion();
+}
+
+
 
 
 
@@ -253,8 +271,9 @@ public NhGroup getRootGroup() {
 public void endDefine()
 throws NhException
 {
+
   if (bugs >= 1) {
-    prtf("NhFileWriter.endDefine: path: \"" + path + "\"\n");
+    prtf("NhFileWriter.endDefine: path: \"%s\"", path);
   }
   if (fileStatus != ST_DEFINING) throwerr("already called endDefine");
   fileStatus = ST_WRITEDATA;
@@ -464,7 +483,7 @@ public void close()
 throws NhException
 {
   if (bugs >= 1) {
-    prtf("NhFileWriter.close: path: \"" + path + "\"\n");
+    prtf("NhFileWriter.close: path: \"%s\"", path);
   }
 
   if (fileStatus == ST_DEFINING)

@@ -293,8 +293,8 @@ throws HdfException
   this.bugs = debugLevel;
 
   if (bugs >= 1) {
-    prtf("HdfFileWriter.const: filePath: \"%s\"\n  softwareVersion: %s\n",
-      filePath, softwareVersion);
+    prtf("HdfFileWriter.const: filePath: \"%s\"\n  softwareVersion: %s",
+      filePath, getSoftwareVersion());
   }
 
   fileStatus = ST_DEFINING;
@@ -324,12 +324,22 @@ throws HdfException
 
 
 public String toString() {
-  String res = super.toString();
-  res += "  filePath: " + filePath;
-  res += "  optFlag: " + optFlag;
-  res += "  status: " + statusNames[fileStatus];
+  String res = "  filePath: \"" + filePath + "\""
+    + "  status: " + statusNames[ fileStatus]
+    + "  softwareVersion: " + getSoftwareVersion();
   return res;
 }
+
+
+
+
+
+
+static public String getSoftwareVersion() {
+  return softwareVersion;
+}
+
+
 
 
 
