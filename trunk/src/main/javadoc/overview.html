@@ -82,9 +82,9 @@ of Nujan.
 
 <!-- -->
 <h2>Download </h2>
-<a href="http://www.ral.ucar.edu/~steves/nujan-0.8.1.jar"> Nujan 0.8.1 jar </a><br>
-<a href="http://www.ral.ucar.edu/~steves/nujan-0.8.1-javadoc.jar"> Nujan 0.8.1 javaDoc </a><br>
-<a href="http://www.ral.ucar.edu/~steves/nujan-0.8.1-src.zip"> Nujan 0.8.1 source </a><br>
+<a href="http://www.ral.ucar.edu/~steves/nujan-0.9.1.jar"> Nujan 0.9.1 jar </a><br>
+<a href="http://www.ral.ucar.edu/~steves/nujan-0.9.1-javadoc.jar"> Nujan 0.9.1 javaDoc </a><br>
+<a href="http://www.ral.ucar.edu/~steves/nujan-0.9.1-src.zip"> Nujan 0.9.1 source </a><br>
 <!-- -->
 
 
@@ -135,7 +135,7 @@ NetCDF or HDF5 writers are:
   <tr><td> Subgroups                   </td><td> -      </td><td> y      </td><td> y      </td></tr>
   <tr><td> One unlimited dim           </td><td> y      </td><td> y      </td><td> -      </td></tr>
   <tr><td> Multiple unlimited dims     </td><td> -      </td><td> y      </td><td> -      </td></tr>
-  <tr><td> Partial writing             </td><td> y      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> Partial writing             </td><td> y      </td><td> y      </td><td> y      </td></tr>
   <tr><td> Compression using gzip      </td><td> -      </td><td> y      </td><td> y      </td></tr>
   <tr><td> Other compression methods   </td><td> -      </td><td> y      </td><td> -      </td></tr>
   <tr><td> Arbitrary filters           </td><td> -      </td><td> y      </td><td> -      </td></tr>
@@ -154,13 +154,6 @@ For notes on the NetCDF4 data model see:<br>
 <h2>Notes on Nujan Restrictions </h2>
 
 <dl>
-
-  <dt><b> Partial writing </b></dt>
-  <dd>
-  Nujan does not support writing a variable's data incrementally.
-  In Nujan, all of a variable's data must be written in a single
-  call.
-  </dd>
 
   <dt><b> Variables over 2 GB total size </b></dt>
   <dd>

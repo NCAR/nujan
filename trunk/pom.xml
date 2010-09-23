@@ -11,7 +11,7 @@
     <groupId>edu.ucar.ral</groupId>
     <artifactId>nujan</artifactId>
     <packaging>bundle</packaging>
-    <version>0.8.1</version>
+    <version>0.9.1</version>
     <name>Pure Java NetCDF 4/HDF 5 writing library</name>
     <url>http://wiki.ucar.edu/display/NNEWD</url>
 
