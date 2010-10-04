@@ -33,12 +33,8 @@ import java.util.Arrays;
 class HdfChunk {
 
 int[] chunkStartIxs;      // start indices of this chunk in the hyperslab
-int[] chunkUserDims;      // dimensions of usable data.
-                          // Normally == chunkDims, but in odd cases like
-                          //   varDims = (10,10}, chunkDims=(7,7),
-                          // the chunkUserDims of the 4 chunks will be
-                          //   (7,7)    (7,3)
-                          //   (3,7)    (3,3)
+HdfGroup hdfGroup;        // the owning group
+
 long chunkDataSize;       // size = disk space used; may be less than the
                           //   product of dims * eleSize if compressed
 long chunkDataAddr;       // offset on disk
@@ -47,17 +43,14 @@ long chunkDataAddr;       // offset on disk
 
 HdfChunk(
   int[] chunkStartIxs,
-  int[] chunkUserDims)
+  HdfGroup hdfGroup)      // the owning group
 throws HdfException
 {
   if (chunkStartIxs == null)
     HdfUtil.throwerr("invalid chunkStartIxs");
-  if (chunkUserDims == null)
-    HdfUtil.throwerr("invalid chunkUserDims");
-  if (chunkUserDims.length != chunkStartIxs.length)
-    HdfUtil.throwerr("chunkUserDims len mismatch");
   this.chunkStartIxs = Arrays.copyOf( chunkStartIxs, chunkStartIxs.length);
-  this.chunkUserDims = Arrays.copyOf( chunkUserDims, chunkUserDims.length);
+  this.hdfGroup = hdfGroup;
+
   chunkDataSize = 0;
   chunkDataAddr = 0;
 } // end constructor
@@ -67,7 +60,6 @@ throws HdfException
 public String toString() {
   String res =
       "  chunkStartIxs: " + HdfUtil.formatInts( chunkStartIxs) + "\n"
-    + "  chunkUserDims: " + HdfUtil.formatInts( chunkUserDims) + "\n"
     + "  chunkDataSize: " + chunkDataSize + "\n"
     + "  chunkDataAddr: " + chunkDataAddr;
   return res;

@@ -163,19 +163,21 @@ int stgFieldLen;
  *        or may have length 0 in odd cases where a variable has
  *        no data.  For example a variable may have attributes
  *        without data.  If varDims is null or length 0, must have
- *        chunkDims==null and compressionLevel==0.
+ *        chunkLens==null and compressionLevel==0.
  */
 int[] varDims;
 
-/**
- * Len of each side of a chunk hyperslab.
- *        Must have chunkDims.length == varDims.length,
- *        or null if using contiguous storage.
- */
-int[] chunkDims;
 
 /**
- * rank == dimensionality == varDims.length == chunkDims.length
+ * Len of each side of a chunk hyperslab.
+ *        Must have chunkLens.length == varDims.length,
+ *        or null if using contiguous storage.
+ */
+int[] chunkLens;
+
+
+/**
+ * rank == dimensionality == varDims.length == chunkLens.length
  */
 int rank;
 
@@ -286,12 +288,12 @@ throws HdfException
  *        or may have length 0 in odd cases where a variable has
  *        no data.  For example a variable may have attributes
  *        without data.  If varDims is null or length 0, must have
- *        chunkDims==null and compressionLevel==0.
- * @param chunkDims len of each side of a chunk hyperslab.
- *        Must have chunkDims.length == varDims.length.
- *        If chunkDims == null use contiguous storage.
- *        If chunkDims == varDims, use chunked storage with just one chunk.
- *        If varDims == null or varDims.length == 0, chunkDims must be null.
+ *        chunkLens==null and compressionLevel==0.
+ * @param chunkLens len of each side of a chunk hyperslab.
+ *        Must have chunkLens.length == varDims.length.
+ *        If chunkLens == null use contiguous storage.
+ *        If chunkLens == varDims, use chunked storage with just one chunk.
+ *        If varDims == null or varDims.length == 0, chunkLens must be null.
  * @param fillValue Fill value of appropriate type for this variable.
  *        May be null.
  *        <p>
@@ -328,7 +330,7 @@ HdfGroup(
                              // including DTYPE_STRING_VAR.
 
   int[] varDims,
-  int[] chunkDims,
+  int[] chunkLens,
   Object fillValue,          // null, Byte, Short, Int, Long,
                              // Float, Double, String, etc.
   int compressionLevel,      // Zip compression level: 0==Uncompressed;
@@ -347,7 +349,7 @@ throws HdfException
   if (hdfFile.bugs >= 1) {
     prtf("HdfGroup: new dataset at path: \"" + getPath() + "\""
       + "  type: " + HdfUtil.formatDtypeDim( dtype, varDims)
-      + "  chunkDims: " + HdfUtil.formatInts( chunkDims));
+      + "  chunkLens: " + HdfUtil.formatInts( chunkLens));
   }
   HdfUtil.checkName( groupName,
     "dataset in group \"" + parentGroup.groupName + "\"");
@@ -356,28 +358,28 @@ throws HdfException
   if (varDims == null) this.varDims = null;
   else this.varDims = Arrays.copyOf( varDims, varDims.length);
 
-  // Set up chunkDims.
+  // Set up chunkLens.
 
   int layoutClass;
-  if (chunkDims == null) {
+  if (chunkLens == null) {
     layoutClass = MsgLayout.LY_CONTIGUOUS;
-    this.chunkDims = null;
+    this.chunkLens = null;
   }
   else {
     layoutClass = MsgLayout.LY_CHUNKED;
-    this.chunkDims = Arrays.copyOf( chunkDims, chunkDims.length);
+    this.chunkLens = Arrays.copyOf( chunkLens, chunkLens.length);
   }
 
 
   if (varDims == null) {
-    if (chunkDims != null)
-      throwerr("varDims == null but chunkDims != null");
+    if (chunkLens != null)
+      throwerr("varDims == null but chunkLens != null");
     if (compressionLevel > 0)
       throwerr("cannot use compression with null data");
   }
   else if (varDims.length == 0) {
-    if (chunkDims != null)
-      throwerr("varDims len == 0 but chunkDims != null");
+    if (chunkLens != null)
+      throwerr("varDims len == 0 but chunkLens != null");
     if (compressionLevel > 0)
       throwerr("cannot use compression with scalar data");
   }
@@ -406,12 +408,12 @@ throws HdfException
     prtf("HdfGroup: rank: %d  totNumEle: %d", rank, totNumEle);
 
 
-  if (chunkDims != null) {
-    if (chunkDims.length != varDims.length)
-      throwerr("chunkDims len != varDims len");
+  if (chunkLens != null) {
+    if (chunkLens.length != varDims.length)
+      throwerr("chunkLens len != varDims len");
     for (int ii = 0; ii < rank; ii++) {
-      if (chunkDims[ii] <= 0) throwerr("invalid chunkDims");
-      if (chunkDims[ii] > varDims[ii]) throwerr("chunkDims > varDims");
+      if (chunkLens[ii] <= 0) throwerr("invalid chunkLens");
+      if (chunkLens[ii] > varDims[ii]) throwerr("chunkLens > varDims");
     }
   }
 
@@ -421,17 +423,17 @@ throws HdfException
 
 
   // Calc numDimChunks = num chunks in each dimension,
-  //   which is varDims[ii] / chunkDims[ii], round up.
+  //   which is varDims[ii] / chunkLens[ii], round up.
   // Calc totNumChunks = total number of chunks = product of numDimChunks[*].
   // If contiguous, we have one chunk.
 
   int[] numDimChunks = new int[rank];
   int totNumChunks = 1;
   for (int ii = 0; ii < rank; ii++) {
-    if (chunkDims == null) numDimChunks[ii] = 1;
+    if (chunkLens == null) numDimChunks[ii] = 1;
     else {
-      numDimChunks[ii] = varDims[ii] / chunkDims[ii];
-      if (numDimChunks[ii] * chunkDims[ii] != varDims[ii])
+      numDimChunks[ii] = varDims[ii] / chunkLens[ii];
+      if (numDimChunks[ii] * chunkLens[ii] != varDims[ii])
         numDimChunks[ii]++;
     }
     totNumChunks *= numDimChunks[ii];
@@ -443,7 +445,7 @@ throws HdfException
 
   // Calc totChunkNums = number of chunks represented by any level
   // of the startIxs indices, so in calcChunkIxs we can do ...
-  //   ichunk = sum( (startIxs[ii]/chunkDims[ii]) * totChunkNums[ii]);
+  //   ichunk = sum( (startIxs[ii]/chunkLens[ii]) * totChunkNums[ii]);
 
   totChunkNums = new int[rank];
   if (rank > 0) {
@@ -460,9 +462,11 @@ throws HdfException
 
   hdfChunks = new HdfChunk[ totNumChunks];
   int[] startIxs = new int[rank];
-  if (chunkDims == null) {
-    hdfChunks[0] = new HdfChunk( startIxs, varDims);
+
+  if (chunkLens == null) {
+    hdfChunks[0] = new HdfChunk( startIxs, this);
   }
+
   else {
     for (int ichunk = 0; ichunk < totNumChunks; ichunk++) {
       if (hdfFile.bugs >= 1)
@@ -471,24 +475,24 @@ throws HdfException
           HdfUtil.formatInts( startIxs));
       if (calcChunkIx( startIxs) != ichunk) throwerr("calcChunkIx error");
 
-      // Set userDims = chunkDims, but the edge chunks
-      // in a dimension ii may be shorter if varDims[ii]
-      // is not a multiple of chunkDims[ii].
+      ///// Set userDims = chunkLens, but the edge chunks
+      ///// in a dimension ii may be shorter if varDims[ii]
+      ///// is not a multiple of chunkLens[ii].
 
-      int[] userDims = new int[rank];
-      for (int ii = 0; ii < rank; ii++) {
-        if (chunkDims == null) userDims[ii] = varDims[ii];
-        else {
-          userDims[ii] = Math.min(
-            chunkDims[ii],
-            varDims[ii] - startIxs[ii]);
-        }
-      }
-      if (hdfFile.bugs >= 1)
-        prtf("HdfGroup: %s: ichunk: %d  userDims: %s",
-          getPath(), ichunk, HdfUtil.formatInts( userDims));
+      ///int[] userDims = new int[rank];
+      ///for (int ii = 0; ii < rank; ii++) {
+      ///  if (chunkLens == null) userDims[ii] = varDims[ii];
+      ///  else {
+      ///    userDims[ii] = Math.min(
+      ///      chunkLens[ii],
+      ///      varDims[ii] - startIxs[ii]);
+      ///  }
+      ///}
+      ///if (hdfFile.bugs >= 1)
+      ///  prtf("HdfGroup: %s: ichunk: %d  userDims: %s",
+      ///    getPath(), ichunk, HdfUtil.formatInts( userDims));
 
-      hdfChunks[ichunk] = new HdfChunk( startIxs, userDims);
+      hdfChunks[ichunk] = new HdfChunk( startIxs, this);
       if (hdfFile.bugs >= 1) {
         prtf("HdfGroup: %s: hdfChunks[%d]: %s",
           getPath(), ichunk, hdfChunks[ichunk]);
@@ -496,12 +500,12 @@ throws HdfException
 
       // Increment startIxs
       for (int ii = rank - 1; ii >= 0; ii--) {
-        startIxs[ii] += chunkDims[ii];
+        startIxs[ii] += chunkLens[ii];
         if (startIxs[ii] < varDims[ii]) break;
         startIxs[ii] = 0;
       }
     }
-  } // else chunkDims != null
+  } // else chunkLens != null
 
   // Initialize various messages
   msgDataType = new MsgDataType(
@@ -586,12 +590,12 @@ throws HdfException
  *        or may have length 0 in odd cases where a variable has
  *        no data.  For example a variable may have attributes
  *        without data.  If varDims is null or length 0, must have
- *        chunkDims==null and compressionLevel==0.
- * @param chunkDims len of each side of a chunk hyperslab.
- *        Must have chunkDims.length == varDims.length.
- *        If chunkDims == null use contiguous storage.
- *        If chunkDims == varDims, use chunked storage with just one chunk.
- *        If varDims == null or varDims.length == 0, chunkDims must be null.
+ *        chunkLens==null and compressionLevel==0.
+ * @param chunkLens len of each side of a chunk hyperslab.
+ *        Must have chunkLens.length == varDims.length.
+ *        If chunkLens == null use contiguous storage.
+ *        If chunkLens == varDims, use chunked storage with just one chunk.
+ *        If varDims == null or varDims.length == 0, chunkLens must be null.
  * @param fillValue Fill value of appropriate type for this variable.
  *        May be null.
  *        <p>
@@ -622,7 +626,7 @@ public HdfGroup addVariable(
                              // including DTYPE_STRING_VAR.
 
   int[] varDims,             // dimension lengths
-  int[] chunkDims,
+  int[] chunkLens,
   Object fillValue,          // fill value or null
   int compressionLevel)
 throws HdfException
@@ -650,7 +654,7 @@ throws HdfException
     subNames,
     stgFieldLen,
     varDims,
-    chunkDims,
+    chunkLens,
     fillValue,
     compressionLevel,
     hdfFile);
@@ -988,11 +992,11 @@ throws HdfException, IOException
   // Find the chunk
   int ichunk = 0;
   if (startIxs == null) {
-    if (chunkDims != null) throwerr("startIxs == null but chunkDims != null");
+    if (chunkLens != null) throwerr("startIxs == null but chunkLens != null");
     ichunk = 0;
   }
   else {
-    if (chunkDims == null) throwerr("startIxs != null but chunkDims == null");
+    if (chunkLens == null) throwerr("startIxs != null but chunkLens == null");
     ichunk = calcChunkIx( startIxs);
   }
 
@@ -1004,8 +1008,11 @@ throws HdfException, IOException
   // Check that dtype and dataDims match what the user
   // declared in the earlier addVariable call.
 
+  int[] chunkDataLens;
+  if (chunkLens == null) chunkDataLens = varDims;
+  else chunkDataLens = chunkLens;
   HdfUtil.checkTypeMatch( getPath(), dtype, dataDtype,
-    chunk.chunkUserDims, dataDims);
+    chunkDataLens, dataDims);
 
   if (chunk.chunkDataAddr != 0)
     throwerr("chunk has already been written.  path: %s  startIxs: %s",
@@ -1089,9 +1096,8 @@ throws HdfException, IOException
   // For non-compressed numeric data we could use something like ...
   //   chunkDataSize = elementLen;
   //   for (int ii = 0; ii < rank; ii++) {
-  //     chunkDataSize *= chunk.chunkUserDims[ii];
+  //     chunkDataSize *= chunk.chunkLens[ii];
   //   }
-  //
   // However compressed data can be any length,
   // so we just use the output length.
 
@@ -1134,14 +1140,14 @@ throws HdfException
     if (startIxs[ii] >= varDims[ii])
       throwerr("startIxs[%d] == %d is >= varDims[%d] == %d",
         ii, startIxs[ii], ii, varDims[ii]);
-    if (chunkDims == null) {
-      if (startIxs[ii] != 0) throwerr("startIxs != 0 for chunkDims == null");
+    if (chunkLens == null) {
+      if (startIxs[ii] != 0) throwerr("startIxs != 0 for chunkLens == null");
     }
     else {
-      if (startIxs[ii] % chunkDims[ii] != 0)
-        throwerr("startIxs[%d] == %d is not a multiple of chunkDims[%d] == %d",
-          ii, startIxs[ii], ii, chunkDims[ii]);
-      ichunk += (startIxs[ii] / chunkDims[ii]) * totChunkNums[ii];
+      if (startIxs[ii] % chunkLens[ii] != 0)
+        throwerr("startIxs[%d] == %d is not a multiple of chunkLens[%d] == %d",
+          ii, startIxs[ii], ii, chunkLens[ii]);
+      ichunk += (startIxs[ii] / chunkLens[ii]) * totChunkNums[ii];
     }
   }
   if (ichunk < 0 || ichunk >= hdfChunks.length) throwerr("invalid ichunk");

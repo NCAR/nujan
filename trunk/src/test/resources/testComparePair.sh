@@ -12,6 +12,7 @@ badparms() {
   echo $1
   echo "testComparePair.sh: Parms"
   echo "  bugs"
+  echo "  chunk"
   echo "  compress"
   echo "  oldTxt"
   echo "  newDs"
@@ -24,11 +25,12 @@ badparms() {
 
 
 checkOne() {
-  if [ $# -ne 4 ]; then badparms "wrong num parms"; fi
+  if [ $# -ne 5 ]; then badparms "wrong num parms"; fi
   bugs=$1
-  compress=$2
-  oldTxt=$3
-  newDs=$4
+  chunk=$2
+  compress=$3
+  oldTxt=$4
+  newDs=$5
 
   dumpCmd="h5dump -p -w 10000 $newDs"
   $dumpCmd | sed '1s/HDF5 .*/HDF5 "someFile" {/' > tempout.newa
@@ -63,9 +65,8 @@ checkOne() {
   # For netcdf, don't filter the dimension variables,
   # so the sed ends at the start of dimensions '^   DATASET "dim00"'.
   #
-  # Here compress==0 <==> contiguous.
 
-  if [ "$compress" == "0" ]; then
+  if [ "$chunk" == "contiguous" ]; then
     /bin/sed -e '1,/^   DATASET "dim00"/s/^ *CONTIGUOUS.*/          contigOrChunked/' \
       tempout.newb > tempout.newc
   else

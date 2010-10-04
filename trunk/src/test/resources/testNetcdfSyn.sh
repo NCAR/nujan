@@ -89,22 +89,52 @@ testOne() {
   compress=$1
   nhType=$2
   rank=$3
+
+  if [ "$compress" == "0" ]; then chunk="contiguous"
+  else chunk="chunked";
+  fi
+    
   if [ "$bugs" != "none" ]; then
-    echo "testOne: compress: $compress"
+    echo "testOne: compress: $compress  chunk: $chunk"
     echo "  nhType: $nhType  rank: $rank"
   fi
 
-  if [[ "$rank" == "0" ]]; then dims="0"
-  elif [[ "$rank" == "1" ]]; then dims="3"
-  elif [[ "$rank" == "2" ]]; then dims="3,4"
-  elif [[ "$rank" == "3" ]]; then dims="3,4,5"
-  elif [[ "$rank" == "4" ]]; then dims="3,4,5,2"
-  elif [[ "$rank" == "5" ]]; then dims="3,4,5,2,3"
-  elif [[ "$rank" == "6" ]]; then dims="3,4,5,2,3,2"
-  elif [[ "$rank" == "7" ]]; then dims="3,4,5,2,3,2,3"
-  else badparms "testOne: invalid rank: $rank"
+  if [[ "$rank" == "0" ]]; then
+    dims="scalar"
+    chunkLens="contiguous"
+  elif [[ "$rank" == "1" ]]; then
+    dims="3"
+    if [[ "$nhType" == "float" ]]; then chunkLens="1"
+    else chunkLens="3"
+    fi
+  elif [[ "$rank" == "2" ]]; then
+    dims="3,4"
+    if [[ "$nhType" == "float" ]]; then
+      # Both chunk lens do not evenly divide the variable's dimensions.
+      chunkLens="2,3"
+    else chunkLens="3,4"
+    fi
+  elif [[ "$rank" == "3" ]]; then
+    dims="3,4,5"
+    chunkLens="3,4,5"
+  elif [[ "$rank" == "4" ]]; then
+    dims="3,4,5,2"
+    chunkLens="3,4,5,2"
+  elif [[ "$rank" == "5" ]]; then
+    dims="3,4,5,2,3"
+    chunkLens="3,4,5,2,3"
+  elif [[ "$rank" == "6" ]]; then
+    dims="3,4,5,2,3,2"
+    chunkLens="3,4,5,2,3,2"
+  elif [[ "$rank" == "7" ]]; then
+    dims="3,4,5,2,3,2,3"
+    chunkLens="3,4,5,2,3,2,3"
+  else badparms "invalid rank: $rank"
   fi
 
+  if [[ "$chunk" == "contiguous" ]]; then
+    chunkLens="contiguous"
+  fi
 
   if [ "$compress" != "0" -a "$nhType" == "vstring" ]; then
     # Cannot compress vstring because vstrings are kept on
@@ -125,6 +155,7 @@ testOne() {
       -bugs 10 \
       -nhType $nhType \
       -dims $dims \
+      -chunks $chunkLens \
       -compress $compress \
       -utcModTime 0 \
       -numThread 1 \
@@ -145,7 +176,7 @@ testOne() {
 
     oldTxt=${TESTDIR}/testNetcdfSynOut/test.$nhType.rank.$rank.out.gz
     ###xxx replace with CompareNh.java
-    testComparePair.sh $bugs $compress $oldTxt tempa.nc
+    testComparePair.sh $bugs $chunk $compress $oldTxt tempa.nc
 
 
     ###compareCmd="java -cp ${BUILDDIR}:${NCJAR} \

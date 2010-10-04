@@ -77,7 +77,11 @@ final byte[] highKey = new byte[] {
 
 /**
  * Constructor chunked data trees.
- * xxx doc parms
+ *
+ * @param compressionLevel Zip compression level:
+ *        0 is uncompressed; 1 - 9 are increasing compression.
+ * @param hdfGroup The owning group.
+ * @param hdfFile The global owning HdfFileWriter.
  */
 
 BtreeNode(

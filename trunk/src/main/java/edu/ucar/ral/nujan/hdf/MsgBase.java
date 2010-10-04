@@ -263,7 +263,7 @@ int hdrMsgFlag;
 
 /**
  * @param hdrMsgType One of TP_*.
- * @param parentGroup The group containing this message.
+ * @param hdfGroup The group containing this message.
  * @param hdfFile The global owning HdfFileWriter.
  */
 
