@@ -22,7 +22,7 @@ H5CHECK=/d1/steves/ftp/hdf5/tdi/bin/h5check
 badparms() {
   echo Error: $1
   echo Parms:
-  echo "  chunkSpec: all / contig / chunked"
+  echo "  chunkSpec: all / contiguous / chunked"
   echo "  compress:  all / compressLevel (0==none, 1 - 9)"
   echo "  dtype:     all / sfixed08 / ufixed08 /fixed16,32,64"
   echo "               float32,64 string14 vstring reference compound"
@@ -34,10 +34,10 @@ badparms() {
   echo "               update: update verification results - Caution"
   echo ""
   echo "Examples:"
-  echo "./testHdfSyn.sh  contig  0 fixed16  1"
-  echo "./testHdfSyn.sh  chunked 0 string14 2"
-  echo "./testHdfSyn.sh  contig  0 vstring  all"
-  echo "./testHdfSyn.sh  all     0 all      all"
+  echo "./testHdfSyn.sh  contiguous  0 fixed16  1"
+  echo "./testHdfSyn.sh  chunked     0 string14 2"
+  echo "./testHdfSyn.sh  contiguous  0 vstring  all"
+  echo "./testHdfSyn.sh  all         0 all      all"
   exit 1
 }
 
@@ -60,7 +60,7 @@ rankSpec=$4
 bugs=none
 if [ $# -eq 5 ]; then bugs=$5; fi
 
-if [ "$chunkSpec" == "all" ]; then chunks="contig chunked"
+if [ "$chunkSpec" == "all" ]; then chunks="contiguous chunked"
 else chunks="$chunkSpec"
 fi
 
@@ -101,15 +101,41 @@ testOne() {
     echo "  dtype: $dtype  rank: $rank"
   fi
 
-  if [[ "$rank" == "0" ]]; then dims="0"
-  elif [[ "$rank" == "1" ]]; then dims="3"
-  elif [[ "$rank" == "2" ]]; then dims="3,4"
-  elif [[ "$rank" == "3" ]]; then dims="3,4,5"
-  elif [[ "$rank" == "4" ]]; then dims="3,4,5,2"
-  elif [[ "$rank" == "5" ]]; then dims="3,4,5,2,3"
-  elif [[ "$rank" == "6" ]]; then dims="3,4,5,2,3,2"
-  elif [[ "$rank" == "7" ]]; then dims="3,4,5,2,3,2,3"
+  if [[ "$rank" == "0" ]]; then
+    dims="scalar"
+    chunkLens="contiguous"
+  elif [[ "$rank" == "1" ]]; then
+    dims="3"
+    if [[ "$dtype" == "float32" ]]; then chunkLens="1"
+    else chunkLens="3"
+    fi
+  elif [[ "$rank" == "2" ]]; then
+    dims="3,4"
+    if [[ "$dtype" == "float32" ]]; then
+      # Both chunk lens do not evenly divide the variable's dimensions.
+      chunkLens="2,3"
+    else chunkLens="3,4"
+    fi
+  elif [[ "$rank" == "3" ]]; then
+    dims="3,4,5"
+    chunkLens="3,4,5"
+  elif [[ "$rank" == "4" ]]; then
+    dims="3,4,5,2"
+    chunkLens="3,4,5,2"
+  elif [[ "$rank" == "5" ]]; then
+    dims="3,4,5,2,3"
+    chunkLens="3,4,5,2,3"
+  elif [[ "$rank" == "6" ]]; then
+    dims="3,4,5,2,3,2"
+    chunkLens="3,4,5,2,3,2"
+  elif [[ "$rank" == "7" ]]; then
+    dims="3,4,5,2,3,2,3"
+    chunkLens="3,4,5,2,3,2,3"
   else badparms "invalid rank: $rank"
+  fi
+
+  if [[ "$chunk" == "contiguous" ]]; then
+    chunkLens="contiguous"
   fi
 
   if [ "$compress" != "0" -a "$dtype" == "vstring" ]; then
@@ -122,7 +148,7 @@ testOne() {
     echo "Cannot use chunked with scalar data ... ignoring"
   elif [ "$compress" != "0" -a "$rank" == "0" ]; then
     echo "Cannot compress scalar data ... ignoring"
-  elif [ "$compress" != "0" -a "$chunk" == "contig" ]; then
+  elif [ "$compress" != "0" -a "$chunk" == "contiguous" ]; then
     echo "Cannot compress contiguous data ... ignoring"
   else
 
@@ -133,7 +159,7 @@ testOne() {
       -bugs 10 \
       -dtype $dtype \
       -dims $dims \
-      -chunked $chunk \
+      -chunks $chunkLens \
       -compress $compress \
       -utcModTime 0 \
       -outFile tempa.h5"
@@ -174,8 +200,8 @@ testOne() {
 
     /bin/egrep -v '^ *OFFSET' tempout.newa > tempout.newb
 
-    # Filter out stuff that changes with contig vs chunked.
-    if [ "$chunk" == "contig" ]; then
+    # Filter out stuff that changes with contiguous vs chunked.
+    if [ "$chunk" == "contiguous" ]; then
       /bin/sed -e 's/^ *CONTIGUOUS.*/          contigOrChunked/' \
         tempout.newb > tempout.newc
     else

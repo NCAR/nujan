@@ -56,7 +56,8 @@ static void badparms( String msg) {
   prtf("parms:");
   prtf("  -bugs         <int>");
   prtf("  -nhType       byte / ubyte / short / int / long / float / double / char / vstring");
-  prtf("  -dims         <int,int,...>   or \"0\" if a scalar");
+  prtf("  -dims         <int,int,...>   or \"scalar\" if a scalar");
+  prtf("  -chunks       <int,int,...>   or \"contiguous\" if contiguous");
   prtf("  -compress     compression level: 0==none, 1 - 9");
   prtf("  -utcModTime   either yyyy-mm-dd or yyyy-mm-ddThh:mm:ss");
   prtf("                or 0, meaning use the current time");
@@ -82,6 +83,7 @@ throws NhException
   int bugs = -1;
   int nhType = -1;
   int[] dims = null;
+  int[] chunks = null;
   int compressLevel = -1;
   long utcModTime = -1;
   int numThread = -1;
@@ -105,15 +107,12 @@ throws NhException
       else badparms("unknown nhType: " + val);
     }
     else if (key.equals("-dims")) {
-      if (val.equals("0")) dims = new int[0];
-      else {
-        String[] stgs = val.split(",");
-        dims = new int[ stgs.length];
-        for (int ii = 0; ii < stgs.length; ii++) {
-          dims[ii] = Integer.parseInt( stgs[ii]);
-          if (dims[ii] < 1) badparms("invalid dimension: " + dims[ii]);
-        }
-      }
+      if (val.equals("scalar")) dims = new int[0];
+      else dims = parseInts("dimension", val);
+    }
+    else if (key.equals("-chunks")) {
+      if (val.equals("contiguous")) chunks = new int[0];
+      else chunks = parseInts("chunk length", val);
     }
     else if (key.equals("-compress")) compressLevel = Integer.parseInt( val);
     else if (key.equals("-utcModTime")) {
@@ -143,6 +142,7 @@ throws NhException
   if (bugs < 0) badparms("missing parm: -bugs");
   if (nhType < 0) badparms("missing parm: -nhType");
   if (dims == null) badparms("missing parm: -dims");
+  if (chunks == null) badparms("missing parm: -chunks");
   if (compressLevel < 0) badparms("missing parm: -compress");
   if (utcModTime < 0) badparms("missing parm: -utcModTime");
   if (numThread < 0) badparms("missing parm: -numThread");
@@ -150,12 +150,12 @@ throws NhException
 
   if (numThread < 1 || numThread > 100) badparms("invalid numThread");
 
+  if (chunks.length == 0) chunks = null;
   prtf("Tnetcdfa: bugs: %d", bugs);
   prtf("Tnetcdfa: nhType: \"%s\"", NhVariable.nhTypeNames[nhType]);
   prtf("Tnetcdfa: rank: %d", dims.length);
-  for (int idim : dims) {
-    prtf("  Tnetcdfa: dim: %d", idim);
-  }
+  prtf("Tnetcdfa: dims: %s", formatInts( dims));
+  prtf("Tnetcdfa: chunks: %s", formatInts( chunks));
   prtf("Tnetcdfa: compress: %d", compressLevel);
 
   SimpleDateFormat utcSdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
@@ -166,7 +166,7 @@ throws NhException
 
   final long startTime = System.currentTimeMillis();
   if (numThread == 1)
-    testOne( bugs, nhType, dims, compressLevel, utcModTime, outFile);
+    testOne( bugs, nhType, dims, chunks, compressLevel, utcModTime, outFile);
   else {
     Thread[] threads = new Thread[numThread];
     for (int ii = 0; ii < numThread; ii++) {
@@ -175,6 +175,7 @@ throws NhException
       final int bugsFinal = bugs;
       final int nhTypeFinal = nhType;
       final int[] dimsFinal = dims;
+      final int[] chunksFinal = chunks;
       final int compressLevelFinal = compressLevel;
       final long utcModTimeFinal = utcModTime;
       threads[ii] = new Thread() {
@@ -186,6 +187,7 @@ throws NhException
               bugsFinal,
               nhTypeFinal,
               dimsFinal,
+              chunksFinal,
               compressLevelFinal,
               utcModTimeFinal,
               fnameFinal);
@@ -224,6 +226,7 @@ static void testOne(
   int bugs,
   int nhType,
   int[] dims,
+  int[] chunks,
   int compressLevel,
   long utcModTime,           // milliSecs since 1970, or if 0 use current time
   String fname)
@@ -251,10 +254,10 @@ throws NhException
     dtype = HdfGroup.DTYPE_STRING_VAR;
   else throwerr("unknown nhType: " + NhVariable.nhTypeNames[nhType]);
 
-  Object vdata = null;
+  Object allData = null;
   Object fillValue = null;
   try {
-    vdata = GenData.genHdfData(
+    allData = GenData.genHdfData(
       dtype,
       stgFieldLen,
       null,           // refGroup
@@ -294,7 +297,7 @@ throws NhException
       rootGroup.addAttribute(
         String.format("globAttr%04d", ii),   // attrName
         nhType,
-        vdata);
+        allData);
     }
   }
   if (numAttr > 0 && rank == 0) {
@@ -345,18 +348,114 @@ throws NhException
       String.format("testVar%04d", ivar),  // varName
       nhType,
       nhDims,
+      chunks,
       compressLevel,
-      vdata,
+      allData,
       fillValue);
   }
 
   hfile.endDefine();
 
-  int[] startIxs = null;
-  if (compressLevel > 0) startIxs = new int[rank];
-  for (int ii = 0; ii < numVar; ii++) {
-    testVars[ii].writeData( startIxs, vdata);
-  }
+  for (int ivar = 0; ivar < numVar; ivar++) {
+    if (chunks == null) {
+      testVars[ivar].writeData( null, allData);    // startIxs = null
+    }
+
+    else {             // else use chunks
+      int[] startIxs = new int[rank];
+      boolean allDone = false;
+      while (! allDone) {
+
+        // Chunks at the edge may be partially valid
+        int[] validDims = new int[rank];
+        for (int ii = 0; ii < rank; ii++) {
+          validDims[ii] = Math.min( chunks[ii], dims[ii] - startIxs[ii]);
+        }
+
+        Object chunkData = null;
+        if (rank == 0)
+          throwerr("Tnetcdfa: chunking not ok for scalars");
+        if (nhType == NhVariable.TP_FLOAT) {
+          float fillValueFloat = 0;
+          if (fillValue != null)
+            fillValueFloat = ((Float) fillValue).floatValue();
+
+          if (rank == 1) {
+            float[] vals = new float[ chunks[0]];
+            for (int ia = 0; ia < chunks[0]; ia++) {
+              float val = fillValueFloat;
+              if (ia < validDims[0])
+                val = startIxs[0] + ia;
+              vals[ia] = val;
+            }
+            chunkData = vals;
+          }
+          else if (rank == 2) {
+            float[][] vals = new float[ chunks[0]][ chunks[1]];
+            for (int ia = 0; ia < chunks[0]; ia++) {
+              for (int ib = 0; ib < chunks[1]; ib++) {
+                float val = fillValueFloat;
+                if (ia < validDims[0]
+                  && ib < validDims[1])
+                {
+                  val = 10 * (startIxs[0] + ia) + startIxs[1] + ib;
+                }
+                vals[ia][ib] = val;
+              }
+            }
+            chunkData = vals;
+          }
+          else if (rank == 3) {
+            float[][][] vals = new float[ chunks[0]][ chunks[1]][ chunks[2]];
+            for (int ia = 0; ia < chunks[0]; ia++) {
+              for (int ib = 0; ib < chunks[1]; ib++) {
+                for (int ic = 0; ic < chunks[2]; ic++) {
+                  float val = fillValueFloat;
+                  if (ia < validDims[0]
+                    && ib < validDims[1]
+                    && ic < validDims[2])
+                  {
+                    val =
+                      100 * (startIxs[0] + ia)
+                      + 10 * (startIxs[1] + ib)
+                      + startIxs[2] + ic;
+                  }
+                  vals[ia][ib][ic] = val;
+                }
+              }
+            }
+            chunkData = vals;
+          }
+
+          // Tests for chunk lens < dims not ok for higher ranks
+          else {
+            if (! testEqualInts( dims, chunks))
+              throwerr("Tnetcdfa: chunks < dims not ok for higher ranks");
+            chunkData = allData;
+          }
+        } // if nhType == NhVariable.TP_FLOAT
+
+        // Tests for chunk lens < dims not ok for other types
+        else {
+          if (! testEqualInts( dims, chunks))
+            throwerr("Tnetcdfa: chunks < dims not ok for other types");
+          chunkData = allData;
+        }
+
+        testVars[ivar].writeData(
+          startIxs,
+          chunkData);
+
+        // Increment startIxs
+        for (int ii = rank - 1; ii >= 0; ii--) {
+          startIxs[ii] += chunks[ii];
+          if (startIxs[ii] < dims[ii]) break;
+          startIxs[ii] = 0;
+          if (ii == 0) allDone = true;
+        }
+      }
+    } // else use chunks
+  } // for ivar
 
   hfile.close();
 } // end testOne
@@ -425,25 +524,19 @@ static NhVariable testDefineVariable(
   String varName,
   int nhType,
   NhDimension[] nhDims,   // varDims
+  int[] chunks,
   int compressLevel,      // compression level: 0==none, 1 - 9
-  Object vdata,
+  Object allData,
   Object fillValue)
 throws NhException
 {
   int rank = nhDims.length;
-  int[] chunkLens = null;
-  if (compressLevel > 0) {
-    chunkLens = new int[rank];
-    for (int ii = 0; ii < rank; ii++) {
-      chunkLens[ii] = nhDims[ii].getLength();
-    }
-  }
 
   NhVariable vara = parentGroup.addVariable(
     varName,             // varName
     nhType,              // nhType
     nhDims,              // varDims
-    chunkLens,
+    chunks,
     fillValue,
     compressLevel);
 
@@ -453,7 +546,7 @@ throws NhException
       vara.addAttribute(
         String.format("varAttr%04d", ii),   // attrName
         nhType,
-        vdata);
+        allData);
     }
   }
 
@@ -469,6 +562,63 @@ throws NhException
   return vara;
 
 } // end testDefineVariable
+
+
+
+
+
+static int[] parseInts( String msg, String stg)
+throws NhException
+{
+  if (stg == null) throwerr("stg is null");
+  int[] vals;
+  String[] stgs = stg.split(",");
+  vals = new int[ stgs.length];
+  for (int ii = 0; ii < stgs.length; ii++) {
+    vals[ii] = Integer.parseInt( stgs[ii]);
+    if (vals[ii] < 1) badparms(
+      "invalid " + msg + ": " + vals[ii]);
+  }
+  return vals;
+}
+
+
+
+
+
+static boolean testEqualInts(
+  int[] avals,
+  int[] bvals)
+{
+  boolean bres = true;
+  for (int ii = 0; ii < avals.length; ii++) {
+    if (avals[ii] != bvals[ii]) bres = false;
+  }
+  return bres;
+}
+
+
+
+
+/**
+ * Formats an array of ints.
+ */
+
+static String formatInts(
+  int[] vals)
+{
+  String res = "";
+  if (vals == null) res = "(null)";
+  else {
+    for (int ii = 0; ii < vals.length; ii++) {
+      if (ii > 0) res += " ";
+      res += vals[ii];
+    }
+  }
+  return res;
+}
+
+
 
 
 
