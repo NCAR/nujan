@@ -350,13 +350,21 @@ throws NhException
   }
 
   int[] chunkLens = null;
+  if (nhDims.length > 0) {
+    chunkLens = new int[ nhDims.length];
+    for (int ii = 0; ii < nhDims.length; ii++) {
+      chunkLens[ii] = nhDims[ii].getLength();
+    }
+  }
+  int compress = compressionLevel;
+  if (nhDims.length == 0) compress = 0;        // cannot compress a scalar
   NhVariable outVar = outGroup.addVariable(
     inVar.getShortName(),
     nhType,
     nhDims,
     chunkLens,
     fillValue,
-    compressionLevel);
+    compress);
 
   // Copy attributes
   for (Attribute attr : inVar.getAttributes()) {
@@ -511,6 +519,7 @@ throws NhException
   Object rawData = decodeArray( arr, bugs);
 
   int[] startIxs = null;
+  if (inVar.getRank() > 0) startIxs = new int[ inVar.getRank()];
   nhVar.writeData( startIxs, rawData);
 }
 
