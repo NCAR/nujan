@@ -16,16 +16,16 @@
     <url>http://wiki.ucar.edu/display/NNEWD</url>
 
     <ciManagement>
-        <system>continuum</system>
-        <url>http://wxforge.wx.ll.mit.edu:8080/continuum</url>
+        <system>hudson</system>
+        <url>http://nnew-build:8080/hudson/job/Nujan/</url>
     </ciManagement>
     <!--
          ciManagement> <system>hudson</system>
          <url>http://${ncar.build.host}:8080/hudson</url> </ciManagement -->
 
     <scm>
-        <connection>scm:svn:http://wxforge.wx.ll.mit.edu/svn/nc4writer/trunk</connection>
-        <developerConnection>scm:svn:http://wxforge.wx.ll.mit.edu/svn/nc4writer/trunk</developerConnection>
+        <connection>scm:svn:http://svn.wx.ll.mit.edu/svn/nc4writer/trunk</connection>
+        <developerConnection>scm:svn:http://svn.wx.ll.mit.edu/svn/nc4writer/trunk</developerConnection>
     </scm>
 
     <issueManagement>
@@ -85,7 +85,7 @@
 
         <!-- Other properties -->
         <ncar.build.host>crash</ncar.build.host>
-        <repository.host>wxforge.wx.ll.mit.edu:8080</repository.host>
+        <repository.host>repo.wx.ll.mit.edu</repository.host>
     </properties>
 
     <!-- ================================================ -->
@@ -101,28 +101,13 @@
         </repository>
 
         <repository>
-            <id>wxforge-local</id>
-            <name>local artifacts on wxforge</name>
-            <url>http://wxforge.wx.ll.mit.edu:8080/archiva/repository/local</url>
-            <releases>
-                <enabled>true</enabled>
-            </releases>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
+                  <id>nnew-repositories</id>
+                  <name>External release artifacts for NNEW</name>
+                  <url>http://repo.wx.ll.mit.edu/content/groups/nnew-repositories</url>
+                  <releases><enabled>true</enabled></releases>
+                  <snapshots><enabled>true</enabled></snapshots>
         </repository>
 
-        <repository>
-            <id>wxforge-manual</id>
-            <name>local artifacts on wxforge</name>
-            <url>http://wxforge.wx.ll.mit.edu:8080/archiva/repository/manual</url>
-            <releases>
-                <enabled>true</enabled>
-            </releases>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
-        </repository>
 
         <repository>
             <id>Apache snapshots</id>
@@ -581,27 +566,28 @@
     </reporting>
 
     <!--
-         These settings deploy to the Lincoln Labs repository, and to log in
-         succesfully the settings-external.xml file must be used when running
-         deploy targets Example: mvn -s /tmp/settings-external.xml clean deploy
-     -->
+    These settings deploy to the Lincoln Labs repository, which requires that credentials be present
+    for this repository in ~/.m2/settings.xml.  To deploy a release to nexus repo:
+      mvn deploy -DrepositoryId=snapshots -Durl=http://repo.wx.ll.mit.edu/content/repositories/snapshots
+    -->
     <distributionManagement>
 
         <!-- archiva-managed deployment -->
         <repository>
-            <id>manual</id>
+            <id>releases</id>
             <name>Lincoln Labs Release Repository</name>
-            <url>dav:http://${repository.host}/archiva/repository/local</url>
+            <url>dav:http://${repository.host}/content/repositories/releases</url>
         </repository>
         <snapshotRepository>
-            <id>manual</id>
+            <id>snapshots</id>
             <name>Lincoln Labs Snapshot Repository</name>
-            <url>dav:http://${repository.host}/archiva/repository/local</url>
+            <url>dav:http://${repository.host}/content/repositories/snapshots</url>
         </snapshotRepository>
 
         <site>
-            <id>DeployedSite</id>
-            <url>${sites.path}</url>
+            <id>sites</id>
+            <name>${name}</name>
+            <url>file://${sites.path}</url>
         </site>
 
     </distributionManagement>
