@@ -46,6 +46,23 @@ import edu.ucar.ral.nujan.netcdf.NhGroup;
 import edu.ucar.ral.nujan.netcdf.NhVariable;
 
 
+class FieldSpec {
+  String name;
+  int iscale;
+  double mfact;
+  boolean isFound;
+
+  FieldSpec( String name, int iscale, double mfact) {
+    this.name = name;
+    this.iscale = iscale;
+    this.mfact = mfact;
+    this.isFound = false;
+  }
+} // end class FieldSpec
+
+
+
+
 /**
  * Command line tool to copy a NetCDF4 file (which uses HDF5 format).
  * For usage info, invoke NhCopy with no parameters.
@@ -82,6 +99,12 @@ static void badparms( String msg) {
   prtf("  -compress   compressionLevel for outFile.  0: none,  9: max");
   prtf("  -inFile     input file name.");
   prtf("  -outFile    output file name.");
+  prtf("  -field      name:scale.");
+  prtf("              The -field arg may be repeated.");
+  prtf("                name: fully qualified field name.");
+  prtf("                scale: \"none\" or use scaling:");
+  prtf("                  mfact = 10^scale");
+  prtf("                  val = ((int) (mfact * val)) / mfact");
   prtf("");
   prtf("Example:");
   prtf("java -cp tdcls:netcdfAll-4.0.jar testpk.NhCopy"
@@ -102,6 +125,7 @@ throws NhException
   int compressionLevel = -1;
   String inFile = null;
   String outFile = null;
+  ArrayList<FieldSpec> fieldList = new ArrayList<FieldSpec>();
   int iarg = 0;
   while (iarg < args.length) {
     String key = args[iarg++];
@@ -115,16 +139,48 @@ throws NhException
     }
     else if (key.equals("-inFile")) inFile = val;
     else if (key.equals("-outFile")) outFile = val;
+    else if (key.equals("-field")) {
+      String[] toks = val.split(":");
+      if (toks.length != 2) badparms("invalid -field spec");
+      String name = toks[0];
+      int iscale;
+      double mfact;
+      if (toks[1].equals("none")) {
+        iscale = -9999;
+        mfact = 0;
+      }
+      else {
+        iscale = Integer.parseInt( toks[1]);
+        mfact = 1;
+        if (iscale < 0) {
+          for (int ii = 0; ii < -iscale; ii++) mfact *= 0.1;
+        }
+        else if (iscale > 0) {
+          for (int ii = 0; ii < iscale; ii++) mfact *= 10;
+        }
+      }
+      fieldList.add( new FieldSpec( name, iscale, mfact));
+    }
     else badparms("unknown parm: \"" + key + "\"");
   }
   if (compressionLevel < 0) badparms("parm not specified: -compress");
   if (inFile == null) badparms("parm not specified: -inFile");
   if (outFile == null) badparms("parm not specified: -outFile");
 
+  FieldSpec[] fieldSpecs = fieldList.toArray( new FieldSpec[0]);
+
   if (bugs >= 1) {
     prtf("copyIt: compress: %d", compressionLevel);
     prtf("copyIt: inFile: \"%s\"", inFile);
     prtf("copyIt: outFile: \"%s\"", outFile);
+    if (fieldSpecs.length == 0) prtf("copyIt: fields: (all)");
+    else {
+      for (FieldSpec fspec : fieldSpecs) {
+        String tmsg = "none";
+        if (fspec.iscale != -9999) tmsg = "" + fspec.iscale;
+        prtf("copyIt: field: \"" + fspec.name + "\"  iscale: " + tmsg);
+      }
+    }
   }
 
   NetcdfFile inCdf = null;
@@ -142,11 +198,11 @@ throws NhException
     NhGroup outGroup = outCdf.getRootGroup();
 
     // pass 1: define vars
-    copyGroup( 1, compressionLevel, inGroup, outGroup, bugs);
+    copyGroup( 1, fieldSpecs, compressionLevel, inGroup, outGroup, bugs);
     outCdf.endDefine();
 
     // pass 2: copy data
-    copyGroup( 2, compressionLevel, inGroup, outGroup, bugs);
+    copyGroup( 2, fieldSpecs, compressionLevel, inGroup, outGroup, bugs);
     inCdf.close();
     inCdf = null;
     outCdf.close();
@@ -156,6 +212,15 @@ throws NhException
     exc.printStackTrace();
     badparms("const: caught: " + exc);
   }
+
+  boolean allOk = true;
+  for (FieldSpec fspec : fieldSpecs) {
+    if (! fspec.isFound) {
+      allOk = false;
+      prtf("Error: field not found: \"" + fspec.name + "\"");
+    }
+  }
+  if (! allOk) throwerr("at least one field not found");
 } // end const
 
 
@@ -165,6 +230,7 @@ throws NhException
 
 static void copyGroup(
   int pass,                  // 1: define vars;  2: copy data
+  FieldSpec[] fieldSpecs,    // if len==0, use all fields
   int compressionLevel,      // 0: no compression;  9: max compression
   Group inGroup,
   NhGroup outGroup,
@@ -186,8 +252,13 @@ throws NhException
   for (Variable var : inGroup.getVariables()) {
     if (bugs >= 2) prtf("NhCopy testaa 1: pass: "
       + pass + "  var: " + var.getName());
-    if (pass == 1) copyVarDef( compressionLevel, var, outGroup, bugs);
-    else copyData( var, outGroup, bugs);
+
+    FieldSpec fspec = findFieldSpec( fieldSpecs, var.getName());
+    if (fspec != null) fspec.isFound = true;
+    if (fieldSpecs.length == 0 || fspec != null) {
+      if (pass == 1) copyVarDef( compressionLevel, var, outGroup, bugs);
+      else copyData( fspec, var, outGroup, bugs);
+    }
   }
 
   for (Group inSub : inGroup.getGroups()) {
@@ -195,11 +266,28 @@ throws NhException
     if (pass == 1) outSub = outGroup.addGroup( inSub.getShortName());
     else outSub = outGroup.findSubGroup( inSub.getShortName());
 
-    copyGroup( pass, compressionLevel, inSub, outSub, bugs);
+    copyGroup( pass, fieldSpecs, compressionLevel, inSub, outSub, bugs);
   }
   
 } // end copyGroup
 
+
+
+
+
+static FieldSpec findFieldSpec(
+  FieldSpec[] fieldSpecs,
+  String name)
+{
+  FieldSpec fspec = null;
+  for (FieldSpec tspec : fieldSpecs) {
+    if (tspec.name.equals( name)) {
+      fspec = tspec;
+      break;
+    }
+  }
+  return fspec;
+}
 
 
 
@@ -244,8 +332,20 @@ throws NhException
   else throwerr("unknown type \"%s\" for variable \"%s\"",
     tp, inVar.getName());
 
-  prtf("NhCopy.copyVarDef: name: \"%s\"  type: %s  nhType: %s",
-    inVar.getName(), inVar.getDataType(), NhVariable.nhTypeNames[nhType]);
+  ///String tmsg = "NhCopy.copyVarDef: " + inVar.getNameAndDimensions();
+  ///tmsg += " [";
+  ///for (int ii = 0; ii < inVar.getRank(); ii++) {
+  ///  if (ii > 0) tmsg += ",";
+  ///  tmsg += inVar.getShape(ii);
+  ///}
+  ///tmsg += "]";
+  ///tmsg += "  size: " + inVar.getSize();
+  ///tmsg += "  type: " + inVar.getDataType();
+  ///prtf( tmsg);
+
+  if (bugs >= 1) {
+    prtf("copyVarDef: nhType: %s", NhVariable.nhTypeNames[nhType]);
+  }
 
   // Make a list of our matching dimensions.
   ArrayList<NhDimension> nhDimList = new ArrayList<NhDimension>();
@@ -491,13 +591,14 @@ throws NhException
 
 
 static void copyData(
+  FieldSpec fspec,               // may be null
   Variable inVar,
   NhGroup outGroup,
   int bugs)
 throws NhException
 {
   if (bugs >= 1) {
-    prtf("copyData: inVar: %s", inVar);
+    prtf("copyData: inVar: %s", inVar.getName());
   }
   // Find our corresponding variable
   NhVariable nhVar = null;
@@ -515,6 +616,74 @@ throws NhException
     exc.printStackTrace();
     throwerr("caught: " + exc);
   }
+
+  // Print helpful info: min, max
+  if (bugs >= 0) {
+    String tmsg = "  variable: \"" + inVar.getName() + "\"";
+
+    tmsg += " (";
+    for (int ii = 0; ii < inVar.getRank(); ii++) {
+      if (ii > 0) tmsg += ",";
+      tmsg += inVar.getDimension(ii).getName();
+    }
+    tmsg += ")";
+
+    tmsg += " (";
+    for (int ii = 0; ii < inVar.getRank(); ii++) {
+      if (ii > 0) tmsg += ",";
+      tmsg += inVar.getDimension(ii).getLength();
+    }
+    tmsg += ")";
+
+    tmsg += "  size: " + inVar.getSize();
+    DataType tp = inVar.getDataType();
+    tmsg += "  type: " + tp;
+
+    if (fspec == null || fspec.iscale == -9999) tmsg += "  iscale: none";
+    else tmsg += "  iscale: " + fspec.iscale;
+
+    if (tp == DataType.FLOAT || tp == DataType.DOUBLE) {
+      double minVal = Double.MAX_VALUE;
+      double maxVal = Double.MIN_VALUE;
+      double total = 0;
+      for (int ii = 0; ii < arr.getSize(); ii++) {
+        double vv = arr.getDouble(ii);
+        if (vv < minVal) minVal = vv;
+        if (vv > maxVal) maxVal = vv;
+        total += vv;
+        if (fspec != null && fspec.iscale != -9999) {
+          double roundVal = ((int) (fspec.mfact * vv)) / fspec.mfact;
+          arr.setDouble( ii, roundVal);
+        }
+      }
+      prtf( tmsg + "  min: %g  max: %g  avg: %g",
+        minVal, maxVal, total / (double) arr.getSize());
+    } // if some type of float
+
+    else if (tp == DataType.BYTE || tp == DataType.INT
+     || tp == DataType.LONG || tp == DataType.SHORT)
+    {
+      long minVal = Long.MAX_VALUE;
+      long maxVal = Long.MIN_VALUE;
+      long total = 0;
+      for (int ii = 0; ii < arr.getSize(); ii++) {
+        long vv = arr.getLong(ii);
+        if (vv < minVal) minVal = vv;
+        if (vv > maxVal) maxVal = vv;
+        total += vv;
+        if (fspec != null && fspec.iscale != -9999) {
+          double roundVal = ((int) (fspec.mfact * vv)) / fspec.mfact;
+          arr.setLong( ii, (long) roundVal);
+        }
+      }
+      prtf( tmsg + "  min: %d  max: %d  avg: %g",
+        minVal, maxVal, total / (double) arr.getSize());
+    } // if some type of integer
+
+    else {
+      prtf(  tmsg);
+    }
+  } // if bugs >= 0
 
   Object rawData = decodeArray( arr, bugs);
 
