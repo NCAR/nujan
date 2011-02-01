@@ -351,6 +351,8 @@ throws NhException
  *        If nhDims == null or nhDims.length == 0, chunkLens must be null.
  * @param fillValue The fill value.  The type must agree with nhType
  *    as shown in the table above.
+ *    May be null.
+ *    Must be null for scalar or TP_STRING.
  * @param compressionLevel  Desired level of compression.  0 is no
  *    compression; 1 through 9 are increasing compression.
  *    Scalar data (nhDims == new int[0]) must have compressionLevel = 0.
