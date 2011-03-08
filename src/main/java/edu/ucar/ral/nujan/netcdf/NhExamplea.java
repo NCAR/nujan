@@ -79,18 +79,24 @@ throws NhException
   if (outFile == null) badparms("missing parm: -outFile");
 
   NhFileWriter hfile = new NhFileWriter(
-    outFile, NhFileWriter.OPT_OVERWRITE);
+    outFile, NhFileWriter.OPT_OVERWRITE,
+    1,        // nhDebugLevel
+    1,        // hdfDebugLevel
+    0);       // utcModTime: current time
+
   prtln("hfile: " + hfile);
 
   NhGroup rootGroup = hfile.getRootGroup();
 
   // Usually dimensions are added to the rootGroup, not a subGroup.
-  int rank = 2;             // 2 dimensional data: x, y
+  int rank = 2;          // 2 dimensional data: y, x
+  int[] dimLens = new int[rank];
+  dimLens[0] = 10;      // num y
+  dimLens[1] = 10;      // num x
+
   NhDimension[] nhDims = new NhDimension[ rank];
-  int numx = 10;
-  int numy = 10;
-  nhDims[0] = rootGroup.addDimension( "xdim", numx);
-  nhDims[1] = rootGroup.addDimension( "ydim", numy);
+  nhDims[0] = rootGroup.addDimension( "ydim", dimLens[0]);
+  nhDims[1] = rootGroup.addDimension( "xdim", dimLens[1]);
 
   // Attributes may be added to any group and any variable.
   // Attribute values may be either a String or a 1 dimensional
@@ -132,7 +138,7 @@ throws NhException
     "celsius");
 
   // Add a variable with chunked storage
-  chunkLens = new int[] { 5, 10};
+  chunkLens = new int[] { 7, 7};     // numY, numX
   NhVariable temperature = northernGroup.addVariable(
     "temperature",              // varName
     NhVariable.TP_DOUBLE,       // nhType
@@ -150,21 +156,10 @@ throws NhException
   // Fill the humidityData array.
   // The type and dimensions must match those declared
   // in addVariable above.
-  double[][] humidityData = new double[numx][numy];
-  for (int ix = 0; ix < numx; ix++) {
-    for (int iy = 0; iy < numy; iy++) {
-      humidityData[ix][iy] = 100 * ix + iy;
-    }
-  }
-
-  // Fill the temperatureData arrays, one for each chunk.
-  // The size must match the declared CHUNK, not dimension, lengths.
-  double[][] temperatureDataChunk0 = new double[chunkLens[0]][chunkLens[1]];
-  double[][] temperatureDataChunk1 = new double[chunkLens[0]][chunkLens[1]];
-  for (int ix = 0; ix < chunkLens[0]; ix++) {
-    for (int iy = 0; iy < chunkLens[1]; iy++) {
-      temperatureDataChunk0[ix][iy] = 100 * ix + iy + 1000;
-      temperatureDataChunk1[ix][iy] = 100 * ix + iy + 2000;
+  double[][] humidityData = new double[dimLens[0]][dimLens[1]];
+  for (int iy = 0; iy < dimLens[0]; iy++) {
+    for (int ix = 0; ix < dimLens[1]; ix++) {
+      humidityData[iy][ix] = 100 * iy + ix;
     }
   }
 
@@ -172,11 +167,42 @@ throws NhException
   int[] startIxs = null;
   humidity.writeData( startIxs, humidityData);
 
-  // Write out the temperatureData array in two chunks.
-  startIxs = new int[] {0, 0};
-  temperature.writeData( startIxs, temperatureDataChunk0);
-  startIxs[0] = 5;
-  temperature.writeData( startIxs, temperatureDataChunk1);
+  // Write out the temperatureData array in multiple chunks.
+  startIxs = new int[] {0, 0};    // y, x
+  while (true) {           // one iteration per chunk written
+
+    int chunkLenY = Math.min( chunkLens[0], dimLens[0] - startIxs[0]);
+    int chunkLenX = Math.min( chunkLens[1], dimLens[1] - startIxs[1]);
+    //chunkLenY = chunkLens[0];  // xxx
+    //chunkLenX = chunkLens[1];  // xxx
+    prtln("###### write chunk: startIxs: " + startIxs[0] + "  " + startIxs[1]);
+    prtln("###### write chunk: chunkLenY: " + chunkLenY
+      + "  chunkLenX: " + chunkLenX);
+    double[][] temperatureChunk = new double[chunkLenY][chunkLenX];
+
+    // Fill the chunk with synthetic data
+    for (int iy = 0; iy < chunkLenY; iy++) {
+      for (int ix = 0; ix < chunkLenX; ix++) {
+        temperatureChunk[iy][ix] = 100 * startIxs[0]
+          + startIxs[1]
+          + 100 * iy + ix;
+        prtln("    iy: " + iy + "  ix: " + ix + "  temperature: "
+          + temperatureChunk[iy][ix]);
+      }
+    }
+
+    temperature.writeData( startIxs, temperatureChunk);
+
+    // Increment startIxs for the next chunk
+    for (int jj = rank - 1; jj >= 0; jj--) {
+      startIxs[jj] += chunkLens[jj];
+      if (jj > 0 && startIxs[jj] >= dimLens[jj]) startIxs[jj] = 0;
+      else break;
+    }
+    if (startIxs[0] >= dimLens[0]) break;    // if all chunks were written
+  }
+
+
 
   hfile.close();
   prtln("All done");

@@ -47,7 +47,7 @@
       <artifactId>netcdfJava</artifactId>
       <version>4.1</version>
       <scope>system</scope>
-      <systemPath>/d1/steves/ftp/netcdfJava/netcdfAll-4.1.jar</systemPath>
+      <systemPath>/d1/steves/ftp/netcdfJava/netcdfAll-4.2.jar</systemPath>
     </dependency>
   </dependencies>
 </project>

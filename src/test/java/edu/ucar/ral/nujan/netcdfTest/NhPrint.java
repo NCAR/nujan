@@ -57,7 +57,7 @@ static void badparms( String msg) {
   prtf("  -inFile     input file name.");
   prtf("");
   prtf("Example:");
-  prtf("java -cp x/classes:x/netcdfAll-4.1.jar edu.ucar.ral.nujan.netcdfTest.NhPrint -bugs 0 -sort y -inFile tempa.nc");
+  prtf("java -cp x/classes:x/netcdfAll-4.2.jar edu.ucar.ral.nujan.netcdfTest.NhPrint -bugs 0 -sort y -inFile tempa.nc");
   System.exit(1);
 }
 

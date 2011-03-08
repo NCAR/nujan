@@ -295,8 +295,12 @@ throws HdfException
 
 
 /**
- * Checks that specType == dataType and specDims == dataDims; else
- * throws an HdfException.
+ * Checks that dataType == specType.
+ * Checks that dataDims[i] == chunkDims[i]
+ *      or startIxs[i] == lastPos and dataDims == fullDim - lastPos
+ * where lastPos is the last startIx in this dim.
+ *
+ * Else throws an HdfException.
  * Called by HdfGroup.writeDataSub and MsgAttribute.constructor.
  */
 
@@ -304,8 +308,10 @@ static void checkTypeMatch(
   String msg,
   int specType,               // declared type, one of HdfGroup.DTYPE_*
   int dataType,               // actual data type, one of HdfGroup.DTYPE_*
-  int[] specDims,
-  int[] dataDims)
+  int[] varDims,              // entire var dimensions
+  int[] startIxs,             // current start indices
+  int[] chunkDims,             // specified chunk dims
+  int[] dataDims)             // dims of data object to be written
 throws HdfException
 {
   // Check that dtype and varDims match what the user
@@ -342,26 +348,42 @@ throws HdfException
         + "  data type:     " + HdfGroup.dtypeNames[ dataType] + "\n");
   }
 
-  if (specDims == null) {
+  // Check dimensions
+  // If scalar ...
+  if (chunkDims == null) {
     if (dataDims.length != 0)
       throwerr("type mismatch for: " + msg + "\n"
         + "  declared rank: (null)\n"
         + "  data rank:     " + dataDims.length + "\n");
   }
+
+  // Else not scalar ...
   else {
-    if (dataDims.length != specDims.length)
-      throwerr("type mismatch for: " + msg + "\n"
-        + "  declared rank: " + specDims.length + "\n"
+    // Check rank
+    if (dataDims.length != chunkDims.length)
+      throwerr("Dimension mismatch for: " + msg + "\n"
+        + "  declared rank: " + chunkDims.length + "\n"
         + "  data rank:     " + dataDims.length + "\n");
 
-    for (int ii = 0; ii < specDims.length; ii++) {
-      if (dataDims[ii] != specDims[ii])
-        throwerr("type mismatch for: " + msg + "\n"
+    // Check each dimension
+    for (int ii = 0; ii < chunkDims.length; ii++) {
+      boolean allOk = false;
+      if (dataDims[ii] == chunkDims[ii]) allOk = true;
+      else {
+        if (startIxs[ii] + chunkDims[ii] >= varDims[ii]) {  // if at last pos
+          if (dataDims[ii] == varDims[ii] - startIxs[ii]) allOk = true;
+        }
+      }
+      if (! allOk) {
+        throwerr("Dimension mismatch for: " + msg + "\n"
           + "  data dimension length mismatch for dimension " + ii + "\n"
-          + "  declared dim: " + specDims[ii] + "\n"
-          + "  data dim: " + dataDims[ii] + "\n");
-    }
-  }
+          + "  declared variable len: " + varDims[ii] + "\n"
+          + "  declared chunk len:    " + chunkDims[ii] + "\n"
+          + "  current startIx:       " + startIxs[ii] + "\n"
+          + "  data object dim len:   " + dataDims[ii] + "\n");
+      }
+    } // for ii
+  } // else not scalar
 } // end checkTypeMatch
 
 
@@ -383,7 +405,7 @@ throws HdfException
 {
   if (name == null || name.length() == 0)
     throwerr("Name for %s is empty", loc);
-  if (! Pattern.matches("^[_a-zA-Z][-_a-zA-Z0-9]*$", name))
+  if (! Pattern.matches("^[_a-zA-Z][-_: a-zA-Z0-9]*$", name))
     throwerr("Invalid name for %s.  Name: \"%s\"", loc, name);
 }
 
