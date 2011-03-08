@@ -51,12 +51,14 @@ class FieldSpec {
   int iscale;
   double mfact;
   boolean isFound;
+  int[] chunkLens;
 
   FieldSpec( String name, int iscale, double mfact) {
     this.name = name;
     this.iscale = iscale;
     this.mfact = mfact;
     this.isFound = false;
+    this.chunkLens = null;
   }
 } // end class FieldSpec
 
@@ -99,15 +101,22 @@ static void badparms( String msg) {
   prtf("  -compress   compressionLevel for outFile.  0: none,  9: max");
   prtf("  -inFile     input file name.");
   prtf("  -outFile    output file name.");
-  prtf("  -field      name:scale.");
+  prtf("");
+  prtf("  -field      name:rounding.");
+  prtf("              or");
+  prtf("              name:rounding:chunkLen,chunkLen,... (one len per dim).");
   prtf("              The -field arg may be repeated.");
   prtf("                name: fully qualified field name.");
-  prtf("                scale: \"none\" or use scaling:");
-  prtf("                  mfact = 10^scale");
+  prtf("                rounding: \"none\" or use rounding, like grib2:");
+  prtf("                  mfact = 10^rounding");
   prtf("                  val = ((int) (mfact * val)) / mfact");
+  prtf("                chunkLens: The chunkLen for each dimension,");
+  prtf("                  or omitted.");
+  prtf("                Note: this feature is for testing only,");
+  prtf("                works on float vars having 1 <= rank <= 4.");
   prtf("");
   prtf("Example:");
-  prtf("java -cp tdcls:netcdfAll-4.0.jar testpk.NhCopy"
+  prtf("java -cp tdcls:netcdfAll-4.2.jar testpk.NhCopy"
     + " -compress 0 -inFile ta.nc -outFile tb.nc");
   System.exit(1);
 }
@@ -139,9 +148,10 @@ throws NhException
     }
     else if (key.equals("-inFile")) inFile = val;
     else if (key.equals("-outFile")) outFile = val;
+
     else if (key.equals("-field")) {
       String[] toks = val.split(":");
-      if (toks.length != 2) badparms("invalid -field spec");
+      if (toks.length < 2) badparms("invalid -field spec");
       String name = toks[0];
       int iscale;
       double mfact;
@@ -159,8 +169,16 @@ throws NhException
           for (int ii = 0; ii < iscale; ii++) mfact *= 10;
         }
       }
-      fieldList.add( new FieldSpec( name, iscale, mfact));
-    }
+      FieldSpec fspec = new FieldSpec( name, iscale, mfact);
+      fieldList.add( fspec);
+      if (toks.length > 2) {      // get chunkLens
+        fspec.chunkLens = new int[ toks.length - 2];
+        for (int ii = 0; ii < fspec.chunkLens.length; ii++) {
+          fspec.chunkLens[ii] = Integer.parseInt( toks[2+ii]);
+        }
+      }
+    } // if key == "-field"
+
     else badparms("unknown parm: \"" + key + "\"");
   }
   if (compressionLevel < 0) badparms("parm not specified: -compress");
@@ -255,9 +273,17 @@ throws NhException
 
     FieldSpec fspec = findFieldSpec( fieldSpecs, var.getName());
     if (fspec != null) fspec.isFound = true;
+    // Only process the field if it is in fieldSpecs,
+    // or if no fieldSpecs were given.
     if (fieldSpecs.length == 0 || fspec != null) {
-      if (pass == 1) copyVarDef( compressionLevel, var, outGroup, bugs);
-      else copyData( fspec, var, outGroup, bugs);
+      if (var.getDataType() == DataType.STRUCTURE) {
+        if (pass == 1) prtf("Warning: skipping structure: " + var);
+      }
+      else {
+        if (pass == 1)
+          copyVarDef( fspec, compressionLevel, var, outGroup, bugs);
+        else copyData( fspec, var, outGroup, bugs);
+      }
     }
   }
 
@@ -296,6 +322,7 @@ static FieldSpec findFieldSpec(
 
 
 static void copyVarDef(
+  FieldSpec fspec,
   int compressionLevel,      // 0: no compression;  9: max compression
   Variable inVar,
   NhGroup outGroup,
@@ -347,30 +374,12 @@ throws NhException
     prtf("copyVarDef: nhType: %s", NhVariable.nhTypeNames[nhType]);
   }
 
-  // Make a list of our matching dimensions.
-  ArrayList<NhDimension> nhDimList = new ArrayList<NhDimension>();
-  for (Dimension dim : inVar.getDimensions()) {
-    // Search outGroup and it's ancestors for a NhDimension
-    // having the same name as dim.
-    NhDimension nhDim = null;
-    NhGroup grp = outGroup;
-    while (grp != null) {
-      for (NhDimension nhd : grp.getDimensions()) {
-        if (nhd.getName().equals( dim.getName())) {
-          nhDim = nhd;
-          break;
-        }
-      }
-      if (nhDim != null) break;
-      grp = grp.getParentGroup();
-    }
-    if (nhDim == null)
-      throwerr("cannot find dimension \"%s\" for variable \"%s\"",
-        dim.getName(), inVar.getName());
-    nhDimList.add( nhDim);
-  } // for each dim
+  NhDimension[] nhDims = getNhDims( inVar, outGroup);
 
-  NhDimension[] nhDims = nhDimList.toArray( new NhDimension[0]);
+  int[] dimLens = new int[nhDims.length];
+  for (int ii = 0; ii < dimLens.length; ii++) {
+    dimLens[ii] = nhDims[ii].getLength();
+  }
 
   // Get the fill value, if specified
   Object fillValue = null;
@@ -449,20 +458,32 @@ throws NhException
     }
   }
 
-  int[] chunkLens = null;
+
+  int[] useChunkLens = null;
   if (nhDims.length > 0) {
-    chunkLens = new int[ nhDims.length];
-    for (int ii = 0; ii < nhDims.length; ii++) {
-      chunkLens[ii] = nhDims[ii].getLength();
+    if (fspec != null && fspec.chunkLens != null) {
+      if (nhDims.length == 0)
+        throwerr("cannot spec chunkLens for scaler.  inVar: " + inVar);
+      if (fspec.chunkLens.length != nhDims.length)
+        throwerr("chunkLens rank mismatch for inVar: " + inVar);
+      for (int ii = 0; ii < nhDims.length; ii++) {
+        if (fspec.chunkLens[ii] > dimLens[ii])
+          throwerr("chunkLen exceeds dim for var: " + inVar);
+      }
+      useChunkLens = fspec.chunkLens;
+    }
+    else {
+      useChunkLens = dimLens;
     }
   }
+
   int compress = compressionLevel;
   if (nhDims.length == 0) compress = 0;        // cannot compress a scalar
   NhVariable outVar = outGroup.addVariable(
     inVar.getShortName(),
     nhType,
     nhDims,
-    chunkLens,
+    useChunkLens,
     fillValue,
     compress);
 
@@ -472,6 +493,44 @@ throws NhException
   }
 
 } // end copyVarDef
+
+
+
+
+
+
+static NhDimension[] getNhDims(
+  Variable inVar,
+  NhGroup outGroup)
+throws NhException
+{
+
+  // Make a list of our matching dimensions.
+  ArrayList<NhDimension> nhDimList = new ArrayList<NhDimension>();
+  for (Dimension dim : inVar.getDimensions()) {
+    // Search outGroup and it's ancestors for a NhDimension
+    // having the same name as dim.
+    NhDimension nhDim = null;
+    NhGroup grp = outGroup;
+    while (grp != null) {
+      for (NhDimension nhd : grp.getDimensions()) {
+        if (nhd.getName().equals( dim.getName())) {
+          nhDim = nhd;
+          break;
+        }
+      }
+      if (nhDim != null) break;
+      grp = grp.getParentGroup();
+    }
+    if (nhDim == null)
+      throwerr("cannot find dimension \"%s\" for variable \"%s\"",
+        dim.getName(), inVar.getName());
+    nhDimList.add( nhDim);
+  } // for each dim
+
+  NhDimension[] nhDims = nhDimList.toArray( new NhDimension[0]);
+  return nhDims;
+}
 
 
 
@@ -687,10 +746,113 @@ throws NhException
 
   Object rawData = decodeArray( arr, bugs);
 
-  int[] startIxs = null;
-  if (inVar.getRank() > 0) startIxs = new int[ inVar.getRank()];
-  nhVar.writeData( startIxs, rawData);
-}
+  int[] starts = null;      // startIxs
+  if (inVar.getRank() > 0) starts = new int[ inVar.getRank()];
+  if (fspec != null && fspec.chunkLens != null) {
+
+    // Get dimLens so we can check chunkLens
+    NhDimension[] nhDims = getNhDims( inVar, outGroup);
+    int[] dimLens = new int[nhDims.length];
+    for (int ii = 0; ii < dimLens.length; ii++) {
+      dimLens[ii] = nhDims[ii].getLength();
+    }
+
+    int[] clens = fspec.chunkLens;
+    if (dimLens.length == 1) {
+      if (! (rawData instanceof float[]))
+        throwerr("wrong type for rawData: " + rawData.getClass());
+      float[] fvals = (float[]) rawData;
+      float[] chunkVals = new float[clens[0]];
+      for (starts[0] = 0; starts[0] < dimLens[0]; starts[0] += clens[0]) {
+        for (int ia = 0; ia < clens[0]; ia++) {
+          if (starts[0] + ia >= dimLens[0]) break;
+          chunkVals[ia] = fvals[starts[0]+ia];
+        }
+        nhVar.writeData( starts, chunkVals);
+      }
+    } // if rank == 1
+
+    else if (dimLens.length == 2) {
+      if (! (rawData instanceof float[][]))
+        throwerr("wrong type for rawData: " + rawData.getClass());
+      float[][] fvals = (float[][]) rawData;
+      float[][] chunkVals = new float[clens[0]][clens[1]];
+      for (starts[0] = 0; starts[0] < dimLens[0]; starts[0] += clens[0]) {
+        for (starts[1] = 0; starts[1] < dimLens[1]; starts[1] += clens[1]) {
+          for (int ia = 0; ia < clens[0]; ia++) {
+            if (starts[0] + ia >= dimLens[0]) break;
+            for (int ib = 0; ib < clens[1]; ib++) {
+              if (starts[1] + ib >= dimLens[1]) break;
+              chunkVals[ia][ib] = fvals[starts[0]+ia][starts[1]+ib];
+            }
+          } // for ia
+          nhVar.writeData( starts, chunkVals);
+        } // for starts[1]
+      } // for starts[0]
+    } // if rank == 2
+
+    else if (dimLens.length == 3) {
+      if (! (rawData instanceof float[][][]))
+        throwerr("wrong type for rawData: " + rawData.getClass());
+      float[][][] fvals = (float[][][]) rawData;
+      float[][][] chunkVals = new float[clens[0]][clens[1]][clens[2]];
+      for (starts[0] = 0; starts[0] < dimLens[0]; starts[0] += clens[0]) {
+        for (starts[1] = 0; starts[1] < dimLens[1]; starts[1] += clens[1]) {
+          for (starts[2] = 0; starts[2] < dimLens[2]; starts[2] += clens[2]) {
+            for (int ia = 0; ia < clens[0]; ia++) {
+              if (starts[0] + ia >= dimLens[0]) break;
+              for (int ib = 0; ib < clens[1]; ib++) {
+                if (starts[1] + ib >= dimLens[1]) break;
+                for (int ic = 0; ic < clens[2]; ic++) {
+                  if (starts[2] + ic >= dimLens[2]) break;
+                    chunkVals[ia][ib][ic]
+                      = fvals[starts[0]+ia][starts[1]+ib][starts[2]+ic];
+                }
+              }
+            } // for ia
+            nhVar.writeData( starts, chunkVals);
+          } // for starts[2]
+        } // for starts[1]
+      } // for starts[0]
+    } // if rank == 3
+
+    else if (dimLens.length == 4) {
+      if (! (rawData instanceof float[][][][]))
+        throwerr("wrong type for rawData: " + rawData.getClass());
+      float[][][][] fvals = (float[][][][]) rawData;
+      float[][][][] chunkVals
+        = new float[clens[0]][clens[1]][clens[2]][clens[3]];
+      for (starts[0] = 0; starts[0] < dimLens[0]; starts[0] += clens[0]) {
+        for (starts[1] = 0; starts[1] < dimLens[1]; starts[1] += clens[1]) {
+          for (starts[2] = 0; starts[2] < dimLens[2]; starts[2] += clens[2]) {
+            for (starts[3] = 0; starts[3] < dimLens[3]; starts[3] += clens[3]) {
+              for (int ia = 0; ia < clens[0]; ia++) {
+                if (starts[0] + ia >= dimLens[0]) break;
+                for (int ib = 0; ib < clens[1]; ib++) {
+                  if (starts[1] + ib >= dimLens[1]) break;
+                  for (int ic = 0; ic < clens[2]; ic++) {
+                    if (starts[2] + ic >= dimLens[2]) break;
+                    for (int id = 0; id < clens[3]; id++) {
+                      if (starts[3] + id >= dimLens[3]) break;
+                        chunkVals[ia][ib][ic][id] = fvals[starts[0]+ia]
+                          [starts[1]+ib][starts[2]+ic][starts[3]+id];
+                    }
+                  }
+                }
+              } // for ia
+              nhVar.writeData( starts, chunkVals);
+            } // for starts[3]
+          } // for starts[2]
+        } // for starts[1]
+      } // for starts[0]
+    } // if rank == 4
+
+  } // if chunkLens were specified
+
+  else {   // else no chunkLens
+    nhVar.writeData( starts, rawData);
+  }
+} // end copyData
 
 
 

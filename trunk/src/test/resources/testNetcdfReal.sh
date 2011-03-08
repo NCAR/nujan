@@ -9,7 +9,7 @@
 # For usage, see badparms below.
 #
 
-NCJAR=/d1/steves/ftp/netcdfJava/netcdfAll-4.1.jar
+NCJAR=/d1/steves/ftp/netcdfJava/netcdfAll-4.2.jar
 BUILDDIR=../../../target/test-classes:../../../target/classes
 PKGBASE=edu.ucar.ral.nujan
 TESTDIR=.

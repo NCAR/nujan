@@ -188,8 +188,14 @@ throws HdfException
 
   // Check that the dataDtype and dataVarDims match what the user declared.
   if (attrValue != null) {
-    HdfUtil.checkTypeMatch( getPath(), attrType, dataDtype,
-      dataVarDims, dataVarDims);    // specDims, dataDims
+    HdfUtil.checkTypeMatch(
+      getPath(),
+      attrType,
+      dataDtype,
+      dataVarDims,                    // var dims
+      new int[dataVarDims.length],    // startIxs == all 0
+      dataVarDims,                    // chunkLens
+      dataVarDims);                   // dataDims
   }
 
   String[] memberNames = null;
@@ -363,6 +369,7 @@ throws HdfException
     hdfGroup.formatRawData(
       attrType,
       stgFieldLen,
+      dataVarDims,                         // chunkDataLens
       attrValue,
       new HdfModInt(0),
       hdfFile.mainGlobalHeap.blkPosition,  // gcolAddr for DTYPE_STRING_VAR
@@ -376,6 +383,7 @@ throws HdfException
     hdfGroup.formatRawData(
       attrType,
       stgFieldLen,
+      dataVarDims,             // chunkDataLens
       attrValue,
       new HdfModInt(0),
       0,                       // gcolAddr for DTYPE_STRING_VAR

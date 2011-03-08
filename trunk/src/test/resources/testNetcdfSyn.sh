@@ -13,7 +13,7 @@
 #   for ii in 0 1 2 3 4 5; do diff <(sed -e '1,/ncdump/ d'  testVerif/test.int.rank.$ii.out) <(sed -e '1,/ncdump/ d'  testVerif/test.double.rank.$ii.out) | less; done
 
 
-NCJAR=/d1/steves/ftp/netcdfJava/netcdfAll-4.1.jar
+NCJAR=/d1/steves/ftp/netcdfJava/netcdfAll-4.2.jar
 BUILDDIR=../../../target/test-classes:../../../target/classes
 PKGBASE=edu.ucar.ral.nujan
 TESTDIR=.

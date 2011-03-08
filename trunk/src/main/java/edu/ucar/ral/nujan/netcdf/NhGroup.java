@@ -392,8 +392,9 @@ throws NhException
   if (fillValue != null) {
     if (nhType == NhVariable.TP_STRING_VAR)
       throwerr("TP_STRING_* variables must have fillValue == null");
-    if (nhDims == null || nhDims.length == 0)
-      throwerr("scalar variables must have fillValue == null");
+    // Allow fillValue even with scalars, since some datasets have that.
+    //if (nhDims == null || nhDims.length == 0)
+    //  throwerr("scalar variables must have fillValue == null");
   }
 
   NhVariable nhVar = null;
@@ -523,7 +524,7 @@ throws NhException
 {
   if (name == null || name.length() == 0)
     throwerr("Name for %s is empty", loc);
-  if (! Pattern.matches("^[_a-zA-Z][-_a-zA-Z0-9]*$", name))
+  if (! Pattern.matches("^[_a-zA-Z][-_: a-zA-Z0-9]*$", name))
     throwerr("Invalid name for %s.  Name: \"%s\"", loc, name);
 }
 
