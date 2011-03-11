@@ -50,6 +50,7 @@ import java.util.ArrayList;
 class BtreeNode extends BaseBlk {
 
 
+/** The group containing the chunks to be represented by this BtreeNode */
 HdfGroup hdfGroup;
 
 ArrayList<byte[]> keyList;
@@ -80,7 +81,8 @@ final byte[] highKey = new byte[] {
  *
  * @param compressionLevel Zip compression level:
  *        0 is uncompressed; 1 - 9 are increasing compression.
- * @param hdfGroup The owning group.
+ * @param hdfGroup The owning group, containing the chunks to be
+ *        represented by this BtreeNode.
  * @param hdfFile The global owning HdfFileWriter.
  */
 
@@ -201,6 +203,9 @@ throws HdfException
 {
   setFormatEntry( formatPass, true, fmtBuf); // BaseBlk: set blkPos, buf pos
 
+  int numChunk = hdfGroup.hdfChunks.length;
+  if (numChunk > hdfFile.maxNumBtreeKid) hdfFile.maxNumBtreeKid = numChunk;
+
   fmtBuf.putBufByte("BtreeNode: signa", signa);
   fmtBuf.putBufByte("BtreeNode: signb", signb);
   fmtBuf.putBufByte("BtreeNode: signc", signc);
@@ -208,7 +213,8 @@ throws HdfException
 
   fmtBuf.putBufByte("BtreeNode: nodeType", 1);   // data node
   fmtBuf.putBufByte("BtreeNode: nodeLevel", nodeLevel);
-  fmtBuf.putBufShort("BtreeNode: numChunk", hdfGroup.hdfChunks.length);
+
+  fmtBuf.putBufShort("BtreeNode: numChunk", numChunk);
 
   fmtBuf.putBufLong("BtreeNode: leftSibling.pos",
     HdfFileWriter.UNDEFINED_ADDR);

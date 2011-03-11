@@ -109,6 +109,13 @@ static final String[] statusNames = {
 
 
 /**
+ * The superblock extension
+ */
+HdfGroup extensionGroup;
+
+
+
+/**
  * The one and only root Group.
  */
 HdfGroup rootGroup;
@@ -149,6 +156,11 @@ long utcModTimeMilliSec;
  * The time of the file open, in seconds after 1970.
  */
 long utcModTimeSec;
+
+/**
+ * The max num of kids in any Btree node.
+ */
+int maxNumBtreeKid = 100;
 
 /**
  * Current indentation level, for debug only.
@@ -227,11 +239,6 @@ final int consistencyFlag = 0;
  */
 final long baseAddress = 0;
 
-/**
- * HDF5 file format: offset of superblock extension.
- * Always 0; not used by this software.
- */
-final long superblockExtensionAddress = UNDEFINED_ADDR;    // -1
 
 /**
  * Current address of the end of file.
@@ -303,9 +310,12 @@ throws HdfException
   utcModTimeSec = utcModTimeMilliSec / 1000;
   indent = 0;
 
+  // Make the superBlock extension
+  extensionGroup = new HdfGroup( this);
+
   // Make rootGroup
   String rootName = "";
-  rootGroup = new HdfGroup( rootName, null, this);
+  rootGroup = new HdfGroup( rootName, null, this);   // parent = null
 
   try {
     if ( ((optFlag & OPT_ALLOW_OVERWRITE) == 0)
@@ -608,8 +618,11 @@ throws HdfException
   fmtBuf.putBufByte("HdfFileWriter: LENGTH_SIZE", OFFSET_SIZE);
   fmtBuf.putBufByte("HdfFileWriter: consistencyFlag", consistencyFlag);
   fmtBuf.putBufLong("HdfFileWriter: baseAddress", baseAddress);
-  fmtBuf.putBufLong("HdfFileWriter: superblockExtensionAddress",
-    superblockExtensionAddress);
+
+  long extenAddr = UNDEFINED_ADDR;    // -1
+  if (extensionGroup != null) extenAddr = extensionGroup.blkPosition;
+  fmtBuf.putBufLong("HdfFileWriter: superblockExtensionAddress", extenAddr);
+
   fmtBuf.putBufLong("HdfFileWriter: eofAddr", eofAddr);
   fmtBuf.putBufLong("HdfFileWriter: rootGroupAddr", rootGroup.blkPosition);
   long endPos = fmtBuf.getPos();
@@ -618,6 +631,7 @@ throws HdfException
   fmtBuf.putBufInt("HdfFileWriter: checkSumHack", checkSumHack);
 
   // External block
+  if (extensionGroup != null) addWork("HdfFileWriter", extensionGroup);
   addWork("HdfFileWriter", rootGroup);
 
   noteFormatExit( fmtBuf);         // BaseBlk: print debug

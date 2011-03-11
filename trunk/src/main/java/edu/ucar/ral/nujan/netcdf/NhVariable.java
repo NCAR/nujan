@@ -426,7 +426,7 @@ throws NhException
       + "  type: " + NhVariable.nhTypeNames[atType]);
   }
   if (nhFile.bugs >= 10) {
-    prtf("  attrValue: " + attrValue);
+    prtf("  attrValue: \"%s\"", attrValue);
   }
   NhGroup.checkName( attrName, "attribute in variable \"" + varName + "\"");
 
@@ -603,8 +603,8 @@ throws NhException
 
   if (bugs >= 10) {
     prtf("getAttrValue: loc: " + loc + "  attrName: " + attrName);
-    prtf("  specd attrValue: " + attrValue);
-    prtf("  final resValue:  " + resValue);
+    prtf("  specd attrValue: \"%s\"", attrValue);
+    prtf("  final resValue:  %s", resValue);
   }
 
   return resValue;

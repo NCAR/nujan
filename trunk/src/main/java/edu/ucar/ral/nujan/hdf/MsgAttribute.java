@@ -169,14 +169,15 @@ throws HdfException
   dataVarDims = Arrays.copyOfRange( dataInfo, 3, dataInfo.length);
 
   if (hdfFile.bugs >= 1) {
-    prtf("MsgAttribute: actual data:" + "\n"
-      + "  attrValue object: " + attrValue + "\n"
+    prtf("MsgAttribute: actual data:\n"
+      + "  attrValue object: \"%s\"\n"
       + "  attrValue dtype: " + HdfGroup.dtypeNames[ dataDtype] + "\n"
       + "  attrValue totNumEle: " + totNumEle + "\n"
       + "  attrValue elementLen: " + elementLen + "\n"
       + "  attrValue rank: " + dataVarDims.length + "\n"
       + "  attrValue type and dims: "
-      + HdfUtil.formatDtypeDim( dataDtype, dataVarDims));
+      + HdfUtil.formatDtypeDim( dataDtype, dataVarDims),
+      attrValue);
     if (attrValue != null)
       prtf("MsgAttribute: attrValue class: " + attrValue.getClass());
   }

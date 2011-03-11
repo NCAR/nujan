@@ -91,6 +91,7 @@ throws NhException
   // Usually dimensions are added to the rootGroup, not a subGroup.
   int rank = 2;          // 2 dimensional data: y, x
   int[] dimLens = new int[rank];
+
   dimLens[0] = 10;      // num y
   dimLens[1] = 10;      // num x
 
@@ -173,10 +174,9 @@ throws NhException
 
     int chunkLenY = Math.min( chunkLens[0], dimLens[0] - startIxs[0]);
     int chunkLenX = Math.min( chunkLens[1], dimLens[1] - startIxs[1]);
-    //chunkLenY = chunkLens[0];  // xxx
-    //chunkLenX = chunkLens[1];  // xxx
-    prtln("###### write chunk: startIxs: " + startIxs[0] + "  " + startIxs[1]);
-    prtln("###### write chunk: chunkLenY: " + chunkLenY
+    prtln("NhExamplea: write chunk: startIxs: "
+      + startIxs[0] + "  " + startIxs[1]
+      + "  chunkLenY: " + chunkLenY
       + "  chunkLenX: " + chunkLenX);
     double[][] temperatureChunk = new double[chunkLenY][chunkLenX];
 
