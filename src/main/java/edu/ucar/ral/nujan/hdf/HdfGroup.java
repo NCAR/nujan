@@ -128,6 +128,12 @@ MsgFillValue msgFillValue;
 /** An HDF5 modification time message, contained in our hdrMsgList. */
 MsgModTime msgModTime;
 
+/**
+ * An HDF5 k_value message, contained in our hdrMsgList.
+ * Used only by the superBlockExtension group.
+ */
+MsgKvalue msgKvalue;
+
 /** An HDF5 attribute message, contained in our hdrMsgList. */
 MsgAttrInfo msgAttrInfo;
 
@@ -226,6 +232,44 @@ int[] totChunkNums;
 HdfChunk[] hdfChunks;
 
 int linkCreationOrder = 0;
+
+
+
+
+
+
+
+
+
+/**
+ * Creates an HDF5 group that is the superblock extension.
+ * @param hdfFile The global owning HdfFileWriter.
+ */
+
+HdfGroup(
+  HdfFileWriter hdfFile)
+throws HdfException
+{
+  super("HdfGroup: " + "superBlockExtension", hdfFile);
+  this.isVariable = false;
+  this.groupName = "superBlockExtension";
+  this.parentGroup = null;
+
+  if (hdfFile.bugs >= 1) {
+    prtf("HdfGroup: new superblock extension group");
+  }
+
+  subGroupList = new ArrayList<HdfGroup>();
+  subVariableList = new ArrayList<HdfGroup>();
+  msgModTime = new MsgModTime( hdfFile.utcModTimeMilliSec, this, hdfFile);
+  msgKvalue = new MsgKvalue( this, hdfFile);
+
+  // Build message list
+  hdrMsgList = new ArrayList<MsgBase>();
+  hdrMsgList.add( msgModTime);
+  hdrMsgList.add( msgKvalue);
+}
+
 
 
 
@@ -716,7 +760,7 @@ throws HdfException
   }
   if (hdfFile.bugs >= 5) {
     prtf("  attr isVlen: " + isVlen);
-    prtf("  attrValue: " + HdfUtil.formatObject( attrValue));
+    prtf("  attrValue: \"%s\"", HdfUtil.formatObject( attrValue));
   }
   HdfUtil.checkName( attrName,
     "attribute in group \"" + groupName + "\"");
@@ -1051,6 +1095,8 @@ throws HdfException, IOException
     HBuffer refBuf = new HBuffer( null, compressionLevel, hdfFile);
     long gcolAddr = hdfFile.outChannel.position();
 
+    if (hdfFile.bugs >= 2)
+      prtf("writeDataSub: call formatRawData for string data");
     formatRawData(
       dtype,
       0,               // stgFieldLen for DTYPE_STRING_FIX
@@ -1081,6 +1127,8 @@ throws HdfException, IOException
     chunk.chunkDataAddr = HdfUtil.alignLong( 8, hdfFile.eofAddr);
     hdfFile.outChannel.position( chunk.chunkDataAddr);
 
+    if (hdfFile.bugs >= 2)
+      prtf("writeDataSub: call formatRawData for numeric data");
     formatRawData(
       dtype,
       stgFieldLen,
@@ -1401,35 +1449,57 @@ void formatRawData(
 throws HdfException
 {
   if (vdata == null) throwerr("vdata is null");
+  if (hdfFile.bugs >= 2)
+    prtIndent("formatRawData entry: groupName: " + groupName
+      + "  fmtBuf: " + fmtBuf);
 
   if (vdata instanceof Object[]) {
-    int[] subLens = Arrays.copyOfRange(
-      chunkDataLens, 1, chunkDataLens.length);
     Object[] objVec = (Object[]) vdata;
-    for (int ii = 0; ii < objVec.length; ii++) {
-      formatRawData(                               // recursion
-        dtp,
-        stgFieldLen,
-        subLens,
-        objVec[ii],
-        cntr,
-        gcolAddr,
-        gcol,
-        fmtBuf);
-    }
-    // If this dimension is too short, pad it out
-    // by rewritign objvec[0].
-    for (int ii = 0; ii < chunkDataLens.length - objVec.length; ii++) {
-      if (objVec.length == 0) throwerr("invalid objVec: len == 0");
-      formatRawData(                               // recursion
-        dtp,
-        stgFieldLen,
-        subLens,
-        objVec[0],
-        cntr,
-        gcolAddr,
-        gcol,
-        fmtBuf);
+    if (hdfFile.bugs >= 2)
+      prtIndent("formatRawData objVec len: " + objVec.length
+        + "  chunkDataLens: " + HdfUtil.formatInts( chunkDataLens));
+    if (chunkDataLens.length > 0) {
+      int[] subLens = Arrays.copyOfRange(
+        chunkDataLens, 1, chunkDataLens.length);
+
+      for (int ii = 0; ii < objVec.length; ii++) {
+        if (hdfFile.bugs >= 2)
+          prtIndent("formatRawData: recurse for data.  ii: " + ii);
+        hdfFile.indent++;
+        formatRawData(                               // recursion
+          dtp,
+          stgFieldLen,
+          subLens,
+          objVec[ii],
+          cntr,
+          gcolAddr,
+          gcol,
+          fmtBuf);
+        hdfFile.indent--;
+      }
+
+      // If this dimension is too short, pad it out
+      // by rewriting objvec[0].
+
+      int padLen = chunkDataLens[0] - objVec.length;
+      if (hdfFile.bugs >= 2)
+        prtIndent("formatRawData: padLen: " + padLen);
+      for (int ii = 0; ii < padLen; ii++) {
+        if (objVec.length == 0) throwerr("invalid objVec: len == 0");
+        if (hdfFile.bugs >= 2)
+          prtIndent("formatRawData: recurse for pad.  ii: " + ii);
+        hdfFile.indent++;
+        formatRawData(                               // recursion
+          dtp,
+          stgFieldLen,
+          subLens,
+          objVec[0],
+          cntr,
+          gcolAddr,
+          gcol,
+          fmtBuf);
+        hdfFile.indent--;
+      }
     }
   }
   else if (vdata instanceof Byte) {
@@ -1512,6 +1582,8 @@ throws HdfException
   else if (vdata instanceof byte[]) {
     checkDtype( DTYPE_SFIXED08, DTYPE_UFIXED08, dtp);
     byte[] avec = (byte[]) vdata;
+    if (hdfFile.bugs >= 2)
+      prtIndent("formatRawData byte vec len: " + avec.length);
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufByte("formatRawData", 0xff & avec[ii]);
     }
@@ -1523,6 +1595,8 @@ throws HdfException
   else if (vdata instanceof short[]) {
     checkDtype( DTYPE_FIXED16, dtp);
     short[] avec = (short[]) vdata;
+    if (hdfFile.bugs >= 2)
+      prtIndent("formatRawData short vec len: " + avec.length);
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufShort("formatRawData", 0xffff & avec[ii]);
     }
@@ -1534,6 +1608,8 @@ throws HdfException
   else if (vdata instanceof int[]) {
     checkDtype( DTYPE_FIXED32, dtp);
     int[] avec = (int[]) vdata;
+    if (hdfFile.bugs >= 2)
+      prtIndent("formatRawData int vec len: " + avec.length);
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufInt("formatRawData", avec[ii]);
     }
@@ -1545,6 +1621,8 @@ throws HdfException
   else if (vdata instanceof long[]) {
     checkDtype( DTYPE_FIXED64, dtp);
     long[] avec = (long[]) vdata;
+    if (hdfFile.bugs >= 2)
+      prtIndent("formatRawData long vec len: " + avec.length);
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufLong("formatRawData", avec[ii]);
     }
@@ -1556,6 +1634,8 @@ throws HdfException
   else if (vdata instanceof float[]) {
     checkDtype( DTYPE_FLOAT32, dtp);
     float[] avec = (float[]) vdata;
+    if (hdfFile.bugs >= 2)
+      prtIndent("formatRawData float vec len: " + avec.length);
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufFloat("formatRawData", avec[ii]);
     }
@@ -1567,6 +1647,8 @@ throws HdfException
   else if (vdata instanceof double[]) {
     checkDtype( DTYPE_FLOAT64, dtp);
     double[] avec = (double[]) vdata;
+    if (hdfFile.bugs >= 2)
+      prtIndent("formatRawData double vec len: " + avec.length);
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufDouble("formatRawData", avec[ii]);
     }
@@ -1582,6 +1664,8 @@ throws HdfException
     // do 1 char -> 1 byte encoding.
     checkDtype( DTYPE_STRING_FIX, dtp);
     char[] avec = (char[]) vdata;
+    if (hdfFile.bugs >= 2)
+      prtIndent("formatRawData char vec len: " + avec.length);
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufByte("formatRawData", 0xff & avec[ii]);
     }
@@ -1591,6 +1675,11 @@ throws HdfException
     }
   }
   else throwerr("unknown raw data type.  class: " + vdata.getClass());
+
+  hdfFile.indent--;
+  if (hdfFile.bugs >= 2)
+    prtIndent("formatRawData exit:  groupName: " + groupName
+      + "  fmtBuf: " + fmtBuf);
 } // end formatRawData
 
 
