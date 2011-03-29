@@ -34,7 +34,7 @@ import edu.ucar.ral.nujan.hdf.HdfException;
 
 
 // Create test data.
-//   genHdfData is used by Testa.java and netcdf/TestNetcdfa.java.
+//   genHdfData is used by Thdfa.java and netcdf/netcdfTest/Tnetcdfa.java.
 //   genNhData is a thin wrapper to interpret type strings like "short",
 //     and is used by netcdf/TestNetcdfa.java.
 

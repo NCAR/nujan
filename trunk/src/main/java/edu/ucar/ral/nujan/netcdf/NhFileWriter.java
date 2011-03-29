@@ -77,7 +77,7 @@ public static final String[] statusNames = {
 
 
 String path;
-int optFlag;                     // zero or more OPT_* bit options
+int optFlag;                    // zero or more OPT_* bit options
 
 
 int fileStatus;                 // one of ST_*
@@ -102,9 +102,8 @@ public NhFileWriter(
   String path)
 throws NhException
 {
-  this( path, 0, 0, 0, 0);  // optFlag = 0
-                               // bugs = 0, 0
-                               // utcModTime = 0 (use current time)
+  this( path, 0, 0, 0, 0, null, null);
+  // optFlag = 0, bugs = 0,0, utcModTime = 0 (use current time)
 }
 
 
@@ -118,12 +117,28 @@ throws NhException
 
 public NhFileWriter(
   String path,
-  int optFlag)                    // zero or more OPT_* bit options
+  int optFlag)               // zero or more OPT_* bit options
 throws NhException
 {
-  this( path, optFlag, 0, 0, 0);  // bugs = 0, 0,
-                                     // utcModTime = 0 (use current time)
+  this( path, optFlag, 0, 0, 0, null, null);
+  // bugs = 0,0, utcModTime = 0 (use current time)
 }
+
+
+
+
+public NhFileWriter(
+  String path,
+  int optFlag,               // zero or more OPT_* bit options
+  String logDir,             // for performance testing only
+  String statTag)            // for performance testing only
+throws NhException
+{
+  this( path, optFlag, 0, 0, 0, logDir, statTag);
+  // bugs = 0,0, utcModTime = 0 (use current time)
+}
+
+
 
 
 
@@ -145,10 +160,12 @@ throws NhException
 
 public NhFileWriter(
   String path,
-  int optFlag,                   // zero or more OPT_* bit options
+  int optFlag,               // zero or more OPT_* bit options
   int nhDebugLevel,
   int hdfDebugLevel,
-  long utcModTime)           // milliSecs since 1970, or if 0 use current time
+  long utcModTime,           // milliSecs since 1970, or if 0 use current time
+  String logDir,             // for performance testing only
+  String statTag)            // for performance testing only
 throws NhException
 {
   this.path = path;
@@ -167,7 +184,7 @@ throws NhException
     if ((optFlag & OPT_OVERWRITE) != 0)
       hdfOptFlag |= HdfFileWriter.OPT_ALLOW_OVERWRITE;
     hdfFile = new HdfFileWriter(
-      path, hdfOptFlag, hdfDebugLevel, utcModTime);
+      path, hdfOptFlag, hdfDebugLevel, utcModTime, logDir, statTag);
     rootGroup = new NhGroup( "", null, this);
       // rootName, parent, nhFileWriter
     rootGroup.hdfGroup = hdfFile.getRootGroup();
@@ -252,6 +269,7 @@ public int getStatus() {
 }
 
 
+
 /**
  * Returns the root group, which is created in the constructor.
  */
@@ -259,6 +277,8 @@ public int getStatus() {
 public NhGroup getRootGroup() {
   return rootGroup;
 }
+
+
 
 
 /**
@@ -458,7 +478,7 @@ throws NhException
   for (NhDimension nhdim : nhGroup.dimensionList) {
     if (nhdim.coordVar == null) {
       float[] dimData = new float[ nhdim.dimLen];
-      try { nhdim.hdfDimVar.writeData( startIxs, dimData); }
+      try { nhdim.hdfDimVar.writeData( startIxs, dimData, false); }
       catch( HdfException exc) {
         exc.printStackTrace();
         throwerr("caught: " + exc);

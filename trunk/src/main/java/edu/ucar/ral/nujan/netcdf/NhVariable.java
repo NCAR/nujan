@@ -27,7 +27,7 @@
 package edu.ucar.ral.nujan.netcdf;
 
 import java.util.Arrays;
-
+import ucar.ma2.Array;
 import edu.ucar.ral.nujan.hdf.HdfException;
 import edu.ucar.ral.nujan.hdf.HdfGroup;
 
@@ -466,8 +466,6 @@ throws NhException
 
 
 
-
-
 /**
  * Writes the data array for this variable to disk.
  * <p>
@@ -487,12 +485,52 @@ public void writeData(
   Object rawData)
 throws NhException
 {
+  writeData( startIxs, rawData, false);    // useLinear = false
+}
+
+
+
+
+/**
+ * Writes the data array for this variable to disk.
+ * <p>
+ * See {@link HdfGroup#addVariable} for documentation on the legal
+ * types of rawData.
+ * <p>
+ * @param startIxs  The indices of the starting point (lower left corner)
+ *    of the hyperslab to be written.  For contiguous storage,
+ *    startIxs should be all zeros.
+ *    Must have startIxs.length == varDims.length.
+ * @param rawData the data array or Object (for a scalar variable)
+ *  to be written.
+ */
+
+public void writeData(
+  int[] startIxs,
+  Object rawData,
+  boolean useLinear)
+throws NhException
+{
   if (nhFile.bugs >= 1) {
-    prtf("NhVariable.writeData: nhType: " + NhVariable.nhTypeNames[nhType]
+    prtf("NhVariable.writeData: nhType: "
+      + NhVariable.nhTypeNames[nhType] + "\n"
+      + "  startIxs: " + NhGroup.formatInts( startIxs) + "\n"
+      + "  useLinear: " + useLinear + "\n"
       + "  rawData: " + rawData);
   }
   if (rawData == null) throwerr("rawData is null");
   Object vdata = null;
+
+  if (rawData instanceof Array) {
+    if (useLinear) {
+      // copyTo1DJavaArray just calls cp = Array.copy(), cp.getStorage().
+      //Object storObj = ((Array) rawData).copyTo1DJavaArray();
+      vdata = ((Array) rawData).getStorage();
+    }
+    else {
+      vdata = ((Array) rawData).copyToNDJavaArray();
+    }
+  }
 
   // Yet another special case ...
   // TP_CHAR is represented by HDF5 DTYPE_STRING_FIX with stgFieldLen=1.
@@ -503,11 +541,15 @@ throws NhException
   // Internally in HDF5, the array is represented as a
   // 3 x 4 array of DTYPE_STRING_FIX, with each string having stgFieldLen=1.
 
-  if (nhType == TP_CHAR)
+  else if (nhType == TP_CHAR) {
     vdata = convertCharsToStrings( dimLens, rawData, nhFile.bugs);
-  else vdata = rawData;
+  }
 
-  try { hdfVar.writeData( startIxs, vdata); }
+  else {
+    vdata = rawData;
+  }
+
+  try { hdfVar.writeData( startIxs, vdata, useLinear); }
   catch( HdfException exc) {
     exc.printStackTrace();
     throwerr("caught: " + exc);

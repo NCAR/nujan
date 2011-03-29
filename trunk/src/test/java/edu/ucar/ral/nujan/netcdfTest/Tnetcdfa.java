@@ -31,8 +31,10 @@ import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.SimpleTimeZone;
+import ucar.ma2.ArrayFloat;
 
 
+import edu.ucar.ral.nujan.hdf.HdfUtil;
 import edu.ucar.ral.nujan.netcdf.NhDimension;
 import edu.ucar.ral.nujan.netcdf.NhException;
 import edu.ucar.ral.nujan.netcdf.NhFileWriter;
@@ -61,6 +63,7 @@ static void badparms( String msg) {
   prtf("  -compress     compression level: 0==none, 1 - 9");
   prtf("  -utcModTime   either yyyy-mm-dd or yyyy-mm-ddThh:mm:ss");
   prtf("                or 0, meaning use the current time");
+  prtf("  -numThread    1 <= numThread <= 100");
   prtf("  -outFile      <fname>");
   System.exit(1);
 }
@@ -87,6 +90,8 @@ throws NhException
   int compressLevel = -1;
   long utcModTime = -1;
   int numThread = -1;
+  boolean useLinear = false;
+  boolean useArray = false;
   String outFile = null;
 
   if (args.length % 2 != 0) badparms("parms must be key/value pairs");
@@ -134,6 +139,10 @@ throws NhException
         utcModTime = dt.getTime();
       }
     }
+    else if (key.equals("-useLinear"))
+      useLinear = parseBoolean("useLinear", val);
+    else if (key.equals("-useArray"))
+      useArray = parseBoolean("useLinear", val);
     else if (key.equals("-numThread")) numThread = Integer.parseInt( val);
     else if (key.equals("-outFile")) outFile = val;
     else badparms("unkown parm: " + key);
@@ -154,6 +163,10 @@ throws NhException
   prtf("Tnetcdfa: bugs: %d", bugs);
   prtf("Tnetcdfa: nhType: \"%s\"", NhVariable.nhTypeNames[nhType]);
   prtf("Tnetcdfa: rank: %d", dims.length);
+  for (int ii = 0; ii < dims.length; ii++) {
+    prtf("Tnetcdfa: dims[%d]: %d", ii, dims[ii]);
+    if (dims[ii] < 1) badparms("invalid dims");
+  }
   prtf("Tnetcdfa: dims: %s", formatInts( dims));
   prtf("Tnetcdfa: chunks: %s", formatInts( chunks));
   prtf("Tnetcdfa: compress: %d", compressLevel);
@@ -162,11 +175,14 @@ throws NhException
   utcSdf.setTimeZone( new SimpleTimeZone( 0, "UTC"));
   prtf("Tnetcdfa: utcModTime: %d  %s", utcModTime, utcSdf.format( utcModTime));
 
+  prtf("Tnetcdfa: useLinear: %s", useLinear);
+  prtf("Tnetcdfa: useArray: %s", useArray);
   prtf("Tnetcdfa: outFile: \"%s\"", outFile);
 
   final long startTime = System.currentTimeMillis();
   if (numThread == 1)
-    testOne( bugs, nhType, dims, chunks, compressLevel, utcModTime, outFile);
+    testOne( bugs, nhType, dims, chunks, compressLevel,
+      utcModTime, useLinear, useArray, outFile);
   else {
     Thread[] threads = new Thread[numThread];
     for (int ii = 0; ii < numThread; ii++) {
@@ -178,6 +194,8 @@ throws NhException
       final int[] chunksFinal = chunks;
       final int compressLevelFinal = compressLevel;
       final long utcModTimeFinal = utcModTime;
+      final boolean useLinearFinal = useLinear;
+      final boolean useArrayFinal = useArray;
       threads[ii] = new Thread() {
         public void run() {
           prtf("%8.4f  starting thread %d",
@@ -190,6 +208,8 @@ throws NhException
               chunksFinal,
               compressLevelFinal,
               utcModTimeFinal,
+              useLinearFinal,
+              useArrayFinal,
               fnameFinal);
           }
           catch( NhException exc) {
@@ -229,13 +249,17 @@ static void testOne(
   int[] chunks,
   int compressLevel,
   long utcModTime,           // milliSecs since 1970, or if 0 use current time
+  boolean useLinear,
+  boolean useArray,
   String fname)
 throws NhException
 {
   NhFileWriter hfile = new NhFileWriter(
     fname, NhFileWriter.OPT_OVERWRITE,
     bugs, bugs,            // nhBugs, hdfBugs
-    utcModTime);           // utcModTime: use current time.
+    utcModTime,            // utcModTime: use current time.
+    null,                  // logDir
+    null);                 // statTag
 
   NhGroup rootGroup = hfile.getRootGroup();
 
@@ -254,6 +278,17 @@ throws NhException
     dtype = HdfGroup.DTYPE_STRING_VAR;
   else throwerr("unknown nhType: " + NhVariable.nhTypeNames[nhType]);
 
+  // Generate the test data
+  int[] dataDims = dims;
+  if (chunks != null) dataDims = chunks;
+  ///if (useLinear) {
+  ///  int totalLen = 1;
+  ///  for (int ival : dims) {
+  ///    totalLen *= ival;
+  ///  }
+  ///  dataDims = new int[] { totalLen};
+  ///}
+  prtf("Tnetcdfa: dataDims: " + HdfUtil.formatInts( dataDims));
   Object allData = null;
   Object fillValue = null;
   try {
@@ -261,7 +296,7 @@ throws NhException
       dtype,
       stgFieldLen,
       null,           // refGroup
-      dims,
+      dataDims,
       0);             // ival, origin 0.
 
     fillValue = GenData.genFillValue(
@@ -272,6 +307,7 @@ throws NhException
     exc.printStackTrace();
     throwerr("caught: " + exc);
   }
+  prtf("Tnetcdfa: allData: " + HdfUtil.formatObject( allData));
 
   // Netcdf doesn't support fill values for Strings or scalars.
   if (nhType == NhVariable.TP_STRING_VAR) fillValue = null;
@@ -358,7 +394,8 @@ throws NhException
 
   for (int ivar = 0; ivar < numVar; ivar++) {
     if (chunks == null) {
-      testVars[ivar].writeData( null, allData);    // startIxs = null
+      testVars[ivar].writeData( null, allData, useLinear);
+      // startIxs = null
     }
 
     else {             // else use chunks
@@ -367,12 +404,12 @@ throws NhException
       while (! allDone) {
 
         // Chunks at the edge may be partially valid
-        int[] validDims = new int[rank];
+        int[] testDims = new int[rank];
         for (int ii = 0; ii < rank; ii++) {
-          validDims[ii] = Math.min( chunks[ii], dims[ii] - startIxs[ii]);
+          testDims[ii] = Math.min( chunks[ii], dims[ii] - startIxs[ii]);
         }
 
-        Object chunkData = null;
+        Object testData = null;
         if (rank == 0)
           throwerr("Tnetcdfa: chunking not ok for scalars");
         if (nhType == NhVariable.TP_FLOAT) {
@@ -380,71 +417,94 @@ throws NhException
           if (fillValue != null)
             fillValueFloat = ((Float) fillValue).floatValue();
 
-          if (rank == 1) {
-            float[] vals = new float[ chunks[0]];
-            for (int ia = 0; ia < chunks[0]; ia++) {
-              float val = fillValueFloat;
-              if (ia < validDims[0])
-                val = startIxs[0] + ia;
-              vals[ia] = val;
+          if (useLinear || rank == 1) {
+            int totLen = 1;
+            for (int ilen : testDims) {
+              totLen *= ilen;
             }
-            chunkData = vals;
+            if (useArray) {
+              ArrayFloat.D1 arr = new ArrayFloat.D1( totLen);
+              for (int ia = 0; ia < totLen; ia++) {
+                arr.set( ia, ia);
+              }
+              testData = arr;
+            }
+            else {
+              float[] vals = new float[ totLen];
+              for (int ia = 0; ia < totLen; ia++) {
+                vals[ia] = ia;
+              }
+              testData = vals;
+            }
           }
           else if (rank == 2) {
-            float[][] vals = new float[ chunks[0]][ chunks[1]];
-            for (int ia = 0; ia < chunks[0]; ia++) {
-              for (int ib = 0; ib < chunks[1]; ib++) {
-                float val = fillValueFloat;
-                if (ia < validDims[0]
-                  && ib < validDims[1])
-                {
-                  val = 10 * (startIxs[0] + ia) + startIxs[1] + ib;
+            if (useArray) {
+              ArrayFloat.D2 arr = new ArrayFloat.D2(
+                testDims[0], testDims[1]);
+              for (int ia = 0; ia < testDims[0]; ia++) {
+                for (int ib = 0; ib < testDims[1]; ib++) {
+                  arr.set( ia, ib, 10*ia + ib);
                 }
-                vals[ia][ib] = val;
               }
+              testData = arr;
             }
-            chunkData = vals;
+            else {
+              float[][] vals = new float[ testDims[0]][ testDims[1]];
+              for (int ia = 0; ia < testDims[0]; ia++) {
+                for (int ib = 0; ib < testDims[1]; ib++) {
+                  vals[ia][ib] = 10*ia + ib;
+                }
+              }
+              testData = vals;
+            }
           }
           else if (rank == 3) {
-            float[][][] vals = new float[ chunks[0]][ chunks[1]][ chunks[2]];
-            for (int ia = 0; ia < chunks[0]; ia++) {
-              for (int ib = 0; ib < chunks[1]; ib++) {
-                for (int ic = 0; ic < chunks[2]; ic++) {
-                  float val = fillValueFloat;
-                  if (ia < validDims[0]
-                    && ib < validDims[1]
-                    && ic < validDims[2])
-                  {
-                    val =
-                      100 * (startIxs[0] + ia)
-                      + 10 * (startIxs[1] + ib)
-                      + startIxs[2] + ic;
+            if (useArray) {
+              ArrayFloat.D3 arr = new ArrayFloat.D3(
+                testDims[0], testDims[1], testDims[2]);
+              for (int ia = 0; ia < testDims[0]; ia++) {
+                for (int ib = 0; ib < testDims[1]; ib++) {
+                  for (int ic = 0; ic < testDims[2]; ic++) {
+                    arr.set( ia, ib, ic, 100*ia + 10*ib + ic);
                   }
-                  vals[ia][ib][ic] = val;
                 }
               }
+              testData = arr;
             }
-            chunkData = vals;
+            else {
+              float[][][] vals = new float[ testDims[0]][ testDims[1]]
+                [ testDims[2]];
+              for (int ia = 0; ia < testDims[0]; ia++) {
+                for (int ib = 0; ib < testDims[1]; ib++) {
+                  for (int ic = 0; ic < testDims[2]; ic++) {
+                    vals[ia][ib][ic] = 100*ia + 10*ib + ic;
+                  }
+                }
+              }
+              testData = vals;
+            }
           }
 
           // Tests for chunk lens < dims not ok for higher ranks
           else {
             if (! testEqualInts( dims, chunks))
               throwerr("Tnetcdfa: chunks < dims not ok for higher ranks");
-            chunkData = allData;
+            testData = allData;
           }
+
         } // if nhType == NhVariable.TP_FLOAT
 
         // Tests for chunk lens < dims not ok for other types
         else {
           if (! testEqualInts( dims, chunks))
             throwerr("Tnetcdfa: chunks < dims not ok for other types");
-          chunkData = allData;
+          testData = allData;
         }
 
         testVars[ivar].writeData(
           startIxs,
-          chunkData);
+          testData,
+          useLinear);
 
         // Increment startIxs
         for (int ii = rank - 1; ii >= 0; ii--) {
@@ -620,6 +680,15 @@ static String formatInts(
 
 
 
+static boolean parseBoolean( String msg, String stg)
+throws NhException
+{
+  boolean bres = false;
+  if (stg.equals("false")) bres = false;
+  else if (stg.equals("true")) bres = true;
+  else badparms("unknown value for " + msg + ": " + stg);
+  return bres;
+}
 
 
 

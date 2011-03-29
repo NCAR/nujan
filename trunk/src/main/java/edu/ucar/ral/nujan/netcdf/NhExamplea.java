@@ -79,10 +79,8 @@ throws NhException
   if (outFile == null) badparms("missing parm: -outFile");
 
   NhFileWriter hfile = new NhFileWriter(
-    outFile, NhFileWriter.OPT_OVERWRITE,
-    1,        // nhDebugLevel
-    1,        // hdfDebugLevel
-    0);       // utcModTime: current time
+    outFile,
+    NhFileWriter.OPT_OVERWRITE);
 
   prtln("hfile: " + hfile);
 
@@ -166,7 +164,7 @@ throws NhException
 
   // Write out the humidityData array in one call.
   int[] startIxs = null;
-  humidity.writeData( startIxs, humidityData);
+  humidity.writeData( startIxs, humidityData, false);  // useLinear = false
 
   // Write out the temperatureData array in multiple chunks.
   startIxs = new int[] {0, 0};    // y, x
@@ -191,7 +189,8 @@ throws NhException
       }
     }
 
-    temperature.writeData( startIxs, temperatureChunk);
+    temperature.writeData( startIxs, temperatureChunk, false);
+    // useLinear = false
 
     // Increment startIxs for the next chunk
     for (int jj = rank - 1; jj >= 0; jj--) {

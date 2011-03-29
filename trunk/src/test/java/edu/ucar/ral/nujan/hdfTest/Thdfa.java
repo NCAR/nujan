@@ -174,8 +174,12 @@ throws HdfException
   prtf("Thdfa: outFile: \"%s\"", outFile);
 
   HdfFileWriter hfile = new HdfFileWriter(
-    outFile, HdfFileWriter.OPT_ALLOW_OVERWRITE,
-    bugs, utcModTime);
+    outFile,
+    HdfFileWriter.OPT_ALLOW_OVERWRITE,
+    bugs,
+    utcModTime,
+    null,               // statTag
+    null);              // logDir
 
   HdfGroup rootGroup = hfile.getRootGroup();
 
@@ -224,7 +228,8 @@ throws HdfException
     if (chunks == null) {
       testVars[ivar].writeData(
         null,          // startIxs
-        allData);
+        allData,
+        false);        // useLinear
     }
 
     else {             // else use chunks
@@ -309,7 +314,8 @@ throws HdfException
 
         testVars[ivar].writeData(
           startIxs,
-          chunkData);
+          chunkData,
+          false);      // useLinear
 
         // Increment startIxs
         for (int ii = rank - 1; ii >= 0; ii--) {
