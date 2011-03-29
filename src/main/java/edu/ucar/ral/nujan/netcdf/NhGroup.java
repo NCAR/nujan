@@ -369,21 +369,24 @@ public NhVariable addVariable(
 throws NhException
 {
   if (nhFile.bugs >= 1) {
-    String msg = "NhGroup.addVariable: this: \"" + getPath() + "\""
+    prtf("NhGroup.addVariable: this: \"" + getPath() + "\""
       + "  var name: \"" + varName + "\"\n"
-      + "  nhType: " + NhVariable.nhTypeNames[ nhType] + "\n"
-      + "  dims: ";
-    if (nhDims == null) msg += "(null)";
+      + "  nhType: " + NhVariable.nhTypeNames[ nhType]);
+
+    if (nhDims == null) prtf("  dims: (null)");
     else {
-      for (NhDimension dm : nhDims) {
+      String msg = "  nhDims (len " + nhDims.length + "): ";
+      for (int ii = 0; ii < nhDims.length; ii++) {
+        NhDimension dm = nhDims[ii];
+        if (dm == null) throwerr("nhDims element " + ii + " is null");
         msg += "  \"" + dm.dimName + "\"(" + dm.dimLen + ")";
       }
+      prtf( msg);
     }
-    msg += "\n";
-    msg += "  chunkLens: " + formatInts( chunkLens) + "\n";
-    msg += "  fill: " + fillValue + "\n";
-    msg += "  compressionLevel: " + compressionLevel;
-    prtf( msg);
+
+    prtf("  chunkLens: " + formatInts( chunkLens));
+    prtf("  fill: " + fillValue);
+    prtf("  compressionLevel: " + compressionLevel);
   }
 
   checkName( varName, "variable in group \"" + groupName + "\"");

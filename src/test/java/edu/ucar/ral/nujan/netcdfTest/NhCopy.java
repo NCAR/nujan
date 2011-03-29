@@ -80,6 +80,9 @@ class FieldSpec {
 public class NhCopy {
 
 
+static boolean useLinear = false;        // for performance testing only
+static int copyNd = 0;                   // for performance testing only
+
 public static void main( String[] args) {
   try {
     copyIt( args);
@@ -131,6 +134,8 @@ static void copyIt( String[] args)
 throws NhException
 {
   int bugs = 0;
+  String logDir = null;
+  String statTag = null;
   int compressionLevel = -1;
   String inFile = null;
   String outFile = null;
@@ -140,9 +145,9 @@ throws NhException
     String key = args[iarg++];
     if (iarg >= args.length) badparms("no value for the last key");
     String val = args[iarg++];
-    if (key.equals("-bugs")) bugs = Integer.parseInt( val);
+    if (key.equals("-bugs")) bugs = parseInt( "-bugs", val);
     else if (key.equals("-compress")) {
-      compressionLevel = Integer.parseInt( val);
+      compressionLevel = parseInt( "-compress", val);
       if (compressionLevel < 0 || compressionLevel > 9)
         badparms("invalid compress: " + compressionLevel);
     }
@@ -160,7 +165,7 @@ throws NhException
         mfact = 0;
       }
       else {
-        iscale = Integer.parseInt( toks[1]);
+        iscale = parseInt( "scale", toks[1]);
         mfact = 1;
         if (iscale < 0) {
           for (int ii = 0; ii < -iscale; ii++) mfact *= 0.1;
@@ -174,10 +179,23 @@ throws NhException
       if (toks.length > 2) {      // get chunkLens
         fspec.chunkLens = new int[ toks.length - 2];
         for (int ii = 0; ii < fspec.chunkLens.length; ii++) {
-          fspec.chunkLens[ii] = Integer.parseInt( toks[2+ii]);
+          fspec.chunkLens[ii] = parseInt( "chunkLen", toks[2+ii]);
         }
       }
     } // if key == "-field"
+
+    else if (key.equals("-testValLog")) {
+      logDir = val;
+      statTag = "stats";
+    }
+    else if (key.equals("-testValLinear")) {
+      if (val.equals("false")) useLinear = false;
+      else if (val.equals("true")) useLinear = true;
+      else badparms("unknown parm for -testValLinear: \"" + val + "\"");
+    }
+    else if (key.equals("-testValNdArray")) {
+      copyNd = parseInt( "testValNdArray", val);
+    }
 
     else badparms("unknown parm: \"" + key + "\"");
   }
@@ -210,7 +228,9 @@ throws NhException
       NhFileWriter.OPT_OVERWRITE,
       bugs,          // Netcdf debug level
       bugs,          // HDF5 debug level
-      0);            // utcModTime: use current time.
+      0,             // utcModTime: use current time.
+      logDir,
+      statTag);
 
     Group inGroup = inCdf.getRootGroup();
     NhGroup outGroup = outCdf.getRootGroup();
@@ -268,7 +288,7 @@ throws NhException
   } // if pass == 1
 
   for (Variable var : inGroup.getVariables()) {
-    if (bugs >= 2) prtf("NhCopy testaa 1: pass: "
+    if (bugs >= 2) prtf("NhCopy.copyGroup: pass: "
       + pass + "  var: " + var.getName());
 
     FieldSpec fspec = findFieldSpec( fieldSpecs, var.getName());
@@ -675,6 +695,17 @@ throws NhException
     exc.printStackTrace();
     throwerr("caught: " + exc);
   }
+  Object[] ndarrs = null;                  // for performance testing only
+  if (copyNd > 0) {
+    Runtime.getRuntime().gc();
+    long mema = Runtime.getRuntime().freeMemory();
+    ndarrs = new Object[copyNd];
+    for (int ii = 0; ii < copyNd; ii++) {
+      ndarrs[ii] = arr.copyToNDJavaArray();
+    }
+    long memb = Runtime.getRuntime().freeMemory();
+    prtf("copyNd: %d  deltaFreeMem: %d", copyNd, memb - mema);
+  }
 
   // Print helpful info: min, max
   if (bugs >= 0) {
@@ -746,8 +777,8 @@ throws NhException
 
   Object rawData = decodeArray( arr, bugs);
 
-  int[] starts = null;      // startIxs
-  if (inVar.getRank() > 0) starts = new int[ inVar.getRank()];
+  int[] strts = null;      // startIxs for chunks
+  if (inVar.getRank() > 0) strts = new int[ inVar.getRank()];
   if (fspec != null && fspec.chunkLens != null) {
 
     // Get dimLens so we can check chunkLens
@@ -763,12 +794,13 @@ throws NhException
         throwerr("wrong type for rawData: " + rawData.getClass());
       float[] fvals = (float[]) rawData;
       float[] chunkVals = new float[clens[0]];
-      for (starts[0] = 0; starts[0] < dimLens[0]; starts[0] += clens[0]) {
-        for (int ia = 0; ia < clens[0]; ia++) {
-          if (starts[0] + ia >= dimLens[0]) break;
-          chunkVals[ia] = fvals[starts[0]+ia];
+      for (strts[0] = 0; strts[0] < dimLens[0]; strts[0] += clens[0]) {
+
+        int lima = Math.min( clens[0], dimLens[0] - strts[0]);
+        for (int ia = 0; ia < lima; ia++) {
+          chunkVals[ia] = fvals[strts[0]+ia];
         }
-        nhVar.writeData( starts, chunkVals);
+        nhVar.writeData( strts, chunkVals, false);  // useLinear = false
       }
     } // if rank == 1
 
@@ -777,18 +809,19 @@ throws NhException
         throwerr("wrong type for rawData: " + rawData.getClass());
       float[][] fvals = (float[][]) rawData;
       float[][] chunkVals = new float[clens[0]][clens[1]];
-      for (starts[0] = 0; starts[0] < dimLens[0]; starts[0] += clens[0]) {
-        for (starts[1] = 0; starts[1] < dimLens[1]; starts[1] += clens[1]) {
-          for (int ia = 0; ia < clens[0]; ia++) {
-            if (starts[0] + ia >= dimLens[0]) break;
-            for (int ib = 0; ib < clens[1]; ib++) {
-              if (starts[1] + ib >= dimLens[1]) break;
-              chunkVals[ia][ib] = fvals[starts[0]+ia][starts[1]+ib];
+      for (strts[0] = 0; strts[0] < dimLens[0]; strts[0] += clens[0]) {
+        for (strts[1] = 0; strts[1] < dimLens[1]; strts[1] += clens[1]) {
+
+          int lima = Math.min( clens[0], dimLens[0] - strts[0]);
+          int limb = Math.min( clens[1], dimLens[1] - strts[1]);
+          for (int ia = 0; ia < lima; ia++) {
+            for (int ib = 0; ib < limb; ib++) {
+              chunkVals[ia][ib] = fvals[strts[0]+ia] [strts[1]+ib];
             }
           } // for ia
-          nhVar.writeData( starts, chunkVals);
-        } // for starts[1]
-      } // for starts[0]
+          nhVar.writeData( strts, chunkVals, false);  // useLinear = false
+        } // for strts[1]
+      } // for strts[0]
     } // if rank == 2
 
     else if (dimLens.length == 3) {
@@ -796,24 +829,27 @@ throws NhException
         throwerr("wrong type for rawData: " + rawData.getClass());
       float[][][] fvals = (float[][][]) rawData;
       float[][][] chunkVals = new float[clens[0]][clens[1]][clens[2]];
-      for (starts[0] = 0; starts[0] < dimLens[0]; starts[0] += clens[0]) {
-        for (starts[1] = 0; starts[1] < dimLens[1]; starts[1] += clens[1]) {
-          for (starts[2] = 0; starts[2] < dimLens[2]; starts[2] += clens[2]) {
-            for (int ia = 0; ia < clens[0]; ia++) {
-              if (starts[0] + ia >= dimLens[0]) break;
-              for (int ib = 0; ib < clens[1]; ib++) {
-                if (starts[1] + ib >= dimLens[1]) break;
-                for (int ic = 0; ic < clens[2]; ic++) {
-                  if (starts[2] + ic >= dimLens[2]) break;
-                    chunkVals[ia][ib][ic]
-                      = fvals[starts[0]+ia][starts[1]+ib][starts[2]+ic];
+      for (strts[0] = 0; strts[0] < dimLens[0]; strts[0] += clens[0]) {
+        for (strts[1] = 0; strts[1] < dimLens[1]; strts[1] += clens[1]) {
+          for (strts[2] = 0; strts[2] < dimLens[2]; strts[2] += clens[2]) {
+
+            int lima = Math.min( clens[0], dimLens[0] - strts[0]);
+            int limb = Math.min( clens[1], dimLens[1] - strts[1]);
+            int limc = Math.min( clens[2], dimLens[2] - strts[2]);
+            for (int ia = 0; ia < lima; ia++) {
+              for (int ib = 0; ib < limb; ib++) {
+                for (int ic = 0; ic < limc; ic++) {
+                  chunkVals[ia][ib][ic]
+                    = fvals[strts[0]+ia]
+                      [strts[1]+ib]
+                      [strts[2]+ic];
                 }
               }
             } // for ia
-            nhVar.writeData( starts, chunkVals);
-          } // for starts[2]
-        } // for starts[1]
-      } // for starts[0]
+            nhVar.writeData( strts, chunkVals, false);  // useLinear = false
+          } // for strts[2]
+        } // for strts[1]
+      } // for strts[0]
     } // if rank == 3
 
     else if (dimLens.length == 4) {
@@ -822,35 +858,81 @@ throws NhException
       float[][][][] fvals = (float[][][][]) rawData;
       float[][][][] chunkVals
         = new float[clens[0]][clens[1]][clens[2]][clens[3]];
-      for (starts[0] = 0; starts[0] < dimLens[0]; starts[0] += clens[0]) {
-        for (starts[1] = 0; starts[1] < dimLens[1]; starts[1] += clens[1]) {
-          for (starts[2] = 0; starts[2] < dimLens[2]; starts[2] += clens[2]) {
-            for (starts[3] = 0; starts[3] < dimLens[3]; starts[3] += clens[3]) {
-              for (int ia = 0; ia < clens[0]; ia++) {
-                if (starts[0] + ia >= dimLens[0]) break;
-                for (int ib = 0; ib < clens[1]; ib++) {
-                  if (starts[1] + ib >= dimLens[1]) break;
-                  for (int ic = 0; ic < clens[2]; ic++) {
-                    if (starts[2] + ic >= dimLens[2]) break;
-                    for (int id = 0; id < clens[3]; id++) {
-                      if (starts[3] + id >= dimLens[3]) break;
-                        chunkVals[ia][ib][ic][id] = fvals[starts[0]+ia]
-                          [starts[1]+ib][starts[2]+ic][starts[3]+id];
+      for (strts[0] = 0; strts[0] < dimLens[0]; strts[0] += clens[0]) {
+        for (strts[1] = 0; strts[1] < dimLens[1]; strts[1] += clens[1]) {
+          for (strts[2] = 0; strts[2] < dimLens[2]; strts[2] += clens[2]) {
+            for (strts[3] = 0; strts[3] < dimLens[3]; strts[3] += clens[3]) {
+
+              int lima = Math.min( clens[0], dimLens[0] - strts[0]);
+              int limb = Math.min( clens[1], dimLens[1] - strts[1]);
+              int limc = Math.min( clens[2], dimLens[2] - strts[2]);
+              int limd = Math.min( clens[3], dimLens[3] - strts[3]);
+              for (int ia = 0; ia < lima; ia++) {
+                for (int ib = 0; ib < limb; ib++) {
+                  for (int ic = 0; ic < limc; ic++) {
+                    for (int id = 0; id < limd; id++) {
+                      chunkVals[ia][ib][ic][id]
+                        = fvals[strts[0]+ia]
+                          [strts[1]+ib]
+                          [strts[2]+ic]
+                          [strts[3]+id];
                     }
                   }
                 }
               } // for ia
-              nhVar.writeData( starts, chunkVals);
-            } // for starts[3]
-          } // for starts[2]
-        } // for starts[1]
-      } // for starts[0]
+              nhVar.writeData( strts, chunkVals, false);  // useLinear = false
+            } // for strts[3]
+          } // for strts[2]
+        } // for strts[1]
+      } // for strts[0]
     } // if rank == 4
+
+    else if (dimLens.length == 5) {
+      if (! (rawData instanceof float[][][][][]))
+        throwerr("wrong type for rawData: " + rawData.getClass());
+      float[][][][][] fvals = (float[][][][][]) rawData;
+      float[][][][][] chunkVals
+        = new float[clens[0]][clens[1]][clens[2]][clens[3]][clens[4]];
+      for (strts[0] = 0; strts[0] < dimLens[0]; strts[0] += clens[0]) {
+        for (strts[1] = 0; strts[1] < dimLens[1]; strts[1] += clens[1]) {
+          for (strts[2] = 0; strts[2] < dimLens[2]; strts[2] += clens[2]) {
+            for (strts[3] = 0; strts[3] < dimLens[3]; strts[3] += clens[3]) {
+              for (strts[4] = 0; strts[4] < dimLens[4]; strts[4] += clens[4]) {
+
+                int lima = Math.min( clens[0], dimLens[0] - strts[0]);
+                int limb = Math.min( clens[1], dimLens[1] - strts[1]);
+                int limc = Math.min( clens[2], dimLens[2] - strts[2]);
+                int limd = Math.min( clens[3], dimLens[3] - strts[3]);
+                int lime = Math.min( clens[4], dimLens[4] - strts[4]);
+                for (int ia = 0; ia < lima; ia++) {
+                  for (int ib = 0; ib < limb; ib++) {
+                    for (int ic = 0; ic < limc; ic++) {
+                      for (int id = 0; id < limd; id++) {
+                        for (int ie = 0; ie < lime; ie++) {
+                          chunkVals[ia][ib][ic][id][ie]
+                            = fvals[strts[0]+ia]
+                              [strts[1]+ib]
+                              [strts[2]+ic]
+                              [strts[3]+id]
+                              [strts[4]+ie];
+                        }
+                      }
+                    }
+                  }
+                } // for ia
+                nhVar.writeData( strts, chunkVals, false); // useLinear = false
+              } // for strts[4]
+            } // for strts[3]
+          } // for strts[2]
+        } // for strts[1]
+      } // for strts[0]
+    } // if rank == 5
+    else throwerr("higher dims not supported yet");
 
   } // if chunkLens were specified
 
   else {   // else no chunkLens
-    nhVar.writeData( starts, rawData);
+    nhVar.writeData( strts, rawData, useLinear);
   }
 } // end copyData
 
@@ -891,6 +973,7 @@ throws NhException
 
 
 
+// Do special handling of scalars, string arrays.
 
 static Object decodeArray( Array arr, int bugs)
 throws NhException
@@ -951,7 +1034,8 @@ throws NhException
   }
 
   else {
-    resObj = arr.copyToNDJavaArray();
+    if (useLinear) resObj = arr.getStorage();
+    else resObj = arr.copyToNDJavaArray();
   }
   return resObj;
 } // end decodeArray
@@ -1085,6 +1169,16 @@ throws NhException
 
 
 
+static int parseInt( String msg, String stg)
+throws NhException
+{
+  int ival = 0;
+  try { ival = Integer.parseInt( stg); }
+  catch( NumberFormatException exc) {
+    throwerr("bad format for parm %s.  value: \"%s\"", msg, stg);
+  }
+  return ival;
+}
 
 
 

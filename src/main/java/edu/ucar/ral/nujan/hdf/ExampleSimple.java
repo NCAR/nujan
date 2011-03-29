@@ -129,13 +129,13 @@ throws Exception
 
   // Write out the humidityData array in one call.
   int[] startIxs = null;
-  humidity.writeData( startIxs, humidityData);
+  humidity.writeData( startIxs, humidityData, false);  // useLinear = false
 
   // Write out the temperatureData array in two chunks.
   startIxs = new int[] {0, 0};
-  temperature.writeData( startIxs, temperatureDataChunk0);
+  temperature.writeData( startIxs, temperatureDataChunk0, false);
   startIxs[0] = 5;
-  temperature.writeData( startIxs, temperatureDataChunk1);
+  temperature.writeData( startIxs, temperatureDataChunk1, false);
 
   hdfFile.close();
   prtln("All done");

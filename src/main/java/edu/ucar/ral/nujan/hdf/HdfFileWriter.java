@@ -29,10 +29,13 @@ package edu.ucar.ral.nujan.hdf;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-
+import java.io.PrintWriter;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.SimpleTimeZone;
 
 
 
@@ -181,6 +184,12 @@ int debugLevel = 0;             // main debug level
  */
 int bugs = 0;
 
+/** For performance testing only */
+String logDir;
+
+/** For performance testing only */
+String statTag;
+
 /**
  * The in-memory buffer used to construct all metadata (HdfGroups,
  * messages, attributes, Btrees, etc).
@@ -247,6 +256,13 @@ final long baseAddress = 0;
 long eofAddr;
 
 
+/** Used for debug statistics.  */
+PrintWriter statOut;
+
+/** Used for debug statistics.  */
+long statTimea;
+long statTimeOverall;
+
 
 
 /**
@@ -261,7 +277,27 @@ public HdfFileWriter(
   int optFlag)                   // zero or more OPT_* bit options
 throws HdfException
 {
-  this( filePath, optFlag, 0, 0);   // debug = 0, modTime = 0
+  this( filePath, optFlag, 0, 0, null, null); // debug = 0, modTime = 0
+}
+
+
+
+
+/**
+ * Creates a new HDF5 output file.
+ * @param filePath  The name or disk path of the file to create.
+ * @param optFlag  The bitwise OR of one or more OPT_* flags.
+ *     Currently the only one implemented is OPT_ALLOW_OVERWRITE.
+ */
+
+public HdfFileWriter(
+  String filePath,               // file to create
+  int optFlag,                   // zero or more OPT_* bit options
+  String logDir,
+  String statTag)
+throws HdfException
+{
+  this( filePath, optFlag, 0, 0, logDir, statTag); // debug = 0, modTime = 0
 }
 
 
@@ -288,7 +324,9 @@ public HdfFileWriter(
   String filePath,           // file to create
   int optFlag,               // zero or more OPT_* bit options
   int debugLevel,
-  long utcModTime)           // milliSecs since 1970, or if 0 use current time
+  long utcModTime,           // milliSecs since 1970, or if 0 use current time
+  String logDir,
+  String statTag)
 throws HdfException
 {
   super("HdfFileWriter", null);  // BaseBlk: hdfFile = null
@@ -297,11 +335,17 @@ throws HdfException
   this.optFlag = optFlag;
   this.debugLevel = debugLevel;
   this.bugs = debugLevel;
+  this.logDir = logDir;
+  this.statTag = statTag;
+
 
   if (bugs >= 1) {
     prtf("HdfFileWriter.const: filePath: \"%s\"\n  softwareVersion: %s",
       filePath, getSoftwareVersion());
   }
+  initStat();
+  statTimea = printStat( 0, "wtr.const.entry", "filePath: " + filePath);
+  statTimeOverall = statTimea;
 
   fileStatus = ST_DEFINING;
   utcModTimeMilliSec = utcModTime;
@@ -399,6 +443,8 @@ throws HdfException
   if (bugs >= 1) {
     prtf("HdfFileWriter.endDefine: filePath: \"" + filePath + "\"\n");
   }
+  statTimea = printStat( statTimea, "wtr.endDefine.entry",
+    "filePath: " + filePath);
   if (fileStatus != ST_DEFINING) throwerr("already called endDefine");
   fileStatus = ST_WRITEDATA;
 
@@ -424,6 +470,8 @@ throws HdfException
 
   // Set eofAddr in superBlock
   eofAddr = mainBuf.getPos();
+  statTimea = printStat( statTimea, "wtr.endDefine.exit",
+    "filePath: " + filePath);
 
 } // end endDefine
 
@@ -455,6 +503,9 @@ throws HdfException
   if (bugs >= 1) {
     prtf("HdfFileWriter.close: filePath: \"" + filePath + "\"\n");
   }
+  statTimea = printStat( statTimea, "wtr.close.entry",
+    "filePath: " + filePath);
+
   if (fileStatus == ST_DEFINING)
     throwerr("must call endDefine before calling close");
   else if (fileStatus == ST_CLOSED) throwerr("file is already closed");
@@ -503,6 +554,11 @@ throws HdfException
     exc.printStackTrace();
     throwerr("caught: %s", exc);
   }
+  statTimea = printStat( statTimea, "wtr.close.exit.a",
+    "filePath: " + filePath);
+  statTimeOverall = printStat( statTimeOverall, "wtr.close.exit.overall",
+    "filePath: " + filePath);
+  closeStat();
 } // end close
 
 
@@ -704,6 +760,94 @@ String mkIndent() {
   }
   return res;
 }
+
+
+
+
+// Opens log file with name like:
+// logDir/yyyy.mm.dd.hh/nujan.statTag.1300287887634.log
+
+void initStat()
+throws HdfException
+{
+  if (logDir != null) {
+    // Change bad chars to underbar
+    String tstatTag = statTag.replaceAll("[ /,.:;()<>\\]\\[]", "_");
+
+    Date curDate = new Date();
+    SimpleTimeZone utcZone = new SimpleTimeZone( 0, "UTC");
+    SimpleDateFormat utcSdf = new SimpleDateFormat("yyyy.MM.dd.HH");
+    utcSdf.setTimeZone( utcZone);
+
+    File dirFile;
+    dirFile = new File(logDir);
+    dirFile.mkdirs();
+    if (! dirFile.isDirectory())
+      throwerr("cannot init stats logDir: \"" + logDir + "\"");
+
+    String sepChar = System.getProperty("file.separator");
+    String dirName = logDir;
+    if (! dirName.endsWith( sepChar)) dirName += sepChar;
+    dirName += utcSdf.format( curDate);
+    dirFile = new File(dirName);
+    dirFile.mkdirs();
+    if (! dirFile.isDirectory())
+      throwerr("cannot init stats dir: \"" + dirName + "\"");
+
+    String logName = dirName + sepChar + "nujan." + tstatTag
+      + "." + System.currentTimeMillis()
+      + "." + Thread.currentThread().getId()
+      + ".log";
+    try { statOut = new PrintWriter( logName); }
+    catch( IOException exc) {
+      exc.printStackTrace();
+      throwerr("cannot open logName: \"" + logName + "\"");
+    }
+  }
+}
+
+
+void closeStat()
+{
+  if (logDir != null) statOut.close();
+}
+  
+
+
+long printStat(
+  long prevTime,
+  String tag,
+  String extraMsg)
+{
+  long curTime = System.currentTimeMillis();
+  if (logDir != null) {
+    Date curDate = new Date( curTime);
+    SimpleTimeZone utcZone = new SimpleTimeZone( 0, "UTC");
+    //xxxGregorianCalendar utcCal = new GregorianCalendar( utcZone);
+    //xxxutcCal.setTimeInMillis( curTime);
+    SimpleDateFormat utcSdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+    utcSdf.setTimeZone( utcZone);
+
+    String deltaMsg = "NA";
+    if (prevTime != 0)
+      deltaMsg = String.format("%.4f", 0.001 * (curTime - prevTime));
+
+    Runtime rt = Runtime.getRuntime();
+    rt.gc();
+    long freeMem = rt.freeMemory();
+
+    String msg = utcSdf.format( curDate)
+      + " " + tag
+      + "  delta: " + deltaMsg
+      + "  freeMem: " + freeMem;
+    if (extraMsg != null) msg += "  " + extraMsg;
+    statOut.println( msg);
+    statOut.flush(); //////// xxx del this
+  }
+  return curTime;
+}
+
+
 
 
 } // end class

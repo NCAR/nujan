@@ -39,7 +39,7 @@ import java.util.regex.Pattern;
  * A variety of utility functions.
  */
 
-class HdfUtil {
+public class HdfUtil {
 
 
 
@@ -310,7 +310,7 @@ static void checkTypeMatch(
   int dataType,               // actual data type, one of HdfGroup.DTYPE_*
   int[] varDims,              // entire var dimensions
   int[] startIxs,             // current start indices
-  int[] chunkDims,             // specified chunk dims
+  int[] chunkDims,            // specified chunk dims
   int[] dataDims)             // dims of data object to be written
 throws HdfException
 {
@@ -556,7 +556,7 @@ static String formatDtypeDim(
  * if it's an array.  Calls formatObjectSub to do the real work.
  */
 
-static String formatObject( Object obj) {
+public static String formatObject( Object obj) {
   StringBuilder sbuf = new StringBuilder();
   if (obj == null) sbuf.append("  (null)");
   else {
@@ -663,16 +663,18 @@ static void formatObjectSub(
  * Formats an array of ints.
  */
 
-static String formatInts(
+public static String formatInts(
   int[] vals)
 {
   String res = "";
   if (vals == null) res = "(null)";
   else {
+    res = "[";
     for (int ii = 0; ii < vals.length; ii++) {
       if (ii > 0) res += " ";
       res += vals[ii];
     }
+    res += "]";
   }
   return res;
 }

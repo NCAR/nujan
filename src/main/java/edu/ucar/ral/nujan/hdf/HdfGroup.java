@@ -422,7 +422,7 @@ throws HdfException
       throwerr("cannot use compression with null data");
   }
   else if (varDims.length == 0) {
-    if (chunkLens != null)
+    if (chunkLens != null && chunkLens.length > 0)
       throwerr("varDims len == 0 but chunkLens != null");
     if (compressionLevel > 0)
       throwerr("cannot use compression with scalar data");
@@ -682,6 +682,12 @@ throws HdfException
     throwerr("Duplicate subgroup.  The group \"%s\" already contains"
       + "  a subgroup or variable named \"%s\"",
       groupName, varName);
+  long statTimea = hdfFile.printStat( 0, "grp.addVariable.entry",
+    "varName: " + varName
+    + "  dtype: " + dtypeNames[dtype]
+    + "  compLev: " + compressionLevel
+    + "  varDims: " + HdfUtil.formatInts( varDims)
+    + "  chunkLens: " + HdfUtil.formatInts( chunkLens));
 
   int[] dsubTypes = null;
   String[] subNames = null;
@@ -966,17 +972,22 @@ int getNumAttribute()
 
 public void writeData(
   int[] startIxs,
-  Object vdata)
+  Object vdata,
+  boolean useLinear)
 throws HdfException
 {
-  try { writeDataSub( startIxs, vdata); }
+  long statTimea = hdfFile.printStat( 0, "grp.writeData.entry",
+    "useLinear: " + useLinear
+    + "  startIxs: " + HdfUtil.formatInts( startIxs));
+  try { writeDataSub( startIxs, vdata, useLinear); }
   catch( IOException exc) {
     exc.printStackTrace();
     throwerr("caught: %s", exc);
   }
+  hdfFile.printStat( statTimea, "grp.writeData.exit",
+    "useLinear: " + useLinear
+    + "  startIxs: " + HdfUtil.formatInts( startIxs));
 }
-
-
 
 
 
@@ -990,7 +1001,8 @@ throws HdfException
 
 void writeDataSub(
   int[] startIxs,
-  Object vdata)
+  Object vdata,
+  boolean useLinear)
 throws HdfException, IOException
 {
   hdfFile.outChannel.position( HdfUtil.alignLong( 8, hdfFile.eofAddr));
@@ -999,8 +1011,9 @@ throws HdfException, IOException
     prtf("HdfGroup.writeData entry: path: " + getPath() + "\n"
       + "  specified type: "
       + HdfUtil.formatDtypeDim( dtype, varDims) + "\n"
-      + "  eofAddr: " + hdfFile.eofAddr
-      + "  new pos: " + hdfFile.outChannel.position()
+      + "  useLinear: " + useLinear + "\n"
+      + "  eofAddr: " + hdfFile.eofAddr + "\n"
+      + "  new pos: " + hdfFile.outChannel.position() + "\n"
       + "  startIxs: " + HdfUtil.formatInts( startIxs));
   }
 
@@ -1055,6 +1068,27 @@ throws HdfException, IOException
   int[] chunkDataLens;
   if (chunkLens == null) chunkDataLens = varDims;
   else chunkDataLens = chunkLens;
+  if (hdfFile.bugs >= 1) {
+    prtf("  useLinear: %s", useLinear);
+    prtf("  varDims: %s", HdfUtil.formatInts( varDims));
+    prtf("  chunkLens: %s", HdfUtil.formatInts( chunkLens));
+    prtf("  chunkDataLens: %s", HdfUtil.formatInts( chunkDataLens));
+    prtf("  startIxs: %s", HdfUtil.formatInts( startIxs));
+    prtf("  dataDims: %s", HdfUtil.formatInts( dataDims));
+  }
+
+  if (useLinear) {
+    if (chunkDataLens.length > 0) {
+      int totChunkLen = 1;
+      for (int ilen : chunkDataLens) {
+        if (ilen <= 0) throwerr("invalid ilen");
+        totChunkLen *= ilen;
+      }
+      chunkDataLens = new int[] {totChunkLen};  // use one big linear chunk
+    }
+    if (hdfFile.bugs >= 1)
+      prtf("  LINEAR chunkDataLens: %s", HdfUtil.formatInts( chunkDataLens));
+  }
   HdfUtil.checkTypeMatch( getPath(), dtype, dataDtype,
     varDims, startIxs, chunkDataLens, dataDims);
 
