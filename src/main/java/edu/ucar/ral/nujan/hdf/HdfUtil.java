@@ -368,6 +368,7 @@ throws HdfException
 
     long remVolume = 0;
     if (varDims.length > 0) {
+      remVolume = 1;
       for (int ii = 0; ii < varDims.length; ii++) {
         int remLen = chunkLens[ii];
         if (startIxs[ii] + chunkLens[ii] >= varDims[ii])
@@ -380,6 +381,8 @@ throws HdfException
       throwerr("bad chunk size with useLinear.\n"
         + "  declared variable lens: " + formatInts( varDims) + "\n"
         + "  declared chunk lens:    " + formatInts( chunkLens) + "\n"
+        + "  adj chunk lens:         " + formatInts( adjChnLens) + "\n"
+        + "  remVolume:              " + remVolume + "\n"
         + "  current startIxs:       " + formatInts( startIxs) + "\n"
         + "  data object dim lens:   " + formatInts( dataDims) + "\n");
     }
