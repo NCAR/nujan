@@ -193,9 +193,11 @@ throws HdfException
       getPath(),
       attrType,
       dataDtype,
+      false,                          // useLinear
       dataVarDims,                    // var dims
       new int[dataVarDims.length],    // startIxs == all 0
       dataVarDims,                    // chunkLens
+      dataVarDims,                    // adjChunkLens
       dataVarDims);                   // dataDims
   }
 
