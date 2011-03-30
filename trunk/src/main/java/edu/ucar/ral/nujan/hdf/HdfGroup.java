@@ -1065,32 +1065,37 @@ throws HdfException, IOException
   // Check that dtype and dataDims match what the user
   // declared in the earlier addVariable call.
 
-  int[] chunkDataLens;
-  if (chunkLens == null) chunkDataLens = varDims;
-  else chunkDataLens = chunkLens;
+  int[] chnLens = chunkLens;
+  if (chnLens == null) chnLens = varDims;
+  int[] sttIxs = startIxs;
+  if (sttIxs == null) sttIxs = new int[rank];
   if (hdfFile.bugs >= 1) {
     prtf("  useLinear: %s", useLinear);
     prtf("  varDims: %s", HdfUtil.formatInts( varDims));
     prtf("  chunkLens: %s", HdfUtil.formatInts( chunkLens));
-    prtf("  chunkDataLens: %s", HdfUtil.formatInts( chunkDataLens));
+    prtf("  chnLens: %s", HdfUtil.formatInts( chnLens));
     prtf("  startIxs: %s", HdfUtil.formatInts( startIxs));
+    prtf("  sttIxs: %s", HdfUtil.formatInts( sttIxs));
     prtf("  dataDims: %s", HdfUtil.formatInts( dataDims));
   }
 
+  // If useLinear, set adjChnLens = total linear chunk len
+  int[] adjChnLens = chnLens;
   if (useLinear) {
-    if (chunkDataLens.length > 0) {
-      int totChunkLen = 1;
-      for (int ilen : chunkDataLens) {
+    if (chnLens.length > 0) {
+      int linearChunkLen = 1;
+      for (int ilen : chnLens) {
         if (ilen <= 0) throwerr("invalid ilen");
-        totChunkLen *= ilen;
+        linearChunkLen *= ilen;
       }
-      chunkDataLens = new int[] {totChunkLen};  // use one big linear chunk
+      adjChnLens = new int[] {linearChunkLen};    // one big chunk
     }
     if (hdfFile.bugs >= 1)
-      prtf("  LINEAR chunkDataLens: %s", HdfUtil.formatInts( chunkDataLens));
+      prtf("  useLinear true: adjChnLens: %s",
+        HdfUtil.formatInts( adjChnLens));
   }
   HdfUtil.checkTypeMatch( getPath(), dtype, dataDtype,
-    varDims, startIxs, chunkDataLens, dataDims);
+    useLinear, varDims, sttIxs, chnLens, adjChnLens, dataDims);
 
   if (chunk.chunkDataAddr != 0)
     throwerr("chunk has already been written.  path: %s  startIxs: %s",
@@ -1134,7 +1139,7 @@ throws HdfException, IOException
     formatRawData(
       dtype,
       0,               // stgFieldLen for DTYPE_STRING_FIX
-      chunkDataLens,   // specified chunk lens
+      adjChnLens,   // specified chunk lens
       vdata,
       null,            // cntr for DTYPE_COMPOUND
       gcolAddr,        // addr where we will write this gcol
@@ -1166,7 +1171,7 @@ throws HdfException, IOException
     formatRawData(
       dtype,
       stgFieldLen,
-      chunkDataLens,       // specified chunk lens
+      adjChnLens,       // specified chunk lens
       vdata,
       new HdfModInt(0),
       -1,                  // gcolAddr for DTYPE_STRING_VAR
@@ -1474,7 +1479,7 @@ throws HdfException
 void formatRawData(
   int dtp,              // one of DTYPE_*
   int stgFieldLen,      // used for DTYPE_STRING_FIX
-  int[] chunkDataLens,  // specified chunk lens
+  int[] adjChnLens,  // specified chunk lens
   Object vdata,
   HdfModInt cntr,       // used for the index of compound types
   long gcolAddr,        // used for DTYPE_STRING_VAR
@@ -1491,10 +1496,10 @@ throws HdfException
     Object[] objVec = (Object[]) vdata;
     if (hdfFile.bugs >= 2)
       prtIndent("formatRawData objVec len: " + objVec.length
-        + "  chunkDataLens: " + HdfUtil.formatInts( chunkDataLens));
-    if (chunkDataLens.length > 0) {
+        + "  adjChnLens: " + HdfUtil.formatInts( adjChnLens));
+    if (adjChnLens.length > 0) {
       int[] subLens = Arrays.copyOfRange(
-        chunkDataLens, 1, chunkDataLens.length);
+        adjChnLens, 1, adjChnLens.length);
 
       for (int ii = 0; ii < objVec.length; ii++) {
         if (hdfFile.bugs >= 2)
@@ -1515,7 +1520,7 @@ throws HdfException
       // If this dimension is too short, pad it out
       // by rewriting objvec[0].
 
-      int padLen = chunkDataLens[0] - objVec.length;
+      int padLen = adjChnLens[0] - objVec.length;
       if (hdfFile.bugs >= 2)
         prtIndent("formatRawData: padLen: " + padLen);
       for (int ii = 0; ii < padLen; ii++) {
@@ -1621,8 +1626,8 @@ throws HdfException
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufByte("formatRawData", 0xff & avec[ii]);
     }
-    if (chunkDataLens.length != 1) throwerr("bad chunkDataLens");
-    for (int ii = 0; ii < chunkDataLens[0] - avec.length; ii++) {
+    if (adjChnLens.length != 1) throwerr("bad adjChnLens");
+    for (int ii = 0; ii < adjChnLens[0] - avec.length; ii++) {
       fmtBuf.putBufByte("formatRawData", 7777777);
     }
   }
@@ -1634,8 +1639,8 @@ throws HdfException
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufShort("formatRawData", 0xffff & avec[ii]);
     }
-    if (chunkDataLens.length != 1) throwerr("bad chunkDataLens");
-    for (int ii = 0; ii < chunkDataLens[0] - avec.length; ii++) {
+    if (adjChnLens.length != 1) throwerr("bad adjChnLens");
+    for (int ii = 0; ii < adjChnLens[0] - avec.length; ii++) {
       fmtBuf.putBufShort("formatRawData", 7777777);
     }
   }
@@ -1647,8 +1652,8 @@ throws HdfException
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufInt("formatRawData", avec[ii]);
     }
-    if (chunkDataLens.length != 1) throwerr("bad chunkDataLens");
-    for (int ii = 0; ii < chunkDataLens[0] - avec.length; ii++) {
+    if (adjChnLens.length != 1) throwerr("bad adjChnLens");
+    for (int ii = 0; ii < adjChnLens[0] - avec.length; ii++) {
       fmtBuf.putBufInt("formatRawData", 7777777);
     }
   }
@@ -1660,8 +1665,8 @@ throws HdfException
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufLong("formatRawData", avec[ii]);
     }
-    if (chunkDataLens.length != 1) throwerr("bad chunkDataLens");
-    for (int ii = 0; ii < chunkDataLens[0] - avec.length; ii++) {
+    if (adjChnLens.length != 1) throwerr("bad adjChnLens");
+    for (int ii = 0; ii < adjChnLens[0] - avec.length; ii++) {
       fmtBuf.putBufLong("formatRawData", 7777777);
     }
   }
@@ -1673,8 +1678,8 @@ throws HdfException
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufFloat("formatRawData", avec[ii]);
     }
-    if (chunkDataLens.length != 1) throwerr("bad chunkDataLens");
-    for (int ii = 0; ii < chunkDataLens[0] - avec.length; ii++) {
+    if (adjChnLens.length != 1) throwerr("bad adjChnLens");
+    for (int ii = 0; ii < adjChnLens[0] - avec.length; ii++) {
       fmtBuf.putBufFloat("formatRawData", 7777777);
     }
   }
@@ -1686,8 +1691,8 @@ throws HdfException
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufDouble("formatRawData", avec[ii]);
     }
-    if (chunkDataLens.length != 1) throwerr("bad chunkDataLens");
-    for (int ii = 0; ii < chunkDataLens[0] - avec.length; ii++) {
+    if (adjChnLens.length != 1) throwerr("bad adjChnLens");
+    for (int ii = 0; ii < adjChnLens[0] - avec.length; ii++) {
       fmtBuf.putBufDouble("formatRawData", 7777777);
     }
   }
@@ -1703,8 +1708,8 @@ throws HdfException
     for (int ii = 0; ii < avec.length; ii++) {
       fmtBuf.putBufByte("formatRawData", 0xff & avec[ii]);
     }
-    if (chunkDataLens.length != 1) throwerr("bad chunkDataLens");
-    for (int ii = 0; ii < chunkDataLens[0] - avec.length; ii++) {
+    if (adjChnLens.length != 1) throwerr("bad adjChnLens");
+    for (int ii = 0; ii < adjChnLens[0] - avec.length; ii++) {
       fmtBuf.putBufByte("formatRawData", 7777777);
     }
   }

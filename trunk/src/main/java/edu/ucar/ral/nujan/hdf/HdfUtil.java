@@ -296,7 +296,7 @@ throws HdfException
 
 /**
  * Checks that dataType == specType.
- * Checks that dataDims[i] == chunkDims[i]
+ * Checks that dataDims[i] == chunkLens[i]
  *      or startIxs[i] == lastPos and dataDims == fullDim - lastPos
  * where lastPos is the last startIx in this dim.
  *
@@ -308,9 +308,11 @@ static void checkTypeMatch(
   String msg,
   int specType,               // declared type, one of HdfGroup.DTYPE_*
   int dataType,               // actual data type, one of HdfGroup.DTYPE_*
+  boolean useLinear,
   int[] varDims,              // entire var dimensions
   int[] startIxs,             // current start indices
-  int[] chunkDims,            // specified chunk dims
+  int[] chunkLens,            // specified chunk dims
+  int[] adjChnLens,           // chunk dims possibly linearized
   int[] dataDims)             // dims of data object to be written
 throws HdfException
 {
@@ -350,37 +352,66 @@ throws HdfException
 
   // Check dimensions
   // If scalar ...
-  if (chunkDims == null) {
+  if (varDims.length == 0) {
     if (dataDims.length != 0)
       throwerr("type mismatch for: " + msg + "\n"
         + "  declared rank: (null)\n"
         + "  data rank:     " + dataDims.length + "\n");
   }
 
-  // Else not scalar ...
+  // Else if useLinear ...
+  else if (useLinear) {
+    if (dataDims.length != 1) throwerr("useLinear but dataDims rank != 1");
+    if (adjChnLens.length != 1) throwerr("useLinear but adjChnLens rank != 1");
+    int dlen = dataDims[0];
+    int clen = adjChnLens[0];
+
+    long remVolume = 0;
+    if (varDims.length > 0) {
+      for (int ii = 0; ii < varDims.length; ii++) {
+        int remLen = chunkLens[ii];
+        if (startIxs[ii] + chunkLens[ii] >= varDims[ii])
+          remLen = varDims[ii] - startIxs[ii];
+        remVolume *= remLen;
+      }
+    }
+
+    if (! (dlen == clen || dlen == remVolume)) {
+      throwerr("bad chunk size with useLinear.\n"
+        + "  declared variable lens: " + formatInts( varDims) + "\n"
+        + "  declared chunk lens:    " + formatInts( chunkLens) + "\n"
+        + "  current startIxs:       " + formatInts( startIxs) + "\n"
+        + "  data object dim lens:   " + formatInts( dataDims) + "\n");
+    }
+  } // if useLinear
+
+  // Else not scalar or linear ...
   else {
     // Check rank
-    if (dataDims.length != chunkDims.length)
+    if (dataDims.length != chunkLens.length)
       throwerr("Dimension mismatch for: " + msg + "\n"
-        + "  declared rank: " + chunkDims.length + "\n"
-        + "  data rank:     " + dataDims.length + "\n");
+        + "  declared variable lens: " + formatInts( varDims) + "\n"
+        + "  declared chunk lens:    " + formatInts( chunkLens) + "\n"
+        + "  current startIxs:       " + formatInts( startIxs) + "\n"
+        + "  data object dim lens:   " + formatInts( dataDims) + "\n");
 
     // Check each dimension
-    for (int ii = 0; ii < chunkDims.length; ii++) {
+    for (int ii = 0; ii < chunkLens.length; ii++) {
       boolean allOk = false;
-      if (dataDims[ii] == chunkDims[ii]) allOk = true;
+      if (dataDims[ii] == chunkLens[ii]) allOk = true;
       else {
-        if (startIxs[ii] + chunkDims[ii] >= varDims[ii]) {  // if at last pos
-          if (dataDims[ii] == varDims[ii] - startIxs[ii]) allOk = true;
+        if (startIxs[ii] + chunkLens[ii] >= varDims[ii]) {  // if at last pos
+          int remLen = varDims[ii] - startIxs[ii];
+          if (dataDims[ii] == remLen) allOk = true;
         }
       }
       if (! allOk) {
         throwerr("Dimension mismatch for: " + msg + "\n"
           + "  data dimension length mismatch for dimension " + ii + "\n"
-          + "  declared variable len: " + varDims[ii] + "\n"
-          + "  declared chunk len:    " + chunkDims[ii] + "\n"
-          + "  current startIx:       " + startIxs[ii] + "\n"
-          + "  data object dim len:   " + dataDims[ii] + "\n");
+          + "  declared variable lens: " + formatInts( varDims) + "\n"
+          + "  declared chunk lens:    " + formatInts( chunkLens) + "\n"
+          + "  current startIxs:       " + formatInts( startIxs) + "\n"
+          + "  data object dim lens:   " + formatInts( dataDims) + "\n");
       }
     } // for ii
   } // else not scalar

@@ -42,20 +42,34 @@ import edu.ucar.ral.nujan.netcdf.NhVariable;
 public class TestUnita extends TestCase {
 
 
-int nhBugs;
-int hdfBugs;
-String sourceDir;
-String targetDir;
-boolean useCheck;
+// Set defaults when called by Maven's use of JUnit.
+int nhBugs = 0;
+int hdfBugs = 0;
+String sourceDir = "src/test/resources/testUnitData";
+String targetDir = "target/testDira";
+boolean useCheck = true;
+
+String dataTypeStg = "double,float,int";
+
+// Each string has the format:
+// "d,d,d/c,c,c" or special case "d,d,d/null",
+// where d is a dimLen and c is a chunkLen.
+
+String[] dimStgs = {
+  "10,10,10/null",
+  "10,10,10/10,10,10",
+  "10,10,10/5,5,5",
+  "10,10,10/7,7,7"
+};
+
+String compLevelStg = "0,5,9";
+
+String useLinearStg = "false,true";
+
+
 
 
 public TestUnita() {
-  // Set defaults when called by Maven's use of JUnit.
-  nhBugs = 0;
-  hdfBugs = 0;
-  sourceDir = "src/test/resources/testUnitData/test001.nc";
-  targetDir = "target/testDira";
-  useCheck = false;
 }
 
 
@@ -64,7 +78,7 @@ public static void main( String[] args) {
   try {
     TestUnita tunit = new TestUnita();
     tunit.initAll( args);
-    tunit.mkTestFiles();
+    tunit.testIt();
   }
   catch( NhException exc) {
     exc.printStackTrace();
@@ -83,8 +97,6 @@ public static void main( String[] args) {
 void initAll( String[] args)
 throws NhException
 {
-  nhBugs = -1;
-  hdfBugs = -1;
   sourceDir = null;
   targetDir = null;
 
@@ -93,15 +105,15 @@ throws NhException
   for (int iarg = 0; iarg < args.length; iarg += 2) {
     String key = args[iarg];
     String val = args[iarg+1];
-    if (key.equals("-nhBugs")) nhBugs = Integer.parseInt( val, 10);
-    else if (key.equals("-hdfBugs")) hdfBugs = Integer.parseInt( val, 10);
+    if (key.equals("-nhBugs")) nhBugs = parseInt("-nhBugs", val);
+    else if (key.equals("-hdfBugs")) hdfBugs = parseInt("-hdfBugs", val);
     else if (key.equals("-sourceDir")) sourceDir = val;
     else if (key.equals("-targetDir")) targetDir = val;
-    else if (key.equals("-useCheck")) {
-      if (val.equals("false")) useCheck = false;
-      else if (val.equals("true")) useCheck = true;
-      else throwerr("bad value for -useCheck");
-    }
+    else if (key.equals("-check")) useCheck = parseBoolean("-check", val);
+    else if (key.equals("-dataType")) dataTypeStg = val;
+    else if (key.equals("-dims")) dimStgs = new String[] {val};
+    else if (key.equals("-compLevel")) compLevelStg = val;
+    else if (key.equals("-useLinear")) useLinearStg = val;
     else throwerr("unknown parm: %s", key);
   }
 
@@ -110,10 +122,6 @@ throws NhException
   if (sourceDir == null) throwerr("parm not specified: -sourceDir");
   if (targetDir == null) throwerr("parm not specified: -targetDir");
 
-  prtf("TestUnita: nhBugs: %d", nhBugs);
-  prtf("TestUnita: hdfBugs: %d", hdfBugs);
-  prtf("TestUnita: sourceDir: %s", sourceDir);
-  prtf("TestUnita: targetDir: %s", targetDir);
 } // end initAll
 
 
@@ -121,56 +129,62 @@ throws NhException
 
 
 
-public void testAll() throws NhException {
-  nhBugs = 0;
-  hdfBugs = 0;
-  sourceDir = "src/test/resources/testUnitData/test001.nc";
-  targetDir = "target/testDira";
-
-  mkTestFiles();
-}
 
 
 
 
 
 
-
-
-void mkTestFiles()
+public void testIt()
 throws NhException
 {
+  prtf("TestUnita: nhBugs: %d", nhBugs);
+  prtf("TestUnita: hdfBugs: %d", hdfBugs);
+  prtf("TestUnita: sourceDir: %s", sourceDir);
+  prtf("TestUnita: targetDir: %s", targetDir);
+  prtf("TestUnita: dataType: %s", dataTypeStg);
+  for (String stg : dimStgs) {
+    prtf("TestUnita: dim: %s", stg);
+  }
+  prtf("TestUnita: compLevel: %s", compLevelStg);
+
   new File( targetDir).mkdir();
 
-  int[] dataTypes = {
+  int[] testDataTypes = {
     NhVariable.TP_DOUBLE,       // nhType
     NhVariable.TP_FLOAT,
     NhVariable.TP_INT};
+  int[] testRanks = { 0, 1, 2, 3};
+  int[] testDimLens = { 10, 100};
+  int[] testCompLevels = {0, 5, 9};
+  boolean[] testUseLinears = { false, true};
 
-  for (int dataType : dataTypes) {
-    for (int rank : new int[] { 0, 1, 2, 3}) {
-      for (int dimLen : new int[] { 10, 100}) {      // small, big
-        for (String chunkTp : new String[] {"null", "full", "div", "nonDiv"}) {
-          for (int compLevel : new int[] {0, 5, 9}) {
-            // Cannot compress a scalar; compression requires chunking.
-            if (! (compLevel > 0 && (rank == 0 || chunkTp.equals("null")))) {
-              for (boolean useLinear : new boolean[] { false, true}) {
+  for (String dtypeStg : dataTypeStg.split(",")) {
+    int dataType = 0;
+    if (dtypeStg.equals("double")) dataType = NhVariable.TP_DOUBLE;
+    else if (dtypeStg.equals("float")) dataType = NhVariable.TP_FLOAT;
+    else if (dtypeStg.equals("int")) dataType = NhVariable.TP_INT;
+    else throwerr("invalid dataType: \"" + dtypeStg + "\"");
 
-                int[] dimLens = new int[rank];
-                for (int ii = 0; ii < rank; ii++) {
-                  dimLens[ii] = dimLen;
-                }
+    for (String dimStg : dimStgs) {
+      int[][] dimChunks = parseDimChunks("-dims", dimStg);
+      int[] dimLens = dimChunks[0];
+      int[] chunkLens = dimChunks[1];
+      int rank = dimLens.length;
 
-                mkSingleTest( dataType, dimLens, chunkTp,
-                  compLevel, useLinear, sourceDir, targetDir);
-              } // for useLinear
-            } // if not compressing a scalar
-          } // for compLevel
-        }
-      } // for dimLen
-    }
-  } // for dataType
-} // end mkTestFiles
+      for (int compLevel : parseInts("compLevel", compLevelStg)) {
+        for (boolean useLinear : parseBooleans("useLinear", useLinearStg)) {
+
+          // Cannot compress a scalar; compression requires chunking.
+          if (! (compLevel > 0 && (rank == 0 || chunkLens == null))) {
+            mkSingleTest( dataType, dimLens, chunkLens,
+              compLevel, useLinear, sourceDir, targetDir);
+          } // if not compressing a scalar
+        } // for useLinear
+      } // for compLevel
+    } // for dimStg
+  } // for dataTypeStg
+} // end testIt
 
 
 
@@ -179,7 +193,7 @@ throws NhException
 void mkSingleTest(
   int dataType,            // NhVariable.TP_DOUBLE, etc
   int[] dimLens,
-  String chunkTp,          // "null", "full", "div", "nonDiv"
+  int[] chunkLens,
   int compLevel,
   boolean useLinear,
   String sourceDir,
@@ -194,7 +208,11 @@ throws NhException
   else {
     for (int ival : dimLens) namePart += "_" + ival;
   }
-  namePart += ".chunk_" + chunkTp;
+  if (chunkLens == null) namePart += ".chunk_null";
+  else {
+    namePart += ".chunk";
+    for (int ival : chunkLens) namePart += "_" + ival;
+  }
   namePart += ".comp_" + compLevel;
   namePart += ".linear_" + useLinear;
   namePart += ".nc";
@@ -202,7 +220,7 @@ throws NhException
   String sourceName = sourceDir + "/" + namePart;
   String targetName = targetDir + "/" + namePart;
 
-  createFile( dataType, dimLens, chunkTp,
+  createFile( dataType, dimLens, chunkLens,
     compLevel, useLinear, targetName);
 
   if (useCheck) {
@@ -221,7 +239,7 @@ throws NhException
 void createFile(
   int dataType,            // NhVariable.TP_DOUBLE, etc
   int[] dimLens,
-  String chunkTp,          // "null", "full", "div", "nonDiv"
+  int[] chunkLens,
   int compLevel,
   boolean useLinear,
   String targetName)
@@ -233,53 +251,16 @@ throws NhException
     prtf("TestUnita.createFile:");
     prtf("  dataType: %s", NhVariable.nhTypeNames[ dataType]);
     prtf("  rank: %d", rank);
-    for (int ival : dimLens) {
-      prtf("    dimLen: %d", ival);
-    }
-    prtf("  chunkTp: \"%s\"", chunkTp);
+    prtf("  dimLens: %s", formatInts( dimLens));
+    prtf("  chunkLens: %s", formatInts( chunkLens));
     prtf("  compLevel: %d", compLevel);
     prtf("  useLinear: %s", useLinear);
     prtf("  targetName: %s", targetName);
   }
 
-  int[] chunkLens = null;
-
-  if (chunkTp.equals("null")) {}
-
-  else if (chunkTp.equals("full")) {
-    chunkLens = dimLens;
-  }
-
-  else if (chunkTp.equals("div")) {
-    chunkLens = new int[rank];
-    for (int ii = 0; ii < rank; ii++) {
-      chunkLens[ii] = dimLens[ii] / 10;
-      if ( 10 * chunkLens[ii] != dimLens[ii])
-        throwerr("dimLens value is not divisible");
-    }
-  }
-
-  else if (chunkTp.equals("nonDiv")) {
-    chunkLens = new int[rank];
-    for (int ii = 0; ii < rank; ii++) {
-      chunkLens[ii] = dimLens[ii] / 10 + 1;
-      if ( 10 * chunkLens[ii] == dimLens[ii])
-        throwerr("dimLens value is divisible");
-    }
-  }
-  else throwerr("invalid chunkTp: %s", chunkTp);
-  if (chunkLens == null) {
-    if (nhBugs >= 1) prtf("TestUnita.createFile: chunkLens: null");
-  }
-  else {
-    for (int ival : chunkLens) {
-      if (nhBugs >= 1) prtf("TestUnita.createFile: chunkLen: %d", ival);
-    }
-  }
-
   Object dataObj = null;
   int[] genLens;
-  if (chunkTp.equals("null")) genLens = dimLens;
+  if (chunkLens == null) genLens = dimLens;
   else genLens = chunkLens;
 
   if (useLinear) dataObj = generateLinearData( dataType, genLens);
@@ -350,19 +331,13 @@ throws NhException
   // All calls to writeData occur after endDefine.
   hfile.endDefine();
 
-
-
-
   // Write out the data
-  if (chunkTp.equals("null")) {
+  if (chunkLens == null) {
     int[] startIxs = null;
     humidityVar.writeData( startIxs, dataObj, useLinear);
   }
-  else if (chunkTp.equals("full")) {
-    int[] startIxs = new int[rank];      // all 0
-    humidityVar.writeData( startIxs, dataObj, useLinear);
-  }
-  else if (chunkTp.equals("div") || chunkTp.equals("nonDiv")) {
+
+  else {
     int[] startIxs = new int[rank];      // all 0
     boolean allDone = false;
     while (! allDone) {
@@ -377,7 +352,7 @@ throws NhException
       }
       if (rank == 0) allDone = true;
     } // while ! allDone
-  } // if chunkTp is "div" or "nonDiv"
+  }
 
   hfile.close();
 
@@ -553,6 +528,133 @@ throws NhException
   else throwerr("unknown dataType: %s", NhVariable.nhTypeNames[dataType]);
   return dataObj;
 } // end generateLinearData
+
+
+
+
+// Parm has format: "d,d,d/c,c,c" or special case "d,d,d/null",
+// where d is a dimLen and c is a chunkLen.
+//
+// Returns [0][*] = dims, [1][*] = chunks.  chunks may be null.
+
+static int[][] parseDimChunks( String msg, String stg)
+throws NhException
+{
+  String[] toks = stg.split("/");
+  if (toks.length != 2) throwerr("bad format for parm \"" + msg + "\".");
+  int[] dims = parseInts( msg, toks[0]);
+  int[] chunks = null;
+  if (! toks[1].equals("null")) chunks = parseInts( msg, toks[1]);
+  return new int[][] { dims, chunks};
+}
+
+
+
+// Returns [0][*] = dims, [1][*] = chunks.
+
+static int[][] oldParseIntPairs( String msg, String stg)
+throws NhException
+{
+  String[] toks = stg.split(",");
+  if (toks.length == 0) throwerr("parm \"" + msg + "\" is empty.");
+  int[] dims = new int[toks.length];
+  int[] chunks = new int[toks.length];
+  for (int ii = 0; ii < toks.length; ii++) {
+    String[] subToks = toks[ii].split("/");
+    if (subToks.length != 2)
+      throwerr("parm \"" + msg + "\" has invalid spec \""
+        + toks[ii] + "\" in string \"" + stg + "\"");
+    try { dims[ii] = Integer.parseInt( subToks[0], 10); }
+    catch( NumberFormatException exc) {
+      throwerr("parm \"" + msg + "\" has invalid integer in \""
+        + toks[ii] + "\" in string \"" + stg + "\"");
+    }
+    try { chunks[ii] = Integer.parseInt( subToks[1], 10); }
+    catch( NumberFormatException exc) {
+      throwerr("parm \"" + msg + "\" has invalid integer in \""
+        + toks[ii] + "\" in string \"" + stg + "\"");
+    }
+  }
+  return new int[][] { dims, chunks};
+}
+
+
+
+
+
+static int parseInt( String msg, String stg)
+throws NhException
+{
+  int res = 0;
+  try { res = Integer.parseInt( stg, 10); }
+  catch( NumberFormatException exc) {
+    throwerr("parm \"" + msg + "\" has invalid integer: \"" + stg + "\"");
+  }
+  return res;
+}
+
+
+
+
+static int[] parseInts( String msg, String stg)
+throws NhException
+{
+  String[] toks = stg.split(",");
+  if (toks.length == 0) throwerr("parm \"" + msg + "\" is empty.");
+  int[] res = new int[toks.length];
+  for (int ii = 0; ii < toks.length; ii++) {
+    res[ii] = parseInt( msg, toks[ii]);
+  }
+  return res;
+}
+
+
+
+
+static boolean parseBoolean( String msg, String stg)
+throws NhException
+{
+  boolean res = false;
+  if (stg.equals("n") || stg.equals("false")) res = false;
+  else if (stg.equals("y") || stg.equals("true")) res = true;
+  else throwerr("parm \"" + msg + "\" has invalid boolean: \"" + stg + "\"");
+  return res;
+}
+
+
+
+static boolean[] parseBooleans( String msg, String stg)
+throws NhException
+{
+  String[] toks = stg.split(",");
+  if (toks.length == 0) throwerr("parm \"" + msg + "\" is empty.");
+  boolean[] res = new boolean[toks.length];
+  for (int ii = 0; ii < toks.length; ii++) {
+    res[ii] = parseBoolean( msg, toks[ii]);
+  }
+  return res;
+}
+
+
+
+
+
+public static String formatInts(
+  int[] vals)
+{
+  String res = "";
+  if (vals == null) res = "(null)";
+  else {
+    res = "[";
+    for (int ii = 0; ii < vals.length; ii++) {
+      if (ii > 0) res += " ";
+      res += vals[ii];
+    }
+    res += "]";
+  }
+  return res;
+}
+
 
 
 
