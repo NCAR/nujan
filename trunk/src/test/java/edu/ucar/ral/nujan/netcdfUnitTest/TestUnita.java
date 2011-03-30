@@ -258,15 +258,6 @@ throws NhException
     prtf("  targetName: %s", targetName);
   }
 
-  Object dataObj = null;
-  int[] genLens;
-  if (chunkLens == null) genLens = dimLens;
-  else genLens = chunkLens;
-
-  if (useLinear) dataObj = generateLinearData( dataType, genLens);
-  else dataObj = generateCuboidData( dataType, genLens);
-
-
   NhFileWriter hfile = new NhFileWriter(
     targetName,
     NhFileWriter.OPT_OVERWRITE,
@@ -332,15 +323,28 @@ throws NhException
   hfile.endDefine();
 
   // Write out the data
+
   if (chunkLens == null) {
+    Object dataObj = null;
+    if (useLinear) dataObj = generateLinearData( dataType, dimLens);
+    else dataObj = generateCuboidData( dataType, dimLens);
     int[] startIxs = null;
     humidityVar.writeData( startIxs, dataObj, useLinear);
   }
 
   else {
+    Object dataObj = null;
     int[] startIxs = new int[rank];      // all 0
     boolean allDone = false;
     while (! allDone) {
+      int[] genLens = new int[rank];
+      for (int ii = 0; ii < rank; ii++) {
+        if (startIxs[ii] + chunkLens[ii] <= dimLens[ii])
+          genLens[ii] = chunkLens[ii];
+        else genLens[ii] = dimLens[ii] - startIxs[ii];
+      }
+      if (useLinear) dataObj = generateLinearData( dataType, genLens);
+      else dataObj = generateCuboidData( dataType, genLens);
       humidityVar.writeData( startIxs, dataObj, useLinear);
 
       // Increment startIxs
@@ -357,6 +361,10 @@ throws NhException
   hfile.close();
 
 } // end createFile
+
+
+
+
 
 
 
@@ -473,6 +481,10 @@ throws NhException
 
 
 
+
+
+
+
 Object generateLinearData(
   int dataType,            // NhVariable.TP_DOUBLE, etc
   int[] dimLens)
@@ -528,6 +540,10 @@ throws NhException
   else throwerr("unknown dataType: %s", NhVariable.nhTypeNames[dataType]);
   return dataObj;
 } // end generateLinearData
+
+
+
+
 
 
 
