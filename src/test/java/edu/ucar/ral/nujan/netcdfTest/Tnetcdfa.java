@@ -63,6 +63,8 @@ static void badparms( String msg) {
   prtf("  -compress     compression level: 0==none, 1 - 9");
   prtf("  -utcModTime   either yyyy-mm-dd or yyyy-mm-ddThh:mm:ss");
   prtf("                or 0, meaning use the current time");
+  prtf("  -useArray     false/true: use Netcdf Array object (only for float)");
+  prtf("  -useLinear    false/true: use linear array");
   prtf("  -numThread    1 <= numThread <= 100");
   prtf("  -outFile      <fname>");
   System.exit(1);
@@ -483,6 +485,7 @@ throws NhException
               }
               testData = vals;
             }
+            prtf("###### Tnetcdfa: float: class a: " + testData.getClass());
           }
 
           // Tests for chunk lens < dims not ok for higher ranks
@@ -490,7 +493,9 @@ throws NhException
             if (! testEqualInts( dims, chunks))
               throwerr("Tnetcdfa: chunks < dims not ok for higher ranks");
             testData = allData;
+            prtf("###### Tnetcdfa: float: class b: " + testData.getClass());
           }
+          prtf("###### Tnetcdfa: float: class c: " + testData.getClass());
 
         } // if nhType == NhVariable.TP_FLOAT
 
@@ -500,6 +505,7 @@ throws NhException
             throwerr("Tnetcdfa: chunks < dims not ok for other types");
           testData = allData;
         }
+        prtf("###### Tnetcdfa: float: class d: " + testData.getClass());
 
         testVars[ivar].writeData(
           startIxs,
@@ -609,6 +615,11 @@ throws NhException
         allData);
     }
   }
+
+  ///vara.addAttribute(
+  ///  "testArrayOfString",
+  ///  nhType,
+  ///  new String[] {"abc", "def"});
 
   if (numAttr > 0 && rank == 0) {
     vara.addAttribute(

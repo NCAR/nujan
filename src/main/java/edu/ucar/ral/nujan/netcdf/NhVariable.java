@@ -516,7 +516,7 @@ throws NhException
       + NhVariable.nhTypeNames[nhType] + "\n"
       + "  startIxs: " + NhGroup.formatInts( startIxs) + "\n"
       + "  useLinear: " + useLinear + "\n"
-      + "  rawData: " + rawData);
+      + "  rawData class: " + rawData.getClass());
   }
   if (rawData == null) throwerr("rawData is null");
   Object vdata = null;
