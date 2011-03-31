@@ -458,9 +458,10 @@ throws HdfException
     prtf("\nHdfFileWriter.endDefine: start pass 1: mainBuf pos: %d",
       mainBuf.getPos());
 
-  if (bugs >= 2)
-    prtf("HdfFileWriter.endDefine: set bugs = 0 for formatPass 1");
-  bugs = 0;
+  //xxx
+  //if (bugs >= 2)
+  //  prtf("HdfFileWriter.endDefine: set bugs = 0 for formatPass 1");
+  //bugs = 0;
   formatBufAll( 1);           // formatPass = 1
 
   bugs = debugLevel;

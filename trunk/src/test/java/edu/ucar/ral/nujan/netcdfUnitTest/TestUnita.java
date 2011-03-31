@@ -50,7 +50,7 @@ String sourceDir = "src/test/resources/testUnitData";
 String targetDir = "target/testDira";
 boolean useCheck = true;
 
-String dataTypeStg = "ubyte,int,float,double";
+String dataTypeStg = "ubyte,int,float,double,vstring";
 
 // Each string has the format:
 // "d,d,d/c,c,c" or special case "d,d,d/null",
@@ -169,11 +169,14 @@ throws NhException
   prtf("TestUnita: hdfBugs: %d", hdfBugs);
   prtf("TestUnita: sourceDir: \"%s\"", sourceDir);
   prtf("TestUnita: targetDir: \"%s\"", targetDir);
+  prtf("TestUnita: useCheck: %s", useCheck);
   prtf("TestUnita: dataTypeStg: \"%s\"", dataTypeStg);
   for (String stg : dimStgs) {
     prtf("TestUnita: dimStg: \"%s\"", stg);
   }
   prtf("TestUnita: compLevelStg: \"%s\"", compLevelStg);
+  prtf("TestUnita: useSmallStg: \"%s\"", useSmallStg);
+  prtf("TestUnita: useLinearStg: \"%s\"", useLinearStg);
 
   new File( targetDir).mkdir();
 
@@ -183,6 +186,7 @@ throws NhException
     else if (dtypeStg.equals("int")) dataType = NhVariable.TP_INT;
     else if (dtypeStg.equals("float")) dataType = NhVariable.TP_FLOAT;
     else if (dtypeStg.equals("double")) dataType = NhVariable.TP_DOUBLE;
+    else if (dtypeStg.equals("vstring")) dataType = NhVariable.TP_STRING_VAR;
     else throwerr("invalid dataType: \"" + dtypeStg + "\"");
     if (unitBugs >= 1) prtf("dtypeStg: %s", dtypeStg);
 
@@ -202,11 +206,30 @@ throws NhException
             if (unitBugs >= 1) prtf("useLinear: %s", useLinear);
 
             // Cannot compress a scalar; compression requires chunking.
-            if (compLevel > 0 && (rank == 0 || chunkLens == null)) {
-              if (unitBugs >= 1)
-                prtf("test omitted because of rank or chunkLens");
+            boolean useIt = true;
+            if (compLevel > 0) {
+              if (rank == 0) {
+                useIt = false;
+                if (unitBugs >= 1)
+                  prtf("test omitted: compLevel > 0 && rank == 0");
+              }
+              if (chunkLens == null) {
+                useIt = false;
+                if (unitBugs >= 1)
+                  prtf("test omitted: compLevel > 0 && chunkLens == null");
+              }
+              if (dataType == NhVariable.TP_STRING_VAR) {
+                useIt = false;
+                if (unitBugs >= 1)
+                  prtf("test omitted: compLevel > 0 && dataType == STRING_VAR");
+              }
             }
-            else {
+            if (dataType == NhVariable.TP_STRING_VAR && rank > 4) {
+              useIt = false;
+              if (unitBugs >= 1)
+                prtf("test omitted: dataType == STRING_VAR && rank > 4");
+            }
+            if (useIt) {
               mkSingleTest( dataType, dimLens, chunkLens, compLevel,
                 useSmall, useLinear, sourceDir, targetDir);
             } // if not compressing a scalar
@@ -340,6 +363,8 @@ throws NhException
     fillValue = new Float( -999999);
   else if (dataType == NhVariable.TP_DOUBLE)
     fillValue = new Double( -999999);
+  else if (dataType == NhVariable.TP_STRING_VAR)
+    fillValue = null;
   else throwerr("unknown dataType: %s", NhVariable.nhTypeNames[dataType]);
 
   NhVariable humidityVar = northernGroup.addVariable(
@@ -419,6 +444,7 @@ throws NhException
     else if (dataType == NhVariable.TP_INT) dataObj = new Integer(100);
     else if (dataType == NhVariable.TP_FLOAT) dataObj = new Float(100);
     else if (dataType == NhVariable.TP_DOUBLE) dataObj = new Double(100);
+    else if (dataType == NhVariable.TP_STRING_VAR) dataObj = new String("abc");
     else throwerr("unknown dataType: %s", NhVariable.nhTypeNames[dataType]);
   }
 
@@ -448,6 +474,13 @@ throws NhException
       double[] vals = new double[dimLens[0]];
       for (int ia = 0; ia < dimLens[0]; ia++) {
         vals[ia] = ia;
+      }
+      dataObj = vals;
+    }
+    else if (dataType == NhVariable.TP_STRING_VAR) {
+      String[] vals = new String[dimLens[0]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        vals[ia] = "stg" + ia;
       }
       dataObj = vals;
     }
@@ -487,6 +520,15 @@ throws NhException
       for (int ia = 0; ia < dimLens[0]; ia++) {
         for (int ib = 0; ib < dimLens[1]; ib++) {
           vals[ia][ib] = 10 * ia + ib;
+        }
+      }
+      dataObj = vals;
+    }
+    else if (dataType == NhVariable.TP_STRING_VAR) {
+      String[][] vals = new String[dimLens[0]][dimLens[1]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          vals[ia][ib] = "stg" + (10 * ia + ib);
         }
       }
       dataObj = vals;
@@ -534,6 +576,17 @@ throws NhException
         for (int ib = 0; ib < dimLens[1]; ib++) {
           for (int ic = 0; ic < dimLens[2]; ic++) {
             vals[ia][ib][ic] = 100 * ia + 10 * ib + ic;
+          }
+        }
+      }
+      dataObj = vals;
+    }
+    else if (dataType == NhVariable.TP_STRING_VAR) {
+      String[][][] vals = new String[dimLens[0]][dimLens[1]][dimLens[2]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          for (int ic = 0; ic < dimLens[2]; ic++) {
+            vals[ia][ib][ic] = "stg" + (100 * ia + 10 * ib + ic);
           }
         }
       }
@@ -594,6 +647,21 @@ throws NhException
           for (int ic = 0; ic < dimLens[2]; ic++) {
             for (int id = 0; id < dimLens[3]; id++) {
               vals[ia][ib][ic][id] = 1000 * ia + 100 * ib + 10 * ic + id;
+            }
+          }
+        }
+      }
+      dataObj = vals;
+    }
+    else if (dataType == NhVariable.TP_STRING_VAR) {
+      String[][][][] vals = new String[dimLens[0]][dimLens[1]][dimLens[2]]
+        [dimLens[3]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          for (int ic = 0; ic < dimLens[2]; ic++) {
+            for (int id = 0; id < dimLens[3]; id++) {
+              vals[ia][ib][ic][id]
+                = "stg" + (1000 * ia + 100 * ib + 10 * ic + id);
             }
           }
         }
@@ -665,6 +733,23 @@ throws NhException
               for (int ie = 0; ie < dimLens[4]; ie++) {
                 vals[ia][ib][ic][id][ie]
                   = 10000 * ia + 1000 * ib + 100 * ic + 10 * id + ie;
+              }
+            }
+          }
+        }
+      }
+      dataObj = vals;
+    }
+    else if (dataType == NhVariable.TP_STRING_VAR) {
+      String[][][][][] vals = new String[dimLens[0]][dimLens[1]][dimLens[2]]
+        [dimLens[3]][dimLens[4]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          for (int ic = 0; ic < dimLens[2]; ic++) {
+            for (int id = 0; id < dimLens[3]; id++) {
+              for (int ie = 0; ie < dimLens[4]; ie++) {
+                vals[ia][ib][ic][id][ie]
+                  = "stg" + (10000 * ia + 1000 * ib + 100 * ic + 10 * id + ie);
               }
             }
           }
@@ -752,6 +837,15 @@ throws NhException
       }
       dataObj = res;
     }
+    else if (genData instanceof String[]) {
+      String[] res = new String[subLens[0]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        if (iaa < dimLens[0]) res[ia] = ((String[]) genData)[ iaa];
+        else res[ia] = "stg" + FILLVAL;
+      }
+      dataObj = res;
+    }
     else throwerr("unknown type: " + genData.getClass());
   } // if rank == 1
 
@@ -804,6 +898,19 @@ throws NhException
           if (iaa < dimLens[0] && ibb < dimLens[1])
             res[ia][ib] = ((double[][]) genData)[iaa][ibb];
           else res[ia][ib] = FILLVAL;
+        }
+      }
+      dataObj = res;
+    }
+    else if (genData instanceof String[][]) {
+      String[][] res = new String[subLens[0]][subLens[1]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          if (iaa < dimLens[0] && ibb < dimLens[1])
+            res[ia][ib] = ((String[][]) genData)[iaa][ibb];
+          else res[ia][ib] = "stg" + FILLVAL;
         }
       }
       dataObj = res;
@@ -871,6 +978,22 @@ throws NhException
             if (iaa < dimLens[0] && ibb < dimLens[1] && icc < dimLens[2])
               res[ia][ib][ic] = ((double[][][]) genData)[iaa][ibb][icc];
             else res[ia][ib][ic] = FILLVAL;
+          }
+        }
+      }
+      dataObj = res;
+    }
+    else if (genData instanceof String[][][]) {
+      String[][][] res = new String[subLens[0]][subLens[1]][subLens[2]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          for (int ic = 0; ic < subLens[2]; ic++) {
+            int icc = startIxs[2] + ic;
+            if (iaa < dimLens[0] && ibb < dimLens[1] && icc < dimLens[2])
+              res[ia][ib][ic] = ((String[][][]) genData)[iaa][ibb][icc];
+            else res[ia][ib][ic] = "stg" + FILLVAL;
           }
         }
       }
@@ -970,6 +1093,30 @@ throws NhException
                   = ((double[][][][]) genData)[iaa][ibb][icc][idd];
               }
               else res[ia][ib][ic][id] = FILLVAL;
+            }
+          }
+        }
+      }
+      dataObj = res;
+    }
+    else if (genData instanceof String[][][][]) {
+      String[][][][] res = new String[subLens[0]][subLens[1]][subLens[2]]
+        [subLens[3]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          for (int ic = 0; ic < subLens[2]; ic++) {
+            int icc = startIxs[2] + ic;
+            for (int id = 0; id < subLens[3]; id++) {
+              int idd = startIxs[3] + id;
+              if (iaa < dimLens[0] && ibb < dimLens[1] && icc < dimLens[2]
+                && idd < dimLens[3])
+              {
+                res[ia][ib][ic][id]
+                  = ((String[][][][]) genData)[iaa][ibb][icc][idd];
+              }
+              else res[ia][ib][ic][id] = "stg" + FILLVAL;
             }
           }
         }
@@ -1081,6 +1228,33 @@ throws NhException
                     = ((double[][][][][]) genData)[iaa][ibb][icc][idd][iee];
                 }
                 else res[ia][ib][ic][id][ie] = FILLVAL;
+              }
+            }
+          }
+        }
+      }
+      dataObj = res;
+    }
+    else if (genData instanceof String[][][][][]) {
+      String[][][][][] res = new String[subLens[0]][subLens[1]][subLens[2]]
+        [subLens[3]][subLens[4]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          for (int ic = 0; ic < subLens[2]; ic++) {
+            int icc = startIxs[2] + ic;
+            for (int id = 0; id < subLens[3]; id++) {
+              int idd = startIxs[3] + id;
+              for (int ie = 0; ie < subLens[4]; ie++) {
+                int iee = startIxs[4] + ie;
+                if (iaa < dimLens[0] && ibb < dimLens[1] && icc < dimLens[2]
+                  && idd < dimLens[3] && iee < dimLens[4])
+                {
+                  res[ia][ib][ic][id][ie]
+                    = ((String[][][][][]) genData)[iaa][ibb][icc][idd][iee];
+                }
+                else res[ia][ib][ic][id][ie] = "stg" + FILLVAL;
               }
             }
           }
