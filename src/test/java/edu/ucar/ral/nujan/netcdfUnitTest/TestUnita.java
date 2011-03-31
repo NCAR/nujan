@@ -43,28 +43,54 @@ public class TestUnita extends TestCase {
 
 
 // Set defaults when called by Maven's use of JUnit.
+int unitBugs = 0;
 int nhBugs = 0;
 int hdfBugs = 0;
 String sourceDir = "src/test/resources/testUnitData";
 String targetDir = "target/testDira";
 boolean useCheck = true;
 
-String dataTypeStg = "double,float,int";
+String dataTypeStg = "ubyte,int,float,double";
 
 // Each string has the format:
 // "d,d,d/c,c,c" or special case "d,d,d/null",
 // where d is a dimLen and c is a chunkLen.
 
 String[] dimStgs = {
+  "/null",               // scalar
+
+  "10/null",
+  "10/10",
+  "10/5",
+  "10/7",
+
+  "10,10/null",
+  "10,10/10,10",
+  "10,10/5,5",
+  "10,10/7,7",
+
   "10,10,10/null",
   "10,10,10/10,10,10",
   "10,10,10/5,5,5",
-  "10,10,10/7,7,7"
+  "10,10,10/7,7,7",
+
+  "10,10,10,10/null",
+  "10,10,10,10/10,10,10,10",
+  "10,10,10,10/5,5,5,5",
+  "10,10,10,10/7,7,7,7",
+
+  "10,10,10,10,10/null",
+  "10,10,10,10,10/10,10,10,10,10",
+  "10,10,10,10,10/5,5,5,5,5",
+  "10,10,10,10,10/7,7,7,7,7"
 };
 
-String compLevelStg = "0,5,9";
+String compLevelStg = "0,5";
 
-String useLinearStg = "false,true";
+String useSmallStg = "false,true";
+
+//xxx String useLinearStg = "false,true";
+String useLinearStg = "false";
 
 
 
@@ -105,7 +131,8 @@ throws NhException
   for (int iarg = 0; iarg < args.length; iarg += 2) {
     String key = args[iarg];
     String val = args[iarg+1];
-    if (key.equals("-nhBugs")) nhBugs = parseInt("-nhBugs", val);
+    if (key.equals("-unitBugs")) unitBugs = parseInt("-unitBugs", val);
+    else if (key.equals("-nhBugs")) nhBugs = parseInt("-nhBugs", val);
     else if (key.equals("-hdfBugs")) hdfBugs = parseInt("-hdfBugs", val);
     else if (key.equals("-sourceDir")) sourceDir = val;
     else if (key.equals("-targetDir")) targetDir = val;
@@ -113,12 +140,11 @@ throws NhException
     else if (key.equals("-dataType")) dataTypeStg = val;
     else if (key.equals("-dims")) dimStgs = new String[] {val};
     else if (key.equals("-compLevel")) compLevelStg = val;
+    else if (key.equals("-useSmall")) useSmallStg = val;
     else if (key.equals("-useLinear")) useLinearStg = val;
     else throwerr("unknown parm: %s", key);
   }
 
-  if (nhBugs < 0) throwerr("parm not specified: -nhBugs");
-  if (hdfBugs < 0) throwerr("parm not specified: -hdfBugs");
   if (sourceDir == null) throwerr("parm not specified: -sourceDir");
   if (targetDir == null) throwerr("parm not specified: -targetDir");
 
@@ -138,49 +164,54 @@ throws NhException
 public void testIt()
 throws NhException
 {
+  prtf("TestUnita: unitBugs: %d", unitBugs);
   prtf("TestUnita: nhBugs: %d", nhBugs);
   prtf("TestUnita: hdfBugs: %d", hdfBugs);
-  prtf("TestUnita: sourceDir: %s", sourceDir);
-  prtf("TestUnita: targetDir: %s", targetDir);
-  prtf("TestUnita: dataType: %s", dataTypeStg);
+  prtf("TestUnita: sourceDir: \"%s\"", sourceDir);
+  prtf("TestUnita: targetDir: \"%s\"", targetDir);
+  prtf("TestUnita: dataTypeStg: \"%s\"", dataTypeStg);
   for (String stg : dimStgs) {
-    prtf("TestUnita: dim: %s", stg);
+    prtf("TestUnita: dimStg: \"%s\"", stg);
   }
-  prtf("TestUnita: compLevel: %s", compLevelStg);
+  prtf("TestUnita: compLevelStg: \"%s\"", compLevelStg);
 
   new File( targetDir).mkdir();
 
-  int[] testDataTypes = {
-    NhVariable.TP_DOUBLE,       // nhType
-    NhVariable.TP_FLOAT,
-    NhVariable.TP_INT};
-  int[] testRanks = { 0, 1, 2, 3};
-  int[] testDimLens = { 10, 100};
-  int[] testCompLevels = {0, 5, 9};
-  boolean[] testUseLinears = { false, true};
-
   for (String dtypeStg : dataTypeStg.split(",")) {
     int dataType = 0;
-    if (dtypeStg.equals("double")) dataType = NhVariable.TP_DOUBLE;
-    else if (dtypeStg.equals("float")) dataType = NhVariable.TP_FLOAT;
+    if (dtypeStg.equals("ubyte")) dataType = NhVariable.TP_UBYTE;
     else if (dtypeStg.equals("int")) dataType = NhVariable.TP_INT;
+    else if (dtypeStg.equals("float")) dataType = NhVariable.TP_FLOAT;
+    else if (dtypeStg.equals("double")) dataType = NhVariable.TP_DOUBLE;
     else throwerr("invalid dataType: \"" + dtypeStg + "\"");
+    if (unitBugs >= 1) prtf("dtypeStg: %s", dtypeStg);
 
     for (String dimStg : dimStgs) {
       int[][] dimChunks = parseDimChunks("-dims", dimStg);
       int[] dimLens = dimChunks[0];
       int[] chunkLens = dimChunks[1];
       int rank = dimLens.length;
+      if (unitBugs >= 1) prtf("dimStg: %s  rank: %d", dimStg, rank);
 
       for (int compLevel : parseInts("compLevel", compLevelStg)) {
-        for (boolean useLinear : parseBooleans("useLinear", useLinearStg)) {
+        if (unitBugs >= 1) prtf("compLevel: %d", compLevel);
 
-          // Cannot compress a scalar; compression requires chunking.
-          if (! (compLevel > 0 && (rank == 0 || chunkLens == null))) {
-            mkSingleTest( dataType, dimLens, chunkLens,
-              compLevel, useLinear, sourceDir, targetDir);
-          } // if not compressing a scalar
-        } // for useLinear
+        for (boolean useSmall : parseBooleans("useSmall", useSmallStg)) {
+          if (unitBugs >= 1) prtf("useSmall: %s", useSmall);
+          for (boolean useLinear : parseBooleans("useLinear", useLinearStg)) {
+            if (unitBugs >= 1) prtf("useLinear: %s", useLinear);
+
+            // Cannot compress a scalar; compression requires chunking.
+            if (compLevel > 0 && (rank == 0 || chunkLens == null)) {
+              if (unitBugs >= 1)
+                prtf("test omitted because of rank or chunkLens");
+            }
+            else {
+              mkSingleTest( dataType, dimLens, chunkLens, compLevel,
+                useSmall, useLinear, sourceDir, targetDir);
+            } // if not compressing a scalar
+          } // for useLinear
+        } // for useSmall
       } // for compLevel
     } // for dimStg
   } // for dataTypeStg
@@ -195,6 +226,7 @@ void mkSingleTest(
   int[] dimLens,
   int[] chunkLens,
   int compLevel,
+  boolean useSmall,
   boolean useLinear,
   String sourceDir,
   String targetDir)
@@ -214,14 +246,16 @@ throws NhException
     for (int ival : chunkLens) namePart += "_" + ival;
   }
   namePart += ".comp_" + compLevel;
+  namePart += ".small_" + useSmall;
   namePart += ".linear_" + useLinear;
   namePart += ".nc";
+  if (unitBugs >= 1) prtf("mkSingleTest: namePart: %s", namePart);
   
   String sourceName = sourceDir + "/" + namePart;
   String targetName = targetDir + "/" + namePart;
 
   createFile( dataType, dimLens, chunkLens,
-    compLevel, useLinear, targetName);
+    compLevel, useSmall, useLinear, targetName);
 
   if (useCheck) {
     File sourceFile = new File( sourceName);
@@ -241,19 +275,21 @@ void createFile(
   int[] dimLens,
   int[] chunkLens,
   int compLevel,
+  boolean useSmall,
   boolean useLinear,
   String targetName)
 throws NhException
 {
 
   int rank = dimLens.length;
-  if (nhBugs >= 1) {
+  if (unitBugs >= 1) {
     prtf("TestUnita.createFile:");
     prtf("  dataType: %s", NhVariable.nhTypeNames[ dataType]);
     prtf("  rank: %d", rank);
     prtf("  dimLens: %s", formatInts( dimLens));
     prtf("  chunkLens: %s", formatInts( chunkLens));
     prtf("  compLevel: %d", compLevel);
+    prtf("  useSmall: %s", useSmall);
     prtf("  useLinear: %s", useLinear);
     prtf("  targetName: %s", targetName);
   }
@@ -296,12 +332,14 @@ throws NhException
   // Variables may be added to any group.
 
   Object fillValue = null;
-  if (dataType == NhVariable.TP_DOUBLE)
-    fillValue = new Double( -999999);
-  else if (dataType == NhVariable.TP_FLOAT)
-    fillValue = new Float( -999999);
+  if (dataType == NhVariable.TP_UBYTE)
+    fillValue = new Byte( (byte) 99);
   else if (dataType == NhVariable.TP_INT)
     fillValue = new Integer( -999999);
+  else if (dataType == NhVariable.TP_FLOAT)
+    fillValue = new Float( -999999);
+  else if (dataType == NhVariable.TP_DOUBLE)
+    fillValue = new Double( -999999);
   else throwerr("unknown dataType: %s", NhVariable.nhTypeNames[dataType]);
 
   NhVariable humidityVar = northernGroup.addVariable(
@@ -322,12 +360,13 @@ throws NhException
   // All calls to writeData occur after endDefine.
   hfile.endDefine();
 
-  // Write out the data
+  // Generate the test data
+  Object testData = generateCuboidData( dataType, dimLens);
 
+  // Write out the data
   if (chunkLens == null) {
-    Object dataObj = null;
-    if (useLinear) dataObj = generateLinearData( dataType, dimLens);
-    else dataObj = generateCuboidData( dataType, dimLens);
+    Object dataObj = testData;
+    //xxx if (useLinear) dataObj = mkLinearData( dataObj);
     int[] startIxs = null;
     humidityVar.writeData( startIxs, dataObj, useLinear);
   }
@@ -337,14 +376,11 @@ throws NhException
     int[] startIxs = new int[rank];      // all 0
     boolean allDone = false;
     while (! allDone) {
-      int[] genLens = new int[rank];
-      for (int ii = 0; ii < rank; ii++) {
-        if (startIxs[ii] + chunkLens[ii] <= dimLens[ii])
-          genLens[ii] = chunkLens[ii];
-        else genLens[ii] = dimLens[ii] - startIxs[ii];
-      }
-      if (useLinear) dataObj = generateLinearData( dataType, genLens);
-      else dataObj = generateCuboidData( dataType, genLens);
+
+      dataObj = mkSubset( dimLens, chunkLens, startIxs,
+        useSmall, testData);
+      //xxx if (useLinear) dataObj = mkLinearData( dataObj);
+
       humidityVar.writeData( startIxs, dataObj, useLinear);
 
       // Increment startIxs
@@ -369,6 +405,7 @@ throws NhException
 
 
 
+
 Object generateCuboidData(
   int dataType,            // NhVariable.TP_DOUBLE, etc
   int[] dimLens)
@@ -377,103 +414,271 @@ throws NhException
   int rank = dimLens.length;
   Object dataObj = null;
 
-  if (dataType == NhVariable.TP_DOUBLE) {
-    if (rank == 0) dataObj = new Double(100);
-    else if (rank == 1) {
-      double[] vals = new double[dimLens[0]];
-      for (int ia = 0; ia < dimLens[0]; ia++) {
-        vals[ia] = ia;
-      }
-      dataObj = vals;
-    }
-    else if (rank == 2) {
-      double[][] vals = new double[dimLens[0]][dimLens[1]];
-      for (int ia = 0; ia < dimLens[0]; ia++) {
-        for (int ib = 0; ib < dimLens[1]; ib++) {
-          vals[ia][ib] = 100 * ia + ib;
-        }
-      }
-      dataObj = vals;
-    }
-    else if (rank == 3) {
-      double[][][] vals = new double[dimLens[0]][dimLens[1]][dimLens[2]];
-      for (int ia = 0; ia < dimLens[0]; ia++) {
-        for (int ib = 0; ib < dimLens[1]; ib++) {
-          for (int ic = 0; ic < dimLens[2]; ic++) {
-            vals[ia][ib][ic] = 10000 * ia + 100 * ib + ic;
-          }
-        }
-      }
-      dataObj = vals;
-    }
-    else throwerr("unknown rank: %d", rank);
-  } // if TP_DOUBLE
+  if (rank == 0) {
+    if (dataType == NhVariable.TP_UBYTE) dataObj = new Byte( (byte) 100);
+    else if (dataType == NhVariable.TP_INT) dataObj = new Integer(100);
+    else if (dataType == NhVariable.TP_FLOAT) dataObj = new Float(100);
+    else if (dataType == NhVariable.TP_DOUBLE) dataObj = new Double(100);
+    else throwerr("unknown dataType: %s", NhVariable.nhTypeNames[dataType]);
+  }
 
-  else if (dataType == NhVariable.TP_FLOAT) {
-    if (rank == 0) dataObj = new Float(100);
-    else if (rank == 1) {
-      float[] vals = new float[dimLens[0]];
+  else if (rank == 1) {
+    if (dataType == NhVariable.TP_UBYTE) {
+      byte[] vals = new byte[dimLens[0]];
       for (int ia = 0; ia < dimLens[0]; ia++) {
-        vals[ia] = ia;
+        vals[ia] = (byte) ia;
       }
       dataObj = vals;
     }
-    else if (rank == 2) {
-      float[][] vals = new float[dimLens[0]][dimLens[1]];
-      for (int ia = 0; ia < dimLens[0]; ia++) {
-        for (int ib = 0; ib < dimLens[1]; ib++) {
-          vals[ia][ib] = 100 * ia + ib;
-        }
-      }
-      dataObj = vals;
-    }
-    else if (rank == 3) {
-      float[][][] vals = new float[dimLens[0]][dimLens[1]][dimLens[2]];
-      for (int ia = 0; ia < dimLens[0]; ia++) {
-        for (int ib = 0; ib < dimLens[1]; ib++) {
-          for (int ic = 0; ic < dimLens[2]; ic++) {
-            vals[ia][ib][ic] = 10000 * ia + 100 * ib + ic;
-          }
-        }
-      }
-      dataObj = vals;
-    }
-    else throwerr("unknown rank: %d", rank);
-  } // if TP_FLOAT
-
-  else if (dataType == NhVariable.TP_INT) {
-    if (rank == 0) dataObj = new Integer(100);
-    else if (rank == 1) {
+    else if (dataType == NhVariable.TP_INT) {
       int[] vals = new int[dimLens[0]];
       for (int ia = 0; ia < dimLens[0]; ia++) {
         vals[ia] = ia;
       }
       dataObj = vals;
     }
-    else if (rank == 2) {
-      int[][] vals = new int[dimLens[0]][dimLens[1]];
+    else if (dataType == NhVariable.TP_FLOAT) {
+      float[] vals = new float[dimLens[0]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        vals[ia] = ia;
+      }
+      dataObj = vals;
+    }
+    else if (dataType == NhVariable.TP_DOUBLE) {
+      double[] vals = new double[dimLens[0]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        vals[ia] = ia;
+      }
+      dataObj = vals;
+    }
+    else throwerr("unknown dataType: %s", NhVariable.nhTypeNames[dataType]);
+  } // if rank == 1
+
+  else if (rank == 2) {
+    if (dataType == NhVariable.TP_UBYTE) {
+      byte[][] vals = new byte[dimLens[0]][dimLens[1]];
       for (int ia = 0; ia < dimLens[0]; ia++) {
         for (int ib = 0; ib < dimLens[1]; ib++) {
-          vals[ia][ib] = 100 * ia + ib;
+          vals[ia][ib] = (byte) (10 * ia + ib);
         }
       }
       dataObj = vals;
     }
-    else if (rank == 3) {
-      int[][][] vals = new int[dimLens[0]][dimLens[1]][dimLens[2]];
+    else if (dataType == NhVariable.TP_INT) {
+      int[][] vals = new int[dimLens[0]][dimLens[1]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          vals[ia][ib] = 10 * ia + ib;
+        }
+      }
+      dataObj = vals;
+    }
+    else if (dataType == NhVariable.TP_FLOAT) {
+      float[][] vals = new float[dimLens[0]][dimLens[1]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          vals[ia][ib] = 10 * ia + ib;
+        }
+      }
+      dataObj = vals;
+    }
+    else if (dataType == NhVariable.TP_DOUBLE) {
+      double[][] vals = new double[dimLens[0]][dimLens[1]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          vals[ia][ib] = 10 * ia + ib;
+        }
+      }
+      dataObj = vals;
+    }
+    else throwerr("unknown dataType: %s", NhVariable.nhTypeNames[dataType]);
+  } // if rank == 2
+
+  else if (rank == 3) {
+    if (dataType == NhVariable.TP_UBYTE) {
+      byte[][][] vals = new byte[dimLens[0]][dimLens[1]][dimLens[2]];
       for (int ia = 0; ia < dimLens[0]; ia++) {
         for (int ib = 0; ib < dimLens[1]; ib++) {
           for (int ic = 0; ic < dimLens[2]; ic++) {
-            vals[ia][ib][ic] = 10000 * ia + 100 * ib + ic;
+            vals[ia][ib][ic] = (byte) (100 * ia + 10 * ib + ic);
           }
         }
       }
       dataObj = vals;
     }
+    else if (dataType == NhVariable.TP_INT) {
+      int[][][] vals = new int[dimLens[0]][dimLens[1]][dimLens[2]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          for (int ic = 0; ic < dimLens[2]; ic++) {
+            vals[ia][ib][ic] = 100 * ia + 10 * ib + ic;
+          }
+        }
+      }
+      dataObj = vals;
+    }
+    else if (dataType == NhVariable.TP_FLOAT) {
+      float[][][] vals = new float[dimLens[0]][dimLens[1]][dimLens[2]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          for (int ic = 0; ic < dimLens[2]; ic++) {
+            vals[ia][ib][ic] = 100 * ia + 10 * ib + ic;
+          }
+        }
+      }
+      dataObj = vals;
+    }
+    else if (dataType == NhVariable.TP_DOUBLE) {
+      double[][][] vals = new double[dimLens[0]][dimLens[1]][dimLens[2]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          for (int ic = 0; ic < dimLens[2]; ic++) {
+            vals[ia][ib][ic] = 100 * ia + 10 * ib + ic;
+          }
+        }
+      }
+      dataObj = vals;
+    }
+    else throwerr("unknown dataType: %s", NhVariable.nhTypeNames[dataType]);
+  } // if rank == 3
 
-    else throwerr("unknown rank: %d", rank);
-  } // if TP_INT
-  else throwerr("unknown dataType: %s", NhVariable.nhTypeNames[dataType]);
+  else if (rank == 4) {
+    if (dataType == NhVariable.TP_UBYTE) {
+      byte[][][][] vals = new byte[dimLens[0]][dimLens[1]][dimLens[2]]
+        [dimLens[3]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          for (int ic = 0; ic < dimLens[2]; ic++) {
+            for (int id = 0; id < dimLens[3]; id++) {
+              vals[ia][ib][ic][id]
+                = (byte) (1000 * ia + 100 * ib + 10 * ic + id);
+            }
+          }
+        }
+      }
+      dataObj = vals;
+    }
+    else if (dataType == NhVariable.TP_INT) {
+      int[][][][] vals = new int[dimLens[0]][dimLens[1]][dimLens[2]]
+        [dimLens[3]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          for (int ic = 0; ic < dimLens[2]; ic++) {
+            for (int id = 0; id < dimLens[3]; id++) {
+              vals[ia][ib][ic][id] = 1000 * ia + 100 * ib + 10 * ic + id;
+            }
+          }
+        }
+      }
+      dataObj = vals;
+    }
+    else if (dataType == NhVariable.TP_FLOAT) {
+      float[][][][] vals = new float[dimLens[0]][dimLens[1]][dimLens[2]]
+        [dimLens[3]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          for (int ic = 0; ic < dimLens[2]; ic++) {
+            for (int id = 0; id < dimLens[3]; id++) {
+              vals[ia][ib][ic][id] = 1000 * ia + 100 * ib + 10 * ic + id;
+            }
+          }
+        }
+      }
+      dataObj = vals;
+    }
+    else if (dataType == NhVariable.TP_DOUBLE) {
+      double[][][][] vals = new double[dimLens[0]][dimLens[1]][dimLens[2]]
+        [dimLens[3]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          for (int ic = 0; ic < dimLens[2]; ic++) {
+            for (int id = 0; id < dimLens[3]; id++) {
+              vals[ia][ib][ic][id] = 1000 * ia + 100 * ib + 10 * ic + id;
+            }
+          }
+        }
+      }
+      dataObj = vals;
+    }
+    else throwerr("unknown dataType: %s", NhVariable.nhTypeNames[dataType]);
+  } // if rank == 4
+
+  else if (rank == 5) {
+    if (dataType == NhVariable.TP_UBYTE) {
+      byte[][][][][] vals = new byte[dimLens[0]][dimLens[1]][dimLens[2]]
+        [dimLens[3]][dimLens[4]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          for (int ic = 0; ic < dimLens[2]; ic++) {
+            for (int id = 0; id < dimLens[3]; id++) {
+              for (int ie = 0; ie < dimLens[4]; ie++) {
+                vals[ia][ib][ic][id][ie]
+                  = (byte) (10000 * ia + 1000 * ib + 100 * ic + 10 * id + ie);
+              }
+            }
+          }
+        }
+      }
+      dataObj = vals;
+    }
+    else if (dataType == NhVariable.TP_INT) {
+      int[][][][][] vals = new int[dimLens[0]][dimLens[1]][dimLens[2]]
+        [dimLens[3]][dimLens[4]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          for (int ic = 0; ic < dimLens[2]; ic++) {
+            for (int id = 0; id < dimLens[3]; id++) {
+              for (int ie = 0; ie < dimLens[4]; ie++) {
+                vals[ia][ib][ic][id][ie]
+                  = 10000 * ia + 1000 * ib + 100 * ic + 10 * id + ie;
+              }
+            }
+          }
+        }
+      }
+      dataObj = vals;
+    }
+    else if (dataType == NhVariable.TP_FLOAT) {
+      float[][][][][] vals = new float[dimLens[0]][dimLens[1]][dimLens[2]]
+        [dimLens[3]][dimLens[4]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          for (int ic = 0; ic < dimLens[2]; ic++) {
+            for (int id = 0; id < dimLens[3]; id++) {
+              for (int ie = 0; ie < dimLens[4]; ie++) {
+                vals[ia][ib][ic][id][ie]
+                  = 10000 * ia + 1000 * ib + 100 * ic + 10 * id + ie;
+              }
+            }
+          }
+        }
+      }
+      dataObj = vals;
+    }
+    else if (dataType == NhVariable.TP_DOUBLE) {
+      double[][][][][] vals = new double[dimLens[0]][dimLens[1]][dimLens[2]]
+        [dimLens[3]][dimLens[4]];
+      for (int ia = 0; ia < dimLens[0]; ia++) {
+        for (int ib = 0; ib < dimLens[1]; ib++) {
+          for (int ic = 0; ic < dimLens[2]; ic++) {
+            for (int id = 0; id < dimLens[3]; id++) {
+              for (int ie = 0; ie < dimLens[4]; ie++) {
+                vals[ia][ib][ic][id][ie]
+                  = 10000 * ia + 1000 * ib + 100 * ic + 10 * id + ie;
+              }
+            }
+          }
+        }
+      }
+      dataObj = vals;
+    }
+    else throwerr("unknown dataType: %s", NhVariable.nhTypeNames[dataType]);
+  } // if rank == 5
+
+
+
+  else throwerr("unknown rank: %d", rank);
+
   return dataObj;
 } // end generateCuboidData
 
@@ -485,61 +690,529 @@ throws NhException
 
 
 
-Object generateLinearData(
-  int dataType,            // NhVariable.TP_DOUBLE, etc
-  int[] dimLens)
+
+
+
+Object mkSubset(
+  int[] dimLens,
+  int[] chunkLens,
+  int[] startIxs,
+  boolean useSmall,
+  Object genData)
 throws NhException
 {
   int rank = dimLens.length;
+  int FILLVAL = 8888;
+
+  if (rank == 0) throwerr("cannot subset a scalar");
+
+  int[] subLens = new int[rank];
+  for (int ii = 0; ii < rank; ii++) {
+    subLens[ii] = chunkLens[ii];
+    if (useSmall && startIxs[ii] + chunkLens[ii] > dimLens[ii])
+      subLens[ii] = dimLens[ii] - startIxs[ii];
+  }
+
   Object dataObj = null;
 
-  if (dataType == NhVariable.TP_DOUBLE) {
-    if (rank == 0) dataObj = new Double(100);
-    else {
-      int totLen = 1;
-      for (int ii = 0; ii < rank; ii++) {
-        totLen *= dimLens[ii];
+  if (rank == 1) {
+    if (genData instanceof byte[]) {
+      byte[] res = new byte[subLens[0]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        if (iaa < dimLens[0]) res[ia] = ((byte[]) genData)[ iaa];
+        else res[ia] = (byte) FILLVAL;
       }
-      double[] vals = new double[totLen];
-      for (int ia = 0; ia < totLen; ia++) {
-        vals[ia] = ia;
-      }
-      dataObj = vals;
+      dataObj = res;
     }
-  } // if TP_DOUBLE
+    else if (genData instanceof int[]) {
+      int[] res = new int[subLens[0]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        if (iaa < dimLens[0]) res[ia] = ((int[]) genData)[ iaa];
+        else res[ia] = FILLVAL;
+      }
+      dataObj = res;
+    }
+    else if (genData instanceof float[]) {
+      float[] res = new float[subLens[0]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        if (iaa < dimLens[0]) res[ia] = ((float[]) genData)[ iaa];
+        else res[ia] = FILLVAL;
+      }
+      dataObj = res;
+    }
+    else if (genData instanceof double[]) {
+      double[] res = new double[subLens[0]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        if (iaa < dimLens[0]) res[ia] = ((double[]) genData)[ iaa];
+        else res[ia] = FILLVAL;
+      }
+      dataObj = res;
+    }
+    else throwerr("unknown type: " + genData.getClass());
+  } // if rank == 1
 
-  else if (dataType == NhVariable.TP_FLOAT) {
-    if (rank == 0) dataObj = new Float(100);
-    else {
-      int totLen = 1;
-      for (int ii = 0; ii < rank; ii++) {
-        totLen *= dimLens[ii];
+  else if (rank == 2) {
+    if (genData instanceof byte[][]) {
+      byte[][] res = new byte[subLens[0]][subLens[1]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          if (iaa < dimLens[0] && ibb < dimLens[1])
+            res[ia][ib] = ((byte[][]) genData)[iaa][ibb];
+          else res[ia][ib] = (byte) FILLVAL;
+        }
       }
-      float[] vals = new float[totLen];
-      for (int ia = 0; ia < totLen; ia++) {
-        vals[ia] = ia;
-      }
-      dataObj = vals;
+      dataObj = res;
     }
-  } // if TP_FLOAT
+    else if (genData instanceof int[][]) {
+      int[][] res = new int[subLens[0]][subLens[1]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          if (iaa < dimLens[0] && ibb < dimLens[1])
+            res[ia][ib] = ((int[][]) genData)[iaa][ibb];
+          else res[ia][ib] = FILLVAL;
+        }
+      }
+      dataObj = res;
+    }
+    else if (genData instanceof float[][]) {
+      float[][] res = new float[subLens[0]][subLens[1]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          if (iaa < dimLens[0] && ibb < dimLens[1])
+            res[ia][ib] = ((float[][]) genData)[iaa][ibb];
+          else res[ia][ib] = FILLVAL;
+        }
+      }
+      dataObj = res;
+    }
+    else if (genData instanceof double[][]) {
+      double[][] res = new double[subLens[0]][subLens[1]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          if (iaa < dimLens[0] && ibb < dimLens[1])
+            res[ia][ib] = ((double[][]) genData)[iaa][ibb];
+          else res[ia][ib] = FILLVAL;
+        }
+      }
+      dataObj = res;
+    }
+    else throwerr("unknown type: " + genData.getClass());
+  } // if rank == 2
 
-  else if (dataType == NhVariable.TP_INT) {
-    if (rank == 0) dataObj = new Integer(100);
-    else {
-      int totLen = 1;
-      for (int ii = 0; ii < rank; ii++) {
-        totLen *= dimLens[ii];
+  else if (rank == 3) {
+    if (genData instanceof byte[][][]) {
+      byte[][][] res = new byte[subLens[0]][subLens[1]][subLens[2]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          for (int ic = 0; ic < subLens[2]; ic++) {
+            int icc = startIxs[2] + ic;
+            if (iaa < dimLens[0] && ibb < dimLens[1] && icc < dimLens[2])
+              res[ia][ib][ic] = ((byte[][][]) genData)[iaa][ibb][icc];
+            else res[ia][ib][ic] = (byte) FILLVAL;
+          }
+        }
       }
-      int[] vals = new int[totLen];
-      for (int ia = 0; ia < totLen; ia++) {
-        vals[ia] = ia;
-      }
-      dataObj = vals;
+      dataObj = res;
     }
-  } // if TP_INT
-  else throwerr("unknown dataType: %s", NhVariable.nhTypeNames[dataType]);
+    else if (genData instanceof int[][][]) {
+      int[][][] res = new int[subLens[0]][subLens[1]][subLens[2]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          for (int ic = 0; ic < subLens[2]; ic++) {
+            int icc = startIxs[2] + ic;
+            if (iaa < dimLens[0] && ibb < dimLens[1] && icc < dimLens[2])
+              res[ia][ib][ic] = ((int[][][]) genData)[iaa][ibb][icc];
+            else res[ia][ib][ic] = FILLVAL;
+          }
+        }
+      }
+      dataObj = res;
+    }
+    else if (genData instanceof float[][][]) {
+      float[][][] res = new float[subLens[0]][subLens[1]][subLens[2]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          for (int ic = 0; ic < subLens[2]; ic++) {
+            int icc = startIxs[2] + ic;
+            if (iaa < dimLens[0] && ibb < dimLens[1] && icc < dimLens[2])
+              res[ia][ib][ic] = ((float[][][]) genData)[iaa][ibb][icc];
+            else res[ia][ib][ic] = FILLVAL;
+          }
+        }
+      }
+      dataObj = res;
+    }
+    else if (genData instanceof double[][][]) {
+      double[][][] res = new double[subLens[0]][subLens[1]][subLens[2]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          for (int ic = 0; ic < subLens[2]; ic++) {
+            int icc = startIxs[2] + ic;
+            if (iaa < dimLens[0] && ibb < dimLens[1] && icc < dimLens[2])
+              res[ia][ib][ic] = ((double[][][]) genData)[iaa][ibb][icc];
+            else res[ia][ib][ic] = FILLVAL;
+          }
+        }
+      }
+      dataObj = res;
+    }
+    else throwerr("unknown type: " + genData.getClass());
+  } // if rank == 3
+
+  else if (rank == 4) {
+    if (genData instanceof byte[][][][]) {
+      byte[][][][] res = new byte[subLens[0]][subLens[1]][subLens[2]]
+        [subLens[3]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          for (int ic = 0; ic < subLens[2]; ic++) {
+            int icc = startIxs[2] + ic;
+            for (int id = 0; id < subLens[3]; id++) {
+              int idd = startIxs[3] + id;
+              if (iaa < dimLens[0] && ibb < dimLens[1] && icc < dimLens[2]
+                && idd < dimLens[3])
+              {
+                res[ia][ib][ic][id]
+                  = ((byte[][][][]) genData)[iaa][ibb][icc][idd];
+              }
+              else res[ia][ib][ic][id] = (byte) FILLVAL;
+            }
+          }
+        }
+      }
+      dataObj = res;
+    }
+    else if (genData instanceof int[][][][]) {
+      int[][][][] res = new int[subLens[0]][subLens[1]][subLens[2]]
+        [subLens[3]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          for (int ic = 0; ic < subLens[2]; ic++) {
+            int icc = startIxs[2] + ic;
+            for (int id = 0; id < subLens[3]; id++) {
+              int idd = startIxs[3] + id;
+              if (iaa < dimLens[0] && ibb < dimLens[1] && icc < dimLens[2]
+                && idd < dimLens[3])
+              {
+                res[ia][ib][ic][id]
+                  = ((int[][][][]) genData)[iaa][ibb][icc][idd];
+              }
+              else res[ia][ib][ic][id] = FILLVAL;
+            }
+          }
+        }
+      }
+      dataObj = res;
+    }
+    else if (genData instanceof float[][][][]) {
+      float[][][][] res = new float[subLens[0]][subLens[1]][subLens[2]]
+        [subLens[3]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          for (int ic = 0; ic < subLens[2]; ic++) {
+            int icc = startIxs[2] + ic;
+            for (int id = 0; id < subLens[3]; id++) {
+              int idd = startIxs[3] + id;
+              if (iaa < dimLens[0] && ibb < dimLens[1] && icc < dimLens[2]
+                && idd < dimLens[3])
+              {
+                res[ia][ib][ic][id]
+                  = ((float[][][][]) genData)[iaa][ibb][icc][idd];
+              }
+              else res[ia][ib][ic][id] = FILLVAL;
+            }
+          }
+        }
+      }
+      dataObj = res;
+    }
+    else if (genData instanceof double[][][][]) {
+      double[][][][] res = new double[subLens[0]][subLens[1]][subLens[2]]
+        [subLens[3]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          for (int ic = 0; ic < subLens[2]; ic++) {
+            int icc = startIxs[2] + ic;
+            for (int id = 0; id < subLens[3]; id++) {
+              int idd = startIxs[3] + id;
+              if (iaa < dimLens[0] && ibb < dimLens[1] && icc < dimLens[2]
+                && idd < dimLens[3])
+              {
+                res[ia][ib][ic][id]
+                  = ((double[][][][]) genData)[iaa][ibb][icc][idd];
+              }
+              else res[ia][ib][ic][id] = FILLVAL;
+            }
+          }
+        }
+      }
+      dataObj = res;
+    }
+    else throwerr("unknown type: " + genData.getClass());
+  } // if rank == 4
+
+  else if (rank == 5) {
+    if (genData instanceof byte[][][][][]) {
+      byte[][][][][] res = new byte[subLens[0]][subLens[1]][subLens[2]]
+        [subLens[3]][subLens[4]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          for (int ic = 0; ic < subLens[2]; ic++) {
+            int icc = startIxs[2] + ic;
+            for (int id = 0; id < subLens[3]; id++) {
+              int idd = startIxs[3] + id;
+              for (int ie = 0; ie < subLens[4]; ie++) {
+                int iee = startIxs[4] + ie;
+                if (iaa < dimLens[0] && ibb < dimLens[1] && icc < dimLens[2]
+                  && idd < dimLens[3] && iee < dimLens[4])
+                {
+                  res[ia][ib][ic][id][ie]
+                    = ((byte[][][][][]) genData) [iaa][ibb][icc][idd][iee];
+                }
+                else res[ia][ib][ic][id][ie] = (byte) FILLVAL;
+              }
+            }
+          }
+        }
+      }
+      dataObj = res;
+    }
+    else if (genData instanceof int[][][][][]) {
+      int[][][][][] res = new int[subLens[0]][subLens[1]][subLens[2]]
+        [subLens[3]][subLens[4]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          for (int ic = 0; ic < subLens[2]; ic++) {
+            int icc = startIxs[2] + ic;
+            for (int id = 0; id < subLens[3]; id++) {
+              int idd = startIxs[3] + id;
+              for (int ie = 0; ie < subLens[4]; ie++) {
+                int iee = startIxs[4] + ie;
+                if (iaa < dimLens[0] && ibb < dimLens[1] && icc < dimLens[2]
+                  && idd < dimLens[3] && iee < dimLens[4])
+                {
+                  res[ia][ib][ic][id][ie]
+                    = ((int[][][][][]) genData)[iaa][ibb][icc][idd][iee];
+                }
+                else res[ia][ib][ic][id][ie] = FILLVAL;
+              }
+            }
+          }
+        }
+      }
+      dataObj = res;
+    }
+    else if (genData instanceof float[][][][][]) {
+      float[][][][][] res = new float[subLens[0]][subLens[1]][subLens[2]]
+        [subLens[3]][subLens[4]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          for (int ic = 0; ic < subLens[2]; ic++) {
+            int icc = startIxs[2] + ic;
+            for (int id = 0; id < subLens[3]; id++) {
+              int idd = startIxs[3] + id;
+              for (int ie = 0; ie < subLens[4]; ie++) {
+                int iee = startIxs[4] + ie;
+                if (iaa < dimLens[0] && ibb < dimLens[1] && icc < dimLens[2]
+                  && idd < dimLens[3] && iee < dimLens[4])
+                {
+                  res[ia][ib][ic][id][ie]
+                    = ((float[][][][][]) genData)[iaa][ibb][icc][idd][iee];
+                }
+                else res[ia][ib][ic][id][ie] = FILLVAL;
+              }
+            }
+          }
+        }
+      }
+      dataObj = res;
+    }
+    else if (genData instanceof double[][][][][]) {
+      double[][][][][] res = new double[subLens[0]][subLens[1]][subLens[2]]
+        [subLens[3]][subLens[4]];
+      for (int ia = 0; ia < subLens[0]; ia++) {
+        int iaa = startIxs[0] + ia;
+        for (int ib = 0; ib < subLens[1]; ib++) {
+          int ibb = startIxs[1] + ib;
+          for (int ic = 0; ic < subLens[2]; ic++) {
+            int icc = startIxs[2] + ic;
+            for (int id = 0; id < subLens[3]; id++) {
+              int idd = startIxs[3] + id;
+              for (int ie = 0; ie < subLens[4]; ie++) {
+                int iee = startIxs[4] + ie;
+                if (iaa < dimLens[0] && ibb < dimLens[1] && icc < dimLens[2]
+                  && idd < dimLens[3] && iee < dimLens[4])
+                {
+                  res[ia][ib][ic][id][ie]
+                    = ((double[][][][][]) genData)[iaa][ibb][icc][idd][iee];
+                }
+                else res[ia][ib][ic][id][ie] = FILLVAL;
+              }
+            }
+          }
+        }
+      }
+      dataObj = res;
+    }
+    else throwerr("unknown type: " + genData.getClass());
+  } // if rank == 5
+
+
+  else throwerr("unknown rank: " + rank);
   return dataObj;
-} // end generateLinearData
+} // end mkSubset
+
+
+
+
+
+//Object generateLinearData(
+//  int dataType,            // NhVariable.TP_DOUBLE, etc
+//  int[] dimLens)
+//throws NhException
+//{
+//  int rank = dimLens.length;
+//  Object dataObj = null;
+//
+//  int totLen = 0;
+//  if (rank > 0) {
+//    totLen = 1;
+//    for (int ii = 0; ii < rank; ii++) {
+//      totLen *= dimLens[ii];
+//    }
+//  }
+//
+//  if (dataType == NhVariable.TP_DOUBLE) {
+//    if (rank == 0) dataObj = new Double(100);
+//    else {
+//      double[] vals = new double[totLen];
+//      if (rank == 1) {
+//        for (int ia = 0; ia < totLen; ia++) {
+//          vals[ia] = ia;
+//        }
+//      }
+//      else if (rank == 2) {
+//        for (int ia = 0; ia < dimLens[0]; ia++) {
+//          for (int ib = 0; ib < dimLens[1]; ib++) {
+//            vals[ia*dimLens[1] + ib] = 10 * ia + ib;
+//          }
+//        }
+//      }
+//      else if (rank == 3) {
+//        for (int ia = 0; ia < dimLens[0]; ia++) {
+//          for (int ib = 0; ib < dimLens[1]; ib++) {
+//            for (int ic = 0; ic < dimLens[2]; ic++) {
+//              vals[ia*dimLens[1]*dimLens[2] + ib*dimLens[2] + ic]
+//                = 100 * ia + 10 * ib + ic;
+//            }
+//          }
+//        }
+//      }
+//      else throwerr("unknown rank: %d", rank);
+//      dataObj = vals;
+//    }
+//  } // if TP_DOUBLE
+//
+//  else if (dataType == NhVariable.TP_FLOAT) {
+//    if (rank == 0) dataObj = new Float(100);
+//    else {
+//      float[] vals = new float[totLen];
+//      if (rank == 1) {
+//        for (int ia = 0; ia < totLen; ia++) {
+//          vals[ia] = ia;
+//        }
+//      }
+//      else if (rank == 2) {
+//        for (int ia = 0; ia < dimLens[0]; ia++) {
+//          for (int ib = 0; ib < dimLens[1]; ib++) {
+//            vals[ia*dimLens[1] + ib] = 10 * ia + ib;
+//          }
+//        }
+//      }
+//      else if (rank == 3) {
+//        for (int ia = 0; ia < dimLens[0]; ia++) {
+//          for (int ib = 0; ib < dimLens[1]; ib++) {
+//            for (int ic = 0; ic < dimLens[2]; ic++) {
+//              vals[ia*dimLens[1]*dimLens[2] + ib*dimLens[2] + ic]
+//                = 100 * ia + 10 * ib + ic;
+//            }
+//          }
+//        }
+//      }
+//      else throwerr("unknown rank: %d", rank);
+//      dataObj = vals;
+//    }
+//  } // if TP_FLOAT
+//
+//  else if (dataType == NhVariable.TP_INT) {
+//    if (rank == 0) dataObj = new Integer(100);
+//    else {
+//      int[] vals = new int[totLen];
+//      if (rank == 1) {
+//        for (int ia = 0; ia < totLen; ia++) {
+//          vals[ia] = ia;
+//        }
+//      }
+//      else if (rank == 2) {
+//        for (int ia = 0; ia < dimLens[0]; ia++) {
+//          for (int ib = 0; ib < dimLens[1]; ib++) {
+//            vals[ia*dimLens[1] + ib] = 10 * ia + ib;
+//          }
+//        }
+//      }
+//      else if (rank == 3) {
+//        for (int ia = 0; ia < dimLens[0]; ia++) {
+//          for (int ib = 0; ib < dimLens[1]; ib++) {
+//            for (int ic = 0; ic < dimLens[2]; ic++) {
+//              vals[ia*dimLens[1]*dimLens[2] + ib*dimLens[2] + ic]
+//                = 100 * ia + 10 * ib + ic;
+//            }
+//          }
+//        }
+//      }
+//      else throwerr("unknown rank: %d", rank);
+//      dataObj = vals;
+//    }
+//  } // if TP_INT
+//
+//  else throwerr("unknown dataType: %s", NhVariable.nhTypeNames[dataType]);
+//
+//  return dataObj;
+//} // end generateLinearData
 
 
 
@@ -558,7 +1231,11 @@ throws NhException
 {
   String[] toks = stg.split("/");
   if (toks.length != 2) throwerr("bad format for parm \"" + msg + "\".");
-  int[] dims = parseInts( msg, toks[0]);
+
+  int[] dims = null;
+  if (toks[0].length() == 0) dims = new int[0];
+  else dims = parseInts( msg, toks[0]);
+
   int[] chunks = null;
   if (! toks[1].equals("null")) chunks = parseInts( msg, toks[1]);
   return new int[][] { dims, chunks};

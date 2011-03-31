@@ -235,7 +235,7 @@ throws HdfException
     fmtBuf.putBufInt("BtreeNode: chunkSize",
       (int) chunk.chunkDataSize);     // xxx convert long to int
     fmtBuf.putBufInt("BtreeNode: key filterMask", filterMask);
-    for (int ii = 0; ii < hdfGroup.rank; ii++) {
+    for (int ii = 0; ii < hdfGroup.varRank; ii++) {
       fmtBuf.putBufLong("BtreeNode: key startIx", chunk.chunkStartIxs[ii]);
     }
     fmtBuf.putBufLong("BtreeNode: key eleLen offset", 0);
@@ -247,7 +247,7 @@ throws HdfException
   // Format the final key
   fmtBuf.putBufInt("BtreeNode: final key chunkSize", 0);
   fmtBuf.putBufInt("BtreeNode: final key filterMask", filterMask);
-  for (int jj = 0; jj < hdfGroup.rank; jj++) {
+  for (int jj = 0; jj < hdfGroup.varRank; jj++) {
     fmtBuf.putBufLong("BtreeNode: final key dimOffset", hdfGroup.varDims[jj]);
   }
   fmtBuf.putBufLong("BtreeNode: final key eleLen offset",

@@ -369,10 +369,13 @@ throws HdfException
     // Vlen: format the globalHeap references to hdfFile.bbuf
     int compressionLevel = 0;      // cannot compress heap objects
     HBuffer refBuf = new HBuffer( null, compressionLevel, hdfFile);
-    hdfGroup.formatRawData(
+    hdfGroup.formatRawDataNonLinear(
+      "attrName: " + attrName,
       attrType,
       stgFieldLen,
-      dataVarDims,                         // chunkDataLens
+      dataVarDims,                         // varDims
+      dataVarDims,                         // chnLens
+      dataVarDims,                         // dataDims
       attrValue,
       new HdfModInt(0),
       hdfFile.mainGlobalHeap.blkPosition,  // gcolAddr for DTYPE_STRING_VAR
@@ -383,10 +386,13 @@ throws HdfException
 
   else {
     // Raw data: format the raw data to fmtBuf
-    hdfGroup.formatRawData(
+    hdfGroup.formatRawDataNonLinear(
+      "attrName: " + attrName,
       attrType,
       stgFieldLen,
-      dataVarDims,             // chunkDataLens
+      dataVarDims,             // varDims
+      dataVarDims,             // chnLens
+      dataVarDims,             // dataDims
       attrValue,
       new HdfModInt(0),
       0,                       // gcolAddr for DTYPE_STRING_VAR
