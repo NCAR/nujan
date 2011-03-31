@@ -112,14 +112,14 @@ throws HdfException
       hdfGroup.hdfChunks[0].chunkDataSize);
   }
   else if (layoutClass == LY_CHUNKED) {     // if chunked
-    fmtBuf.putBufByte("MsgLayout: chunk rank+1", hdfGroup.rank + 1);
+    fmtBuf.putBufByte("MsgLayout: chunk rank+1", hdfGroup.varRank + 1);
 
     // External block
     fmtBuf.putBufLong(
       "MsgLayout: chunkBtree.pos", chunkBtree.blkPosition);
     if (formatPass != 0) hdfFile.addWork("MsgLayout", chunkBtree);
 
-    for (int ii = 0; ii < hdfGroup.rank; ii++) {
+    for (int ii = 0; ii < hdfGroup.varRank; ii++) {
       fmtBuf.putBufInt("MsgLayout: chunk dim",
         hdfGroup.chunkLens[ii]);
     }
