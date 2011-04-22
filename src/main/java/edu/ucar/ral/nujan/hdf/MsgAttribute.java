@@ -179,7 +179,7 @@ throws HdfException
       + HdfUtil.formatDtypeDim( dataDtype, dataVarDims),
       attrValue);
     if (attrValue != null)
-      prtf("MsgAttribute: attrValue class: " + attrValue.getClass());
+      prtf("  attrValue class: " + attrValue.getClass());
   }
 
   if (totNumEle * elementLen > 65535 - 1000)   // -1000 for hdr, slack, etc.
@@ -196,8 +196,7 @@ throws HdfException
       false,                          // useLinear
       dataVarDims,                    // var dims
       new int[dataVarDims.length],    // startIxs == all 0
-      dataVarDims,                    // chunkLens
-      dataVarDims,                    // adjChunkLens
+      dataVarDims,                    // specChunkDims
       dataVarDims);                   // dataDims
   }
 
@@ -339,6 +338,8 @@ throws HdfException
 
   msgDataSpace.formatNakedMsg( formatPass, fmtBuf);
 
+  int[] startIxs = new int[ dataVarDims.length];
+
   if (attrValue == null) {
     // Don't write null attrValue
   }
@@ -369,13 +370,21 @@ throws HdfException
     // Vlen: format the globalHeap references to hdfFile.bbuf
     int compressionLevel = 0;      // cannot compress heap objects
     HBuffer refBuf = new HBuffer( null, compressionLevel, hdfFile);
-    hdfGroup.formatRawDataNonLinear(
+    int[] curIxs = new int[dataVarDims.length];
+    if (hdfFile.bugs >= 2)
+      prtf("MsgAttribute: call formatRawData for string data");
+    hdfGroup.formatRawData(
       "attrName: " + attrName,
+      0,                   // curLev
+      curIxs,
+      false,               // useLinear
       attrType,
       stgFieldLen,
-      dataVarDims,                         // varDims
-      dataVarDims,                         // chnLens
-      dataVarDims,                         // dataDims
+      dataVarDims,         // varDims
+      dataVarDims,         // chnLens
+      dataVarDims,         // dataDims
+      elementLen,
+      startIxs,
       attrValue,
       new HdfModInt(0),
       hdfFile.mainGlobalHeap.blkPosition,  // gcolAddr for DTYPE_STRING_VAR
@@ -386,17 +395,25 @@ throws HdfException
 
   else {
     // Raw data: format the raw data to fmtBuf
-    hdfGroup.formatRawDataNonLinear(
+    int[] curIxs = new int[dataVarDims.length];
+    if (hdfFile.bugs >= 2)
+      prtf("MsgAttribute: call formatRawData for numeric data");
+    hdfGroup.formatRawData(
       "attrName: " + attrName,
+      0,                   // curLev
+      curIxs,
+      false,               // useLinear
       attrType,
       stgFieldLen,
-      dataVarDims,             // varDims
-      dataVarDims,             // chnLens
-      dataVarDims,             // dataDims
+      dataVarDims,         // varDims
+      dataVarDims,         // chnLens
+      dataVarDims,         // dataDims
+      elementLen,
+      startIxs,
       attrValue,
       new HdfModInt(0),
-      0,                       // gcolAddr for DTYPE_STRING_VAR
-      null,                    // gcol for DTYPE_STRING_VAR
+      0,                   // gcolAddr for DTYPE_STRING_VAR
+      null,                // gcol for DTYPE_STRING_VAR
       fmtBuf);
 
     // Kluge: When an attribute is null or length == 0,

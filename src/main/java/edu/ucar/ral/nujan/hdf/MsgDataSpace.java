@@ -66,7 +66,7 @@ long[] dimPermuations;
 
 
 /**
- * @param rank Dimensionality == varDims.length == chunkLens.length
+ * @param rank Dimensionality == varDims.length == specChunkDims.length
  * @param totNumEle Total num elements, calculated from varDims
  * @param varDims The length of each dimension.
  * @param hdfGroup The owning HdfGroup.

@@ -296,7 +296,7 @@ throws HdfException
 
 /**
  * Checks that dataType == specType.
- * Checks that dataDims[i] == chunkLens[i]
+ * Checks that dataDims[i] == chunkDims[i]
  *      or startIxs[i] == lastPos and dataDims == fullDim - lastPos
  * where lastPos is the last startIx in this dim.
  *
@@ -311,8 +311,7 @@ static void checkTypeMatch(
   boolean useLinear,
   int[] varDims,              // entire var dimensions
   int[] startIxs,             // current start indices
-  int[] chunkLens,            // specified chunk dims
-  int[] adjChnLens,           // chunk dims possibly linearized
+  int[] chunkDims,            // specified chunk dims
   int[] dataDims)             // dims of data object to be written
 throws HdfException
 {
@@ -362,26 +361,26 @@ throws HdfException
   // Else if useLinear ...
   else if (useLinear) {
     if (dataDims.length != 1) throwerr("useLinear but dataDims rank != 1");
-    if (adjChnLens.length != 1) throwerr("useLinear but adjChnLens rank != 1");
     int dlen = dataDims[0];
-    int clen = adjChnLens[0];
 
+    long fullChunkVolume = 0;
     long remVolume = 0;
     if (varDims.length > 0) {
+      fullChunkVolume = 1;
       remVolume = 1;
       for (int ii = 0; ii < varDims.length; ii++) {
-        int remLen = chunkLens[ii];
-        if (startIxs[ii] + chunkLens[ii] >= varDims[ii])
+        int remLen = chunkDims[ii];
+        if (startIxs[ii] + chunkDims[ii] >= varDims[ii])
           remLen = varDims[ii] - startIxs[ii];
+        fullChunkVolume *=  chunkDims[ii];
         remVolume *= remLen;
       }
     }
 
-    if (! (dlen == clen || dlen == remVolume)) {
+    if (! (dlen == fullChunkVolume || dlen == remVolume)) {
       throwerr("bad chunk size with useLinear.\n"
         + "  declared variable lens: " + formatInts( varDims) + "\n"
-        + "  declared chunk lens:    " + formatInts( chunkLens) + "\n"
-        + "  adj chunk lens:         " + formatInts( adjChnLens) + "\n"
+        + "  declared chunk lens:    " + formatInts( chunkDims) + "\n"
         + "  remVolume:              " + remVolume + "\n"
         + "  current startIxs:       " + formatInts( startIxs) + "\n"
         + "  data object dim lens:   " + formatInts( dataDims) + "\n");
@@ -391,19 +390,19 @@ throws HdfException
   // Else not scalar or linear ...
   else {
     // Check rank
-    if (dataDims.length != chunkLens.length)
+    if (dataDims.length != chunkDims.length)
       throwerr("Dimension mismatch for: " + msg + "\n"
         + "  declared variable lens: " + formatInts( varDims) + "\n"
-        + "  declared chunk lens:    " + formatInts( chunkLens) + "\n"
+        + "  declared chunk lens:    " + formatInts( chunkDims) + "\n"
         + "  current startIxs:       " + formatInts( startIxs) + "\n"
         + "  data object dim lens:   " + formatInts( dataDims) + "\n");
 
     // Check each dimension
-    for (int ii = 0; ii < chunkLens.length; ii++) {
+    for (int ii = 0; ii < chunkDims.length; ii++) {
       boolean allOk = false;
-      if (dataDims[ii] == chunkLens[ii]) allOk = true;
+      if (dataDims[ii] == chunkDims[ii]) allOk = true;
       else {
-        if (startIxs[ii] + chunkLens[ii] >= varDims[ii]) {  // if at last pos
+        if (startIxs[ii] + chunkDims[ii] >= varDims[ii]) {  // if at last pos
           int remLen = varDims[ii] - startIxs[ii];
           if (dataDims[ii] == remLen) allOk = true;
         }
@@ -412,7 +411,7 @@ throws HdfException
         throwerr("Dimension mismatch for: " + msg + "\n"
           + "  data dimension length mismatch for dimension " + ii + "\n"
           + "  declared variable lens: " + formatInts( varDims) + "\n"
-          + "  declared chunk lens:    " + formatInts( chunkLens) + "\n"
+          + "  declared chunk lens:    " + formatInts( chunkDims) + "\n"
           + "  current startIxs:       " + formatInts( startIxs) + "\n"
           + "  data object dim lens:   " + formatInts( dataDims) + "\n");
       }
@@ -615,8 +614,8 @@ static void formatObjectSub(
   if (obj == null)
     sbuf.append( String.format( "%s(null)\n", mkIndent( indent)));
   else if (obj instanceof String) {
-    sbuf.append( String.format("%s(%s) \"%s\"\n",
-      mkIndent(indent), obj.getClass().getName(), obj));
+    sbuf.append( String.format("%s(String) \"%s\"\n",
+      mkIndent(indent), obj));
   }
   else if (obj instanceof byte[]) {
     sbuf.append( mkIndent( indent) + "(bytes)");
@@ -678,7 +677,7 @@ static void formatObjectSub(
     Object[] vals = (Object[]) obj;
     for (int ii = 0; ii < vals.length; ii++) {
       sbuf.append( String.format( "%s%d  cls: %s:\n",
-        mkIndent( indent), ii, obj.getClass().getName()));
+        mkIndent( indent), ii, vals[ii].getClass().getName()));
       formatObjectSub( vals[ii], indent + 1, sbuf);
     }
   }

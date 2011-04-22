@@ -295,6 +295,7 @@ throws NhException
   Object fillValue = null;
   try {
     allData = GenData.genHdfData(
+      useLinear,
       dtype,
       stgFieldLen,
       null,           // refGroup

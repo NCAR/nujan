@@ -37,6 +37,7 @@ import edu.ucar.ral.nujan.netcdf.NhException;
 import edu.ucar.ral.nujan.netcdf.NhFileWriter;
 import edu.ucar.ral.nujan.netcdf.NhGroup;
 import edu.ucar.ral.nujan.netcdf.NhVariable;
+import edu.ucar.ral.nujan.hdf.HdfUtil;
 
 
 public class TestUnita extends TestCase {
@@ -111,12 +112,39 @@ public static void main( String[] args) {
     String msg = "caught: " + exc;
     System.out.println( msg);
     System.err.println( msg);
+    printUsageInfo();
     System.exit(1);
   }
 }
 
 
 
+static void printUsageInfo()
+{
+  prtf("");
+  prtf("Parms:");
+  prtf("  -unitBugs       int: debug level for TestUnita");
+  prtf("  -nhBugs         int: debug level for the nujan.netcdf layer");
+  prtf("  -hdfBugs        int: debug level for the nujan.hdf layer");
+  prtf("  -sourceDir      stg: dir containing known good files");
+  prtf("  -targetDir      stg: dir containing output files");
+  prtf("  -check          true/false: if true, compare source vs target");
+  prtf("  -dataType       comma sep list, each element of which is:");
+  prtf("                    ubyte int float double vstring");
+  prtf("  -dims           comma sep list, each element of which is:");
+  prtf("                    stg like 10,10/5,5   varDims/chunkDims");
+  prtf("                    If \"/null\", use a scalar.");
+  prtf("                    If \"varDims/null\", use contiguous.");
+  prtf("  -compLevel      comma sep list, each element of which is:");
+  prtf("                    int compression level, 0 - 9");
+  prtf("  -useSmall       comma sep list, each element of which is:");
+  prtf("                    true/false: if true use small chunks");
+  prtf("                    at region edges; else use full size chunks");
+  prtf("  -useLinear       comma sep list, each element of which is:");
+  prtf("                    true/false: if true use linear array with");
+  prtf("                    writeData");
+  prtf("");
+}
 
 
 
@@ -224,6 +252,14 @@ throws NhException
                   prtf("test omitted: compLevel > 0 && dataType == STRING_VAR");
               }
             }
+            // xxx 5-dim vstring works for
+            // xxx 3,3,3,3,3/null through
+            // xxx 9,9,9,9,9/null, but
+            // xxx 10,10,10,10,10/null,
+            // xxx gives: h5dump: H5HGcache.c:243: H5HG_load:
+            // xxx    Assertion `p == heap->chunk + heap->size' failed.
+            // xxx Sounds like HDF5 has a fixed and small heap
+            // xxx for strings.
             if (dataType == NhVariable.TP_STRING_VAR && rank > 4) {
               useIt = false;
               if (unitBugs >= 1)
@@ -272,10 +308,14 @@ throws NhException
   namePart += ".small_" + useSmall;
   namePart += ".linear_" + useLinear;
   namePart += ".nc";
-  if (unitBugs >= 1) prtf("mkSingleTest: namePart: %s", namePart);
   
   String sourceName = sourceDir + "/" + namePart;
   String targetName = targetDir + "/" + namePart;
+  if (unitBugs >= 1) {
+    prtf("mkSingleTest: namePart: %s", namePart);
+    prtf("mkSingleTest: sourceName: %s", sourceName);
+    prtf("mkSingleTest: targetName: %s", targetName);
+  }
 
   createFile( dataType, dimLens, chunkLens,
     compLevel, useSmall, useLinear, targetName);
@@ -322,7 +362,7 @@ throws NhException
     NhFileWriter.OPT_OVERWRITE,
     nhBugs,
     hdfBugs,
-    1283444655,            // utcModTime: milliseconds since 1970
+    1283444655,            // utcModTime date: milliseconds since 1970
     null,                  // statTag
     null);                 // logDir
 
@@ -393,6 +433,9 @@ throws NhException
     Object dataObj = testData;
     //xxx if (useLinear) dataObj = mkLinearData( dataObj);
     int[] startIxs = null;
+    if (unitBugs >= 10)
+      prtf("TestUnita: contig.  dataObj: %s",
+        HdfUtil.formatObject( dataObj));
     humidityVar.writeData( startIxs, dataObj, useLinear);
   }
 
@@ -406,6 +449,10 @@ throws NhException
         useSmall, testData);
       //xxx if (useLinear) dataObj = mkLinearData( dataObj);
 
+      if (unitBugs >= 10)
+        prtf("TestUnita: chunk.  startIxs: %s  dataObj: %s",
+          HdfUtil.formatInts( startIxs),
+          HdfUtil.formatObject( dataObj));
       humidityVar.writeData( startIxs, dataObj, useLinear);
 
       // Increment startIxs
@@ -1417,33 +1464,33 @@ throws NhException
 
 
 
-// Returns [0][*] = dims, [1][*] = chunks.
-
-static int[][] oldParseIntPairs( String msg, String stg)
-throws NhException
-{
-  String[] toks = stg.split(",");
-  if (toks.length == 0) throwerr("parm \"" + msg + "\" is empty.");
-  int[] dims = new int[toks.length];
-  int[] chunks = new int[toks.length];
-  for (int ii = 0; ii < toks.length; ii++) {
-    String[] subToks = toks[ii].split("/");
-    if (subToks.length != 2)
-      throwerr("parm \"" + msg + "\" has invalid spec \""
-        + toks[ii] + "\" in string \"" + stg + "\"");
-    try { dims[ii] = Integer.parseInt( subToks[0], 10); }
-    catch( NumberFormatException exc) {
-      throwerr("parm \"" + msg + "\" has invalid integer in \""
-        + toks[ii] + "\" in string \"" + stg + "\"");
-    }
-    try { chunks[ii] = Integer.parseInt( subToks[1], 10); }
-    catch( NumberFormatException exc) {
-      throwerr("parm \"" + msg + "\" has invalid integer in \""
-        + toks[ii] + "\" in string \"" + stg + "\"");
-    }
-  }
-  return new int[][] { dims, chunks};
-}
+///// Returns [0][*] = dims, [1][*] = chunks.
+///
+///static int[][] oldParseIntPairs( String msg, String stg)
+///throws NhException
+///{
+///  String[] toks = stg.split(",");
+///  if (toks.length == 0) throwerr("parm \"" + msg + "\" is empty.");
+///  int[] dims = new int[toks.length];
+///  int[] chunks = new int[toks.length];
+///  for (int ii = 0; ii < toks.length; ii++) {
+///    String[] subToks = toks[ii].split("/");
+///    if (subToks.length != 2)
+///      throwerr("parm \"" + msg + "\" has invalid spec \""
+///        + toks[ii] + "\" in string \"" + stg + "\"");
+///    try { dims[ii] = Integer.parseInt( subToks[0], 10); }
+///    catch( NumberFormatException exc) {
+///      throwerr("parm \"" + msg + "\" has invalid integer in \""
+///        + toks[ii] + "\" in string \"" + stg + "\"");
+///    }
+///    try { chunks[ii] = Integer.parseInt( subToks[1], 10); }
+///    catch( NumberFormatException exc) {
+///      throwerr("parm \"" + msg + "\" has invalid integer in \""
+///        + toks[ii] + "\" in string \"" + stg + "\"");
+///    }
+///  }
+///  return new int[][] { dims, chunks};
+///}
 
 
 
