@@ -43,7 +43,106 @@ public class GenData {
 
 
 
+
+
+
 public static Object genHdfData(
+  boolean useLinear,
+  int dtype,
+  int stgFieldLen,
+  HdfGroup refGroup,        // group to use for references
+  int[] dims,
+  int ival)                 // origin 0.  e.g. 1000*ia + 100*ib + 10*ic + id
+throws HdfException
+{
+  Object vdata = genNonLinear(
+    dtype,
+    stgFieldLen,
+    refGroup,        // group to use for references
+    dims,
+    ival);           // origin 0.  e.g. 1000*ia + 100*ib + 10*ic + id
+
+  if (useLinear) {
+    int dprod = 1;
+    for (int dim : dims) {
+      dprod *= dim;
+    }
+
+    Object linData = null;
+    if (dtype == HdfGroup.DTYPE_FLOAT32) linData = new float[dprod];
+    else if (dtype == HdfGroup.DTYPE_STRING_VAR) linData = new String[dprod];
+    else throwerr("unsupported dtype: " + HdfGroup.dtypeNames[dtype]);
+
+    int rank = dims.length;
+    int[] curIxs = new int[rank];
+    int curLevel = 0;
+    int linIx = 0;
+    linIx = appendLinear( curLevel, curIxs, dims, vdata, linIx, linData);
+    if (linIx != dprod) throwerr("linIx mismatch");
+    vdata = linData;
+  }
+
+  return vdata;
+}
+
+
+
+private static int appendLinear(
+  int curLevel,
+  int[] curIxs,
+  int[] dims,
+  Object vdata,
+  int linIx,
+  Object linData)
+throws HdfException
+{
+  int rank = dims.length;
+  if (curLevel < rank - 1) {
+    if (! (vdata instanceof Object[])) throwerr("wrong type");
+    Object[] objVec = (Object[]) vdata;
+    for (int ii = 0; ii < dims[curLevel]; ii++) {
+      curIxs[curLevel] = ii;
+      linIx = appendLinear(                  // recursion
+        curLevel + 1,
+        curIxs,
+        dims,
+        objVec[ii],
+        linIx,
+        linData);
+    }
+  }
+
+  else {
+    if (vdata instanceof float[]) {
+      if (! (linData instanceof float[])) throwerr("type mismatch");
+      float[] vvec = (float[]) vdata;
+      float[] lvec = (float[]) linData;
+      for (int ii = 0; ii < vvec.length; ii++) {
+        lvec[linIx++] = vvec[ii];
+      }
+    }
+    else if (vdata instanceof String[]) {
+      if (! (linData instanceof String[])) throwerr("type mismatch");
+      String[] vvec = (String[]) vdata;
+      String[] lvec = (String[]) linData;
+      for (int ii = 0; ii < vvec.length; ii++) {
+        lvec[linIx++] = vvec[ii];
+      }
+    }
+    else throwerr("unknown type: %s", vdata.getClass());
+  }
+  return linIx;
+} // end appendLinear
+
+
+
+
+
+
+
+
+
+private static Object genNonLinear(
   int dtype,
   int stgFieldLen,
   HdfGroup refGroup,        // group to use for references
@@ -89,8 +188,6 @@ throws HdfException
   }
 
   else if (dims.length == 1
-    && dtype != HdfGroup.DTYPE_STRING_FIX
-    && dtype != HdfGroup.DTYPE_STRING_VAR
     && dtype != HdfGroup.DTYPE_REFERENCE
     && dtype != HdfGroup.DTYPE_COMPOUND)
   {
@@ -102,7 +199,7 @@ throws HdfException
       byte fillValue = ((Byte) fillObj).byteValue();
       byte[] vals = new byte[dims[0]];
       for (int ii = 0; ii < dims[0]; ii++) {
-        vals[ii] = (byte) (0xff & (10 * ival + ii));
+        vals[ii] = (byte) (0xff & (ival + ii));
         if (vals[ii] == fillValue) vals[ii] = 0;
       }
       vdata = vals;
@@ -110,42 +207,56 @@ throws HdfException
     else if (dtype == HdfGroup.DTYPE_FIXED16) {
       short[] vals = new short[dims[0]];
       for (int ii = 0; ii < dims[0]; ii++) {
-        vals[ii] = (short) (0xffff & (10 * ival + ii));
+        vals[ii] = (short) (0xffff & (ival + ii));
       }
       vdata = vals;
     }
     else if (dtype == HdfGroup.DTYPE_FIXED32) {
       int[] vals = new int[dims[0]];
       for (int ii = 0; ii < dims[0]; ii++) {
-        vals[ii] = 10 * ival + ii;
+        vals[ii] = ival + ii;
       }
       vdata = vals;
     }
     else if (dtype == HdfGroup.DTYPE_FIXED64) {
       long[] vals = new long[dims[0]];
       for (int ii = 0; ii < dims[0]; ii++) {
-        vals[ii] = 10 * ival + ii;
+        vals[ii] = ival + ii;
       }
       vdata = vals;
     }
     else if (dtype == HdfGroup.DTYPE_FLOAT32) {
       float[] vals = new float[dims[0]];
       for (int ii = 0; ii < dims[0]; ii++) {
-        vals[ii] = 10 * ival + ii;
+        vals[ii] = ival + ii;
       }
       vdata = vals;
     }
     else if (dtype == HdfGroup.DTYPE_FLOAT64) {
       double[] vals = new double[dims[0]];
       for (int ii = 0; ii < dims[0]; ii++) {
-        vals[ii] = 10 * ival + ii;
+        vals[ii] = ival + ii;
       }
       vdata = vals;
     }
     else if (dtype == HdfGroup.DTYPE_TEST_CHAR) {
       char[] vals = new char[dims[0]];
       for (int ii = 0; ii < dims[0]; ii++) {
-        vals[ii] = alphabet.charAt( (10 * ival + ii) % alphabet.length());
+        vals[ii] = alphabet.charAt( (ival + ii) % alphabet.length());
+      }
+      vdata = vals;
+    }
+    else if (dtype == HdfGroup.DTYPE_STRING_FIX
+      || dtype == HdfGroup.DTYPE_STRING_VAR)
+    {
+      String[] vals = new String[dims[0]];
+      for (int ii = 0; ii < dims[0]; ii++) {
+        vals[ii] = (String) genNonLinear(
+          dtype,
+          stgFieldLen,
+          refGroup,        // group to use for references
+          new int[0],      // dims
+          ival + ii);      // origin
       }
       vdata = vals;
     }
@@ -158,18 +269,18 @@ throws HdfException
     int[] subDims = Arrays.copyOfRange( dims, 1, dims.length);
     Object[] objs = new Object[nn];
     for (int ii = 0; ii < nn; ii++) {
-      objs[ii] = genHdfData(
+      objs[ii] = genNonLinear(               // recursion
         dtype,
         stgFieldLen,
         refGroup,
         subDims,
-        10 * ival + ii);       // origin 0
+        ival + 10 * ii);
     }
     vdata = objs;
   }
 
   return vdata;
-} // end genHdfData
+} // end genNonLinear
 
 
 

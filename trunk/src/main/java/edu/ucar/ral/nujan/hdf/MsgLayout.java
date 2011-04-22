@@ -121,7 +121,7 @@ throws HdfException
 
     for (int ii = 0; ii < hdfGroup.varRank; ii++) {
       fmtBuf.putBufInt("MsgLayout: chunk dim",
-        hdfGroup.chunkLens[ii]);
+        hdfGroup.specChunkDims[ii]);
     }
     fmtBuf.putBufInt("MsgLayout: chunk elementLen", hdfGroup.elementLen);
   }

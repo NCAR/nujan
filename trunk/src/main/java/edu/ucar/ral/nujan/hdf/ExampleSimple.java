@@ -73,13 +73,13 @@ throws Exception
   int[] dims = {numx, numy};      // dimension lengths
 
   // Add a variable with contiguous storage
-  int[] chunkLens = null;         // chunk lengths (contiguous, not chunked)
+  int[] specChunkDims = null;     // chunk lengths (contiguous, not chunked)
   HdfGroup humidity = rootGroup.addVariable(
     "humidity",                   // variable name
     HdfGroup.DTYPE_FLOAT64,       // double precision float
     0,                            // stgFieldLen
     dims,                         // dimension lengths
-    chunkLens,                    // chunk lengths
+    specChunkDims,                // chunk lengths
     new Double(-999999),          // fill value or null
     0);                           // compression: 0 is none, 9 is max
   prtln("humidity: " + humidity);
@@ -89,14 +89,14 @@ throws Exception
     "celsius", false);
 
   // Add a variable with chunked storage
-  chunkLens = new int[] {5, 10};  // divide x into 2 sections of 5 each,
+  specChunkDims = new int[] {5, 10};  // divide x into 2 sections of 5 each,
                                   // leave y entire
   HdfGroup temperature = rootGroup.addVariable(
     "temperature",                // variable name
     HdfGroup.DTYPE_FLOAT64,       // double precision float
     0,                            // stgFieldLen
     dims,                         // dimension lengths
-    chunkLens,                    // chunk lengths
+    specChunkDims,                // chunk lengths
     new Double(-999999),          // fill value or null
     0);                           // compression: 0 is none, 9 is max
   prtln("temperature: " + temperature);
@@ -118,10 +118,12 @@ throws Exception
 
   // Fill the temperatureData arrays, one for each chunk.
   // The size must match the declared CHUNK, not dimension, lengths.
-  double[][] temperatureDataChunk0 = new double[chunkLens[0]][chunkLens[1]];
-  double[][] temperatureDataChunk1 = new double[chunkLens[0]][chunkLens[1]];
-  for (int ix = 0; ix < chunkLens[0]; ix++) {
-    for (int iy = 0; iy < chunkLens[1]; iy++) {
+  double[][] temperatureDataChunk0
+    = new double [specChunkDims[0]] [specChunkDims[1]];
+  double[][] temperatureDataChunk1
+    = new double [specChunkDims[0]] [specChunkDims[1]];
+  for (int ix = 0; ix < specChunkDims[0]; ix++) {
+    for (int iy = 0; iy < specChunkDims[1]; iy++) {
       temperatureDataChunk0[ix][iy] = 100 * ix + iy + 1000;
       temperatureDataChunk1[ix][iy] = 100 * ix + iy + 2000;
     }

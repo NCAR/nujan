@@ -26,6 +26,11 @@
 
 package edu.ucar.ral.nujan.hdf;
 
+
+// xxx fix indenting
+// xxx indent recursions more
+
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -169,21 +174,21 @@ int stgFieldLen;
  *        or may have length 0 in odd cases where a variable has
  *        no data.  For example a variable may have attributes
  *        without data.  If varDims is null or length 0, must have
- *        chunkLens==null and compressionLevel==0.
+ *        specChunkDims==null and compressionLevel==0.
  */
 int[] varDims;
 
 
 /**
  * Len of each side of a chunk hyperslab.
- *        Must have chunkLens.length == varDims.length,
+ *        Must have specChunkDims.length == varDims.length,
  *        or null if using contiguous storage.
  */
-int[] chunkLens;
+int[] specChunkDims;
 
 
 /**
- * varRank == dimensionality == varDims.length == chunkLens.length
+ * varRank == dimensionality == varDims.length == specChunkDims.length
  */
 int varRank;
 
@@ -332,12 +337,12 @@ throws HdfException
  *        or may have length 0 in odd cases where a variable has
  *        no data.  For example a variable may have attributes
  *        without data.  If varDims is null or length 0, must have
- *        chunkLens==null and compressionLevel==0.
- * @param chunkLens len of each side of a chunk hyperslab.
- *        Must have chunkLens.length == varDims.length.
- *        If chunkLens == null use contiguous storage.
- *        If chunkLens == varDims, use chunked storage with just one chunk.
- *        If varDims == null or varDims.length == 0, chunkLens must be null.
+ *        specChunkDims==null and compressionLevel==0.
+ * @param specChunkDims len of each side of a chunk hyperslab.
+ *        Must have specChunkDims.length == varDims.length.
+ *        If specChunkDims == null use contiguous storage.
+ *        If specChunkDims == varDims, use chunked storage with just one chunk.
+ *        If varDims == null or varDims.length == 0, specChunkDims must be null.
  * @param fillValue Fill value of appropriate type for this variable.
  *        May be null.
  *        <p>
@@ -374,7 +379,7 @@ HdfGroup(
                              // including DTYPE_STRING_VAR.
 
   int[] varDims,
-  int[] chunkLens,
+  int[] specChunkDims,
   Object fillValue,          // null, Byte, Short, Int, Long,
                              // Float, Double, String, etc.
   int compressionLevel,      // Zip compression level: 0==Uncompressed;
@@ -393,7 +398,7 @@ throws HdfException
   if (hdfFile.bugs >= 1) {
     prtf("HdfGroup: new dataset at path: \"" + getPath() + "\""
       + "  type: " + HdfUtil.formatDtypeDim( dtype, varDims)
-      + "  chunkLens: " + HdfUtil.formatInts( chunkLens));
+      + "  specChunkDims: " + HdfUtil.formatInts( specChunkDims));
   }
   HdfUtil.checkName( groupName,
     "dataset in group \"" + parentGroup.groupName + "\"");
@@ -402,28 +407,28 @@ throws HdfException
   if (varDims == null) this.varDims = null;
   else this.varDims = Arrays.copyOf( varDims, varDims.length);
 
-  // Set up chunkLens.
+  // Set up specChunkDims.
 
   int layoutClass;
-  if (chunkLens == null) {
+  if (specChunkDims == null) {
     layoutClass = MsgLayout.LY_CONTIGUOUS;
-    this.chunkLens = null;
+    this.specChunkDims = null;
   }
   else {
     layoutClass = MsgLayout.LY_CHUNKED;
-    this.chunkLens = Arrays.copyOf( chunkLens, chunkLens.length);
+    this.specChunkDims = Arrays.copyOf( specChunkDims, specChunkDims.length);
   }
 
 
   if (varDims == null) {
-    if (chunkLens != null)
-      throwerr("varDims == null but chunkLens != null");
+    if (specChunkDims != null)
+      throwerr("varDims == null but specChunkDims != null");
     if (compressionLevel > 0)
       throwerr("cannot use compression with null data");
   }
   else if (varDims.length == 0) {
-    if (chunkLens != null && chunkLens.length > 0)
-      throwerr("varDims len == 0 but chunkLens != null");
+    if (specChunkDims != null && specChunkDims.length > 0)
+      throwerr("varDims len == 0 but specChunkDims != null");
     if (compressionLevel > 0)
       throwerr("cannot use compression with scalar data");
   }
@@ -452,12 +457,12 @@ throws HdfException
     prtf("HdfGroup: varRank: %d  totNumEle: %d", varRank, totNumEle);
 
 
-  if (chunkLens != null) {
-    if (chunkLens.length != varDims.length)
-      throwerr("chunkLens len != varDims len");
+  if (specChunkDims != null) {
+    if (specChunkDims.length != varDims.length)
+      throwerr("specChunkDims len != varDims len");
     for (int ii = 0; ii < varRank; ii++) {
-      if (chunkLens[ii] <= 0) throwerr("invalid chunkLens");
-      if (chunkLens[ii] > varDims[ii]) throwerr("chunkLens > varDims");
+      if (specChunkDims[ii] <= 0) throwerr("invalid specChunkDims");
+      if (specChunkDims[ii] > varDims[ii]) throwerr("specChunkDims > varDims");
     }
   }
 
@@ -467,17 +472,17 @@ throws HdfException
 
 
   // Calc numDimChunks = num chunks in each dimension,
-  //   which is varDims[ii] / chunkLens[ii], round up.
+  //   which is varDims[ii] / specChunkDims[ii], round up.
   // Calc totNumChunks = total number of chunks = product of numDimChunks[*].
   // If contiguous, we have one chunk.
 
   int[] numDimChunks = new int[varRank];
   int totNumChunks = 1;
   for (int ii = 0; ii < varRank; ii++) {
-    if (chunkLens == null) numDimChunks[ii] = 1;
+    if (specChunkDims == null) numDimChunks[ii] = 1;
     else {
-      numDimChunks[ii] = varDims[ii] / chunkLens[ii];
-      if (numDimChunks[ii] * chunkLens[ii] != varDims[ii])
+      numDimChunks[ii] = varDims[ii] / specChunkDims[ii];
+      if (numDimChunks[ii] * specChunkDims[ii] != varDims[ii])
         numDimChunks[ii]++;
     }
     totNumChunks *= numDimChunks[ii];
@@ -489,7 +494,7 @@ throws HdfException
 
   // Calc totChunkNums = number of chunks represented by any level
   // of the startIxs indices, so in calcChunkIxs we can do ...
-  //   ichunk = sum( (startIxs[ii]/chunkLens[ii]) * totChunkNums[ii]);
+  //   ichunk = sum( (startIxs[ii]/specChunkDims[ii]) * totChunkNums[ii]);
 
   totChunkNums = new int[varRank];
   if (varRank > 0) {
@@ -507,7 +512,7 @@ throws HdfException
   hdfChunks = new HdfChunk[ totNumChunks];
   int[] startIxs = new int[varRank];
 
-  if (chunkLens == null) {
+  if (specChunkDims == null) {
     hdfChunks[0] = new HdfChunk( startIxs, this);
   }
 
@@ -519,16 +524,16 @@ throws HdfException
           HdfUtil.formatInts( startIxs));
       if (calcChunkIx( startIxs) != ichunk) throwerr("calcChunkIx error");
 
-      ///// Set userDims = chunkLens, but the edge chunks
+      ///// Set userDims = specChunkDims, but the edge chunks
       ///// in a dimension ii may be shorter if varDims[ii]
-      ///// is not a multiple of chunkLens[ii].
+      ///// is not a multiple of specChunkDims[ii].
 
       ///int[] userDims = new int[varRank];
       ///for (int ii = 0; ii < varRank; ii++) {
-      ///  if (chunkLens == null) userDims[ii] = varDims[ii];
+      ///  if (specChunkDims == null) userDims[ii] = varDims[ii];
       ///  else {
       ///    userDims[ii] = Math.min(
-      ///      chunkLens[ii],
+      ///      specChunkDims[ii],
       ///      varDims[ii] - startIxs[ii]);
       ///  }
       ///}
@@ -544,12 +549,12 @@ throws HdfException
 
       // Increment startIxs
       for (int ii = varRank - 1; ii >= 0; ii--) {
-        startIxs[ii] += chunkLens[ii];
+        startIxs[ii] += specChunkDims[ii];
         if (startIxs[ii] < varDims[ii]) break;
         startIxs[ii] = 0;
       }
     }
-  } // else chunkLens != null
+  } // else specChunkDims != null
 
   // Initialize various messages
   msgDataType = new MsgDataType(
@@ -634,12 +639,12 @@ throws HdfException
  *        or may have length 0 in odd cases where a variable has
  *        no data.  For example a variable may have attributes
  *        without data.  If varDims is null or length 0, must have
- *        chunkLens==null and compressionLevel==0.
- * @param chunkLens len of each side of a chunk hyperslab.
- *        Must have chunkLens.length == varDims.length.
- *        If chunkLens == null use contiguous storage.
- *        If chunkLens == varDims, use chunked storage with just one chunk.
- *        If varDims == null or varDims.length == 0, chunkLens must be null.
+ *        specChunkDims==null and compressionLevel==0.
+ * @param specChunkDims len of each side of a chunk hyperslab.
+ *        Must have specChunkDims.length == varDims.length.
+ *        If specChunkDims == null use contiguous storage.
+ *        If specChunkDims == varDims, use chunked storage with just one chunk.
+ *        If varDims == null or varDims.length == 0, specChunkDims must be null.
  * @param fillValue Fill value of appropriate type for this variable.
  *        May be null.
  *        <p>
@@ -670,7 +675,7 @@ public HdfGroup addVariable(
                              // including DTYPE_STRING_VAR.
 
   int[] varDims,             // dimension lengths
-  int[] chunkLens,
+  int[] specChunkDims,
   Object fillValue,          // fill value or null
   int compressionLevel)
 throws HdfException
@@ -687,7 +692,7 @@ throws HdfException
     + "  dtype: " + dtypeNames[dtype]
     + "  compLev: " + compressionLevel
     + "  varDims: " + HdfUtil.formatInts( varDims)
-    + "  chunkLens: " + HdfUtil.formatInts( chunkLens));
+    + "  specChunkDims: " + HdfUtil.formatInts( specChunkDims));
 
   int[] dsubTypes = null;
   String[] subNames = null;
@@ -704,7 +709,7 @@ throws HdfException
     subNames,
     stgFieldLen,
     varDims,
-    chunkLens,
+    specChunkDims,
     fillValue,
     compressionLevel,
     hdfFile);
@@ -979,7 +984,6 @@ throws HdfException
   long statTimea = hdfFile.printStat( 0, "grp.writeData.entry",
     "useLinear: " + useLinear
     + "  startIxs: " + HdfUtil.formatInts( startIxs));
-  if (useLinear) throwerr("useLinear not implemented");
   try { writeDataSub( startIxs, vdata, useLinear); }
   catch( IOException exc) {
     exc.printStackTrace();
@@ -1050,11 +1054,11 @@ throws HdfException, IOException
   // Find the chunk
   int ichunk = 0;
   if (startIxs == null) {
-    if (chunkLens != null) throwerr("startIxs == null but chunkLens != null");
+    if (specChunkDims != null) throwerr("startIxs == null but specChunkDims != null");
     ichunk = 0;
   }
   else {
-    if (chunkLens == null) throwerr("startIxs != null but chunkLens == null");
+    if (specChunkDims == null) throwerr("startIxs != null but specChunkDims == null");
     ichunk = calcChunkIx( startIxs);
   }
 
@@ -1066,36 +1070,20 @@ throws HdfException, IOException
   // Check that dtype and dataDims match what the user
   // declared in the earlier addVariable call.
 
-  int[] chnLens = chunkLens;
-  if (chnLens == null) chnLens = varDims;
+  int[] chunkDims = specChunkDims;
+  if (chunkDims == null) chunkDims = varDims;
   int[] sttIxs = startIxs;
   if (sttIxs == null) sttIxs = new int[varRank];
   if (hdfFile.bugs >= 1) {
     prtf("  useLinear: %s", useLinear);
     prtf("  varDims: %s", HdfUtil.formatInts( varDims));
-    prtf("  chunkLens: %s", HdfUtil.formatInts( chunkLens));
-    prtf("  chnLens: %s", HdfUtil.formatInts( chnLens));
+    prtf("  specChunkDims: %s", HdfUtil.formatInts( specChunkDims));
+    prtf("  chunkDims: %s", HdfUtil.formatInts( chunkDims));
     prtf("  startIxs: %s", HdfUtil.formatInts( startIxs));
     prtf("  sttIxs: %s", HdfUtil.formatInts( sttIxs));
     prtf("  dataDims: %s", HdfUtil.formatInts( dataDims));
   }
 
-//xxx del:
-  // If useLinear, set adjChnLens = total linear chunk len
-  ///int[] adjChnLens = chnLens;
-  ///if (useLinear) {
-  ///  if (chnLens.length > 0) {
-  ///    int linearChunkLen = 1;
-  ///    for (int ilen : chnLens) {
-  ///      if (ilen <= 0) throwerr("invalid ilen");
-  ///      linearChunkLen *= ilen;
-  ///    }
-  ///    adjChnLens = new int[] {linearChunkLen};    // one big chunk
-  ///  }
-  ///  if (hdfFile.bugs >= 1)
-  ///    prtf("  useLinear true: adjChnLens: %s",
-  ///      HdfUtil.formatInts( adjChnLens));
-  ///}
 
   HdfUtil.checkTypeMatch(
     getPath(),
@@ -1104,8 +1092,7 @@ throws HdfException, IOException
     useLinear,
     varDims,
     sttIxs,
-    chnLens,
-    chnLens,       // xxx should be linearChnLen = 1 ele == totLen
+    chunkDims,
     dataDims);
 
   if (chunk.chunkDataAddr != 0)
@@ -1147,13 +1134,19 @@ throws HdfException, IOException
 
     if (hdfFile.bugs >= 2)
       prtf("writeDataSub: call formatRawData for string data");
-    formatRawDataNonLinear(
+    int[] curIxs = new int[varRank];
+    formatRawData(
       "groupName: " + groupName,
+      0,               // curLev
+      curIxs,
+      useLinear,
       dtype,
       0,               // stgFieldLen for DTYPE_STRING_FIX
       varDims,
-      chnLens,         // specified chunk lens
+      chunkDims,
       dataDims,
+      dataElementLen,
+      startIxs,
       vdata,
       null,            // cntr for DTYPE_COMPOUND
       gcolAddr,        // addr where we will write this gcol
@@ -1182,15 +1175,21 @@ throws HdfException, IOException
 
     if (hdfFile.bugs >= 2)
       prtf("writeDataSub: call formatRawData for numeric data");
-    formatRawDataNonLinear(
+    int[] curIxs = new int[varRank];
+    formatRawData(
       "groupName: " + groupName,
+      0,               // curLev
+      curIxs,
+      useLinear,
       dtype,
       stgFieldLen,
       varDims,
-      chnLens,             // specified chunk lens
+      chunkDims,
       dataDims,
+      dataElementLen,
+      startIxs,
       vdata,
-      new HdfModInt(0),
+      new HdfModInt(0),    // cntr for DTYPE_COMPOUND
       -1,                  // gcolAddr for DTYPE_STRING_VAR
       null,                // gcol for DTYPE_STRING_VAR
       outbuf);
@@ -1202,7 +1201,7 @@ throws HdfException, IOException
   // For non-compressed numeric data we could use something like ...
   //   chunkDataSize = elementLen;
   //   for (int ii = 0; ii < varRank; ii++) {
-  //     chunkDataSize *= chunk.chunkLens[ii];
+  //     chunkDataSize *= chunk.specChunkDims[ii];
   //   }
   // However compressed data can be any length,
   // so we just use the output length.
@@ -1246,14 +1245,16 @@ throws HdfException
     if (startIxs[ii] >= varDims[ii])
       throwerr("startIxs[%d] == %d is >= varDims[%d] == %d",
         ii, startIxs[ii], ii, varDims[ii]);
-    if (chunkLens == null) {
-      if (startIxs[ii] != 0) throwerr("startIxs != 0 for chunkLens == null");
+    if (specChunkDims == null) {
+      if (startIxs[ii] != 0)
+        throwerr("startIxs != 0 for specChunkDims == null");
     }
     else {
-      if (startIxs[ii] % chunkLens[ii] != 0)
-        throwerr("startIxs[%d] == %d is not a multiple of chunkLens[%d] == %d",
-          ii, startIxs[ii], ii, chunkLens[ii]);
-      ichunk += (startIxs[ii] / chunkLens[ii]) * totChunkNums[ii];
+      if (startIxs[ii] % specChunkDims[ii] != 0)
+        throwerr("startIxs[%d] == %d is not a multiple of"
+          + " specChunkDims[%d] == %d",
+          ii, startIxs[ii], ii, specChunkDims[ii]);
+      ichunk += (startIxs[ii] / specChunkDims[ii]) * totChunkNums[ii];
     }
   }
   if (ichunk < 0 || ichunk >= hdfChunks.length) throwerr("invalid ichunk");
@@ -1458,11 +1459,6 @@ throws HdfException
 
 
 
-
-
-
-
-
 /**
  * Formats a regular array of raw data.  Not a ragged (VLEN) array.
  * Called by writeDataSub and MsgAttribute.formatMsgCore.
@@ -1493,314 +1489,43 @@ throws HdfException
  * Similarly for HdfGroup[].
  */
 
-void formatRawDataNonLinear(
+void formatRawData(
   String msg,
-  int dtp,              // one of DTYPE_*
-  int stgFieldLen,      // used for DTYPE_STRING_FIX
-  int[] varDims,        // unused
-  int[] chnLens,        // specified chunk lens
-  int[] dataDims,       // unused
-  Object vdata,
-  HdfModInt cntr,       // used for the index of compound types
-  long gcolAddr,        // used for DTYPE_STRING_VAR
-  GlobalHeap gcol,      // used for DTYPE_STRING_VAR
-  HBuffer fmtBuf)       // output buffer
-throws HdfException
-{
-  int rank = varDims.length;
-  if (vdata == null) throwerr("vdata is null");
-  if (hdfFile.bugs >= 2) {
-    prtIndent("formatRawDataNonLinear entry for: " + msg);
-    prtIndent("  rank: " + rank);
-    prtIndent("  varDims: " + HdfUtil.formatInts( varDims));
-    prtIndent("  chnLens: " + HdfUtil.formatInts( chnLens));
-    prtIndent("  dataDims: " + HdfUtil.formatInts( dataDims));
-    prtIndent("  dtp: " + dtypeNames[dtp]);
-    prtIndent("  vdata class: " + vdata.getClass());
-    Object tobj = vdata;
-    while (tobj instanceof Object[] && ((Object[]) tobj).length > 0) {
-      tobj = ((Object[]) tobj)[0];
-      prtIndent("    vdata nested class: " + tobj.getClass());
-    }
-    prtIndent("  fmtBuf: " + fmtBuf);
-  }
-
-  // Insure all dimensions are valid
-  for (int ii = 0; ii < rank; ii++) {
-    if (varDims[ii] <= 0)
-      throwerr("invalid varDims: " + HdfUtil.formatInts( varDims));
-    if (chnLens[ii] <= 0 || chnLens[ii] > varDims[ii])
-      throwerr("invalid chnLens: " + HdfUtil.formatInts( chnLens));
-    if (dataDims[ii] <= 0 || dataDims[ii] > chnLens[ii])
-      throwerr("invalid dataDims: " + HdfUtil.formatInts( dataDims));
-  }
-
-  if (vdata instanceof Object[]) {
-    Object[] objVec = (Object[]) vdata;
-    if (hdfFile.bugs >= 2)
-      prtIndent("formatRawData objVec len: " + objVec.length
-        + "  chnLens: " + HdfUtil.formatInts( chnLens));
-    if (chnLens.length > 0) {
-      int[] subVarDims = Arrays.copyOfRange( varDims, 1, varDims.length);
-      int[] subChnLens = Arrays.copyOfRange( chnLens, 1, chnLens.length);
-      int[] subDataDims = Arrays.copyOfRange( dataDims, 1, dataDims.length);
-
-      for (int ii = 0; ii < objVec.length; ii++) {
-        if (hdfFile.bugs >= 2)
-          prtIndent("formatRawData: recurse for data.  ii: " + ii);
-        hdfFile.indent++;
-        formatRawDataNonLinear(                          // recursion
-          msg,
-          dtp,
-          stgFieldLen,
-          subVarDims,
-          subChnLens,
-          subDataDims,
-          objVec[ii],
-          cntr,
-          gcolAddr,
-          gcol,
-          fmtBuf);
-        hdfFile.indent--;
-      }
-
-      // If this dimension is too short, pad it out
-      // by rewriting objvec[0].
-
-      int padLen = chnLens[0] - objVec.length;
-      if (hdfFile.bugs >= 2)
-        prtIndent("formatRawData: padLen: " + padLen);
-      for (int ii = 0; ii < padLen; ii++) {
-        if (objVec.length == 0) throwerr("invalid objVec: len == 0");
-        if (hdfFile.bugs >= 2)
-          prtIndent("formatRawData: recurse for pad.  ii: " + ii);
-        hdfFile.indent++;
-        formatRawDataNonLinear(                         // recursion
-          msg,
-          dtp,
-          stgFieldLen,
-          subVarDims,
-          subChnLens,
-          subDataDims,
-          objVec[0],
-          cntr,
-          gcolAddr,
-          gcol,
-          fmtBuf);
-        hdfFile.indent--;
-      }
-    }
-  }
-  else if (vdata instanceof Byte) {
-    checkDtype( DTYPE_SFIXED08, DTYPE_UFIXED08, dtp);
-    byte aval = ((Byte) vdata).byteValue();
-    fmtBuf.putBufByte("formatRawData", aval);
-  }
-  else if (vdata instanceof Short) {
-    checkDtype( DTYPE_FIXED16, dtp);
-    short aval = ((Short) vdata).shortValue();
-    fmtBuf.putBufShort("formatRawData", aval);
-  }
-  else if (vdata instanceof Integer) {
-    checkDtype( DTYPE_FIXED32, dtp);
-    int aval = ((Integer) vdata).intValue();
-    fmtBuf.putBufInt("formatRawData", aval);
-  }
-  else if (vdata instanceof Long) {
-    checkDtype( DTYPE_FIXED64, dtp);
-    long aval = ((Long) vdata).longValue();
-    fmtBuf.putBufLong("formatRawData", aval);
-  }
-  else if (vdata instanceof Float) {
-    checkDtype( DTYPE_FLOAT32, dtp);
-    float aval = ((Float) vdata).floatValue();
-    fmtBuf.putBufFloat("formatRawData", aval);
-  }
-  else if (vdata instanceof Double) {
-    checkDtype( DTYPE_FLOAT64, dtp);
-    double aval = ((Double) vdata).doubleValue();
-    fmtBuf.putBufDouble("formatRawData", aval);
-  }
-
-  else if (vdata instanceof Character) {
-    // Normally we would handle character encoding by
-    // calling HdfUtil.encodeString.
-    // However the final length is fixed, so we must
-    // do 1 char -> 1 byte encoding.
-    checkDtype( DTYPE_STRING_FIX, dtp);
-    fmtBuf.putBufByte("formatRawData", ((Character) vdata).charValue());
-  }
-
-  else if (vdata instanceof String) {
-    checkDtype( DTYPE_STRING_FIX, DTYPE_STRING_VAR, dtp);
-    String aval = (String) vdata;
-    if (dtp == DTYPE_STRING_FIX) {
-      byte[] bytes = HdfUtil.encodeString( aval, false, this);
-      fmtBuf.putBufBytes(
-        "formatRawData", HdfUtil.truncPadNull( bytes, stgFieldLen));
-    }
-    else if (dtp == DTYPE_STRING_VAR) {
-      byte[] bytes = HdfUtil.encodeString(
-        (String) vdata, false, this);     // addNull = false
-      int gcolIx = gcol.putHeapItem("vlen string data", bytes);
-      fmtBuf.putBufInt("vlen len", bytes.length);
-      fmtBuf.putBufLong("vlen gcol addr", gcolAddr);
-      fmtBuf.putBufInt("vlen gcol ix", gcolIx);
-    }
-    else throwerr("dtp mismatch");
-  }
-
-  else if (vdata instanceof HdfGroup) {
-    // For object refs, data is:
-    //   addr of group header, 8 bytes.
-    // For region refs, data is:
-    //   globalHeapReference:
-    //     addr of globalHeap, 8 bytes
-    //     global heap index, 4 bytes
-    //   The object on the global heap is:
-    //     addr of group header, 8 bytes
-    //     some sort of info on type, dimension, start and end indices
-    long aval = ((HdfGroup) vdata).blkPosition;
-    fmtBuf.putBufLong("formatRawData", aval);
-    if (dtp == DTYPE_COMPOUND) {
-      fmtBuf.putBufInt("formatRawData ref ix", cntr.getValue());
-      cntr.increment();
-    }
-  }
-
-  else if (vdata instanceof byte[]) {
-    checkDtype( DTYPE_SFIXED08, DTYPE_UFIXED08, dtp);
-    byte[] avec = (byte[]) vdata;
-    if (hdfFile.bugs >= 2)
-      prtIndent("formatRawData byte vec len: " + avec.length);
-    for (int ii = 0; ii < avec.length; ii++) {
-      fmtBuf.putBufByte("formatRawData", 0xff & avec[ii]);
-    }
-    if (chnLens.length != 1) throwerr("bad chnLens");
-    for (int ii = 0; ii < chnLens[0] - avec.length; ii++) {
-      fmtBuf.putBufByte("formatRawData", 77);
-    }
-  }
-  else if (vdata instanceof short[]) {
-    checkDtype( DTYPE_FIXED16, dtp);
-    short[] avec = (short[]) vdata;
-    if (hdfFile.bugs >= 2)
-      prtIndent("formatRawData short vec len: " + avec.length);
-    for (int ii = 0; ii < avec.length; ii++) {
-      fmtBuf.putBufShort("formatRawData", 0xffff & avec[ii]);
-    }
-    if (chnLens.length != 1) throwerr("bad chnLens");
-    for (int ii = 0; ii < chnLens[0] - avec.length; ii++) {
-      fmtBuf.putBufShort("formatRawData", 7777);
-    }
-  }
-  else if (vdata instanceof int[]) {
-    checkDtype( DTYPE_FIXED32, dtp);
-    int[] avec = (int[]) vdata;
-    if (hdfFile.bugs >= 2)
-      prtIndent("formatRawData int vec len: " + avec.length);
-    for (int ii = 0; ii < avec.length; ii++) {
-      fmtBuf.putBufInt("formatRawData", avec[ii]);
-    }
-    if (chnLens.length != 1) throwerr("bad chnLens");
-    for (int ii = 0; ii < chnLens[0] - avec.length; ii++) {
-      fmtBuf.putBufInt("formatRawData", 7777);
-    }
-  }
-  else if (vdata instanceof long[]) {
-    checkDtype( DTYPE_FIXED64, dtp);
-    long[] avec = (long[]) vdata;
-    if (hdfFile.bugs >= 2)
-      prtIndent("formatRawData long vec len: " + avec.length);
-    for (int ii = 0; ii < avec.length; ii++) {
-      fmtBuf.putBufLong("formatRawData", avec[ii]);
-    }
-    if (chnLens.length != 1) throwerr("bad chnLens");
-    for (int ii = 0; ii < chnLens[0] - avec.length; ii++) {
-      fmtBuf.putBufLong("formatRawData", 7777);
-    }
-  }
-  else if (vdata instanceof float[]) {
-    checkDtype( DTYPE_FLOAT32, dtp);
-    float[] avec = (float[]) vdata;
-    if (hdfFile.bugs >= 2)
-      prtIndent("formatRawData float vec len: " + avec.length);
-    for (int ii = 0; ii < avec.length; ii++) {
-      fmtBuf.putBufFloat("formatRawData", avec[ii]);
-    }
-    if (chnLens.length != 1) throwerr("bad chnLens");
-    for (int ii = 0; ii < chnLens[0] - avec.length; ii++) {
-      fmtBuf.putBufFloat("formatRawData", 7777);
-    }
-  }
-  else if (vdata instanceof double[]) {
-    checkDtype( DTYPE_FLOAT64, dtp);
-    double[] avec = (double[]) vdata;
-    if (hdfFile.bugs >= 2)
-      prtIndent("formatRawData double vec len: " + avec.length);
-    for (int ii = 0; ii < avec.length; ii++) {
-      fmtBuf.putBufDouble("formatRawData", avec[ii]);
-    }
-    if (chnLens.length != 1) throwerr("bad chnLens");
-    for (int ii = 0; ii < chnLens[0] - avec.length; ii++) {
-      fmtBuf.putBufDouble("formatRawData", 7777);
-    }
-  }
-  else if (vdata instanceof char[]) {
-    // Normally we would handle character encoding by
-    // calling HdfUtil.encodeString.
-    // However the final length is fixed, so we must
-    // do 1 char -> 1 byte encoding.
-    checkDtype( DTYPE_STRING_FIX, dtp);
-    char[] avec = (char[]) vdata;
-    if (hdfFile.bugs >= 2)
-      prtIndent("formatRawData char vec len: " + avec.length);
-    for (int ii = 0; ii < avec.length; ii++) {
-      fmtBuf.putBufByte("formatRawData", 0xff & avec[ii]);
-    }
-    if (chnLens.length != 1) throwerr("bad chnLens");
-    for (int ii = 0; ii < chnLens[0] - avec.length; ii++) {
-      fmtBuf.putBufByte("formatRawData", 7777);
-    }
-  }
-  else throwerr("unknown raw data type.  class: " + vdata.getClass());
-
-  hdfFile.indent--;
-  if (hdfFile.bugs >= 2)
-    prtIndent("formatRawData exit:  groupName: " + groupName
-      + "  fmtBuf: " + fmtBuf);
-} // end FormatRawData
-
-
-
-
-
-
-//xxx
-void junkFormatRawDataNonLinear(
-  String msg,
-  int dtp,              // one of DTYPE_*
-  int stgFieldLen,      // used for DTYPE_STRING_FIX
+  int curLev,             // index into curIxs
+  int[] curIxs,           // current indices within current chunk
+  boolean useLinear,
+  int dtp,                // one of DTYPE_*
+  int stgFieldLen,        // used for DTYPE_STRING_FIX
   int[] varDims,
-  int[] chnLens, ///xxx ren to chunkDims, chnDims
+  int[] chunkDims,
   int[] dataDims,
+  int dataElementLen,
+  int[] startIxs,
   Object vdata,
-  HdfModInt cntr,       // used for the index of compound types
-  long gcolAddr,        // used for DTYPE_STRING_VAR
-  GlobalHeap gcol,      // used for DTYPE_STRING_VAR
-  HBuffer fmtBuf)       // output buffer
+  HdfModInt cntr,         // used for the index of DTYPE_COMPOUND
+  long gcolAddr,          // used for DTYPE_STRING_VAR
+  GlobalHeap gcol,        // used for DTYPE_STRING_VAR
+  HBuffer fmtBuf)         // output buffer
 throws HdfException
 {
   int rank = varDims.length;
   if (vdata == null) throwerr("vdata is null");
   if (hdfFile.bugs >= 2) {
-    prtIndent("formatRawDataNonLinear entry for: " + msg);
-    prtIndent("  rank: " + rank);
-    prtIndent("  varDims: " + HdfUtil.formatInts( varDims));
-    prtIndent("  chnLens: " + HdfUtil.formatInts( chnLens));
-    prtIndent("  dataDims: " + HdfUtil.formatInts( dataDims));
+    prtIndent("formatRawData entry for: " + msg);
+    prtIndent("  curLev: " + curLev);
+    prtIndent("  curIxs: " + HdfUtil.formatInts( curIxs));
+    prtIndent("  useLinear: " + useLinear);
     prtIndent("  dtp: " + dtypeNames[dtp]);
+    prtIndent("  stgFieldLen: " + stgFieldLen);
+    prtIndent("  varDims: " + HdfUtil.formatInts( varDims));
+    prtIndent("  chunkDims: " + HdfUtil.formatInts( chunkDims));
+    prtIndent("  dataDims: " + HdfUtil.formatInts( dataDims));
+    prtIndent("  dataElementLen: " + dataElementLen);
+    prtIndent("  startIxs: " + HdfUtil.formatInts( startIxs));
     prtIndent("  vdata class: " + vdata.getClass());
+    prtIndent("  cntr: " + cntr);
+    prtIndent("  rank: " + rank);
+
     Object tobj = vdata;
     while (tobj instanceof Object[] && ((Object[]) tobj).length > 0) {
       tobj = ((Object[]) tobj)[0];
@@ -1808,48 +1533,105 @@ throws HdfException
     }
     prtIndent("  fmtBuf: " + fmtBuf);
   }
+  if (startIxs == null) startIxs = new int[rank];
+
 
   // Insure all dimensions are valid
   for (int ii = 0; ii < rank; ii++) {
     if (varDims[ii] <= 0)
       throwerr("invalid varDims: " + HdfUtil.formatInts( varDims));
-    if (chnLens[ii] <= 0 || chnLens[ii] > varDims[ii])
-      throwerr("invalid chnLens: " + HdfUtil.formatInts( chnLens));
-    if (dataDims[ii] <= 0 || dataDims[ii] > chnLens[ii])
-      throwerr("invalid dataDims: " + HdfUtil.formatInts( dataDims));
-  }
-
-  // Must hande arrays of String or HdfGroup (references)
-  // by recursing, since they show up here as Object[]
-  // no matter how many dimensions they have ... even if it's Object[][][].
-
-  // xxx check this
-  if (vdata instanceof Object[]) {
-    Object[] vvec = (Object[]) vdata;
-    if (hdfFile.bugs >= 2)
-      prtIndent("recurse for Object[]");
-    int[] subVarDims = Arrays.copyOfRange( varDims, 1, varDims.length);
-    int[] subChnLens = Arrays.copyOfRange( chnLens, 1, chnLens.length);
-    int[] subDataDims = Arrays.copyOfRange( dataDims, 1, dataDims.length);
-    for (int ia = 0; ia < vvec.length; ia++) {
-      formatRawDataNonLinear(
-        msg,
-        dtp,              // one of DTYPE_*
-        stgFieldLen,      // used for DTYPE_STRING_FIX
-        subVarDims,       // varDims
-        subChnLens,       // chnLens, ///xxx ren to chunkDims, chnDims
-        subDataDims,      // dataDims,
-        vvec[ia],
-        cntr,             // used for the index of compound types
-        gcolAddr,         // used for DTYPE_STRING_VAR
-        gcol,             // used for DTYPE_STRING_VAR
-        fmtBuf);          // output buffer
+    if (chunkDims[ii] <= 0 || chunkDims[ii] > varDims[ii])
+      throwerr("invalid chunkDims: " + HdfUtil.formatInts( chunkDims));
+    if (curIxs[ii] < 0 || curIxs[ii] >= chunkDims[ii])
+      throwerr("invalid curIxs: " + HdfUtil.formatInts( curIxs));
+    if (useLinear) {
+      if (dataDims.length != 0 && dataDims.length != 1)
+        throwerr("useLinear but data rank not 0 or 1");
+    }
+    else {
+      if (dataDims[ii] <= 0 || dataDims[ii] > chunkDims[ii])
+        throwerr("invalid dataDims: " + HdfUtil.formatInts( dataDims));
     }
   }
 
 
+  // Init for useLinear.
+  // Usually
+  //   virtDataDims == dataDims == chunkDims.
+  // But at the edges of a volume we might have equality, as above, or
+  //   virtDataDims == dataDims < chunkDims.
+  // And for useLinear, we have dataDims.length == 1
+  // and virtDataDims is the n-dim virtual dimensions of vdata.
+  // and either virtDataDims == chunkDims or < chunkDims, as above.
+
+  int[] virtDataDims = null;
+  
+  
+
+  if (rank > 0) {
+
+    if (useLinear) {
+      int chunkVolume = 1;
+      int remVolume = 1;
+      for (int ii = 0; ii < rank; ii++) {
+        chunkVolume *= chunkDims[ii];
+        int remLen = Math.min( chunkDims[ii], varDims[ii] - startIxs[ii]);
+        remVolume *= remLen;
+      }
+      if (hdfFile.bugs >= 2) {
+        prtIndent("  chunkVolume: " + chunkVolume);
+        prtIndent("  remVolume: " + remVolume);
+      }
+
+      if (dataDims.length != 1) throwerr("invalid dataDims");
+      if (dataDims[0] == chunkVolume) {
+        virtDataDims = Arrays.copyOf( chunkDims, chunkDims.length);
+      }
+      else if (dataDims[0] == remVolume) {
+        virtDataDims = new int[rank];
+          for (int ii = 0; ii < rank; ii++) {
+          virtDataDims[ii] = Math.min(
+            chunkDims[ii], varDims[ii] - startIxs[ii]);
+        }
+      }
+      else throwerr("wrong linear len");
+    }
+    else {
+      virtDataDims = Arrays.copyOf( dataDims, dataDims.length);
+    }
+
+    if (hdfFile.bugs >= 2)
+      prtIndent("  virtDataDims: " + HdfUtil.formatInts( virtDataDims));
+  } // if rank >  0
+
+  // Special case for scalars and empty arrays
   if (rank == 0) {
-    if (vdata instanceof Byte) {
+    if (hdfFile.bugs >= 2) prtIndent("  Scalar or empty array");
+    else if (vdata instanceof byte[]) {
+      if (hdfFile.bugs >= 2) prtIndent("formatRawData: empty byte array");
+    }
+    else if (vdata instanceof short[]) {
+      if (hdfFile.bugs >= 2) prtIndent("formatRawData: empty short array");
+    }
+    else if (vdata instanceof int[]) {
+      if (hdfFile.bugs >= 2) prtIndent("formatRawData: empty int array");
+    }
+    else if (vdata instanceof long[]) {
+      if (hdfFile.bugs >= 2) prtIndent("formatRawData: empty long array");
+    }
+    else if (vdata instanceof float[]) {
+      if (hdfFile.bugs >= 2) prtIndent("formatRawData: empty float array");
+    }
+    else if (vdata instanceof double[]) {
+      if (hdfFile.bugs >= 2) prtIndent("formatRawData: empty double array");
+    }
+    else if (vdata instanceof String[]) {
+      if (hdfFile.bugs >= 2) prtIndent("formatRawData: empty String array");
+    }
+    else if (vdata instanceof HdfGroup[]) {
+      if (hdfFile.bugs >= 2) prtIndent("formatRawData: empty HdfGroup array");
+    }
+    else if (vdata instanceof Byte) {
       checkDtype( DTYPE_SFIXED08, DTYPE_UFIXED08, dtp);
       byte aval = ((Byte) vdata).byteValue();
       fmtBuf.putBufByte("formatRawData", aval);
@@ -1922,386 +1704,251 @@ throws HdfException
         cntr.increment();
       }
     }
+    else throwerr("unknown type: " + vdata.getClass());
   } // if rank == 0
 
-  else if (rank == 1) {
-    for (int ia = 0; ia < chnLens[0]; ia++) {
-      if (vdata instanceof byte[]) {
-        checkDtype( DTYPE_SFIXED08, DTYPE_UFIXED08, dtp);
-        if (ia < dataDims[0])
-          fmtBuf.putBufByte("formatRawVal", 0xff & ((byte[]) vdata)[ia]);
-        else fmtBuf.putBufByte("formatRawPad", 77);
+  // On each new level of recursion, set the next element of curIxs.
+  else if (curLev < rank - 1) {
+    for (int ii = 0; ii < chunkDims[curLev]; ii++) {
+      if (hdfFile.bugs >= 2) {
+        prtIndent("  curIxs loop.  curLev: " + curLev
+          + "  curIxs: " + curIxs[curLev]);
       }
-      else if (vdata instanceof short[]) {
-        checkDtype( DTYPE_FIXED16, dtp);
-        if (ia < dataDims[0])
-          fmtBuf.putBufShort("formatRawVal", ((short[]) vdata)[ia]);
-        else fmtBuf.putBufShort("formatRawPad", 7777);
-      }
-      else if (vdata instanceof int[]) {
-        checkDtype( DTYPE_FIXED32, dtp);
-        if (ia < dataDims[0])
-          fmtBuf.putBufInt("formatRawVal", ((int[]) vdata)[ia]);
-        else fmtBuf.putBufInt("formatRawPad", 7777);
-      }
-      else if (vdata instanceof float[]) {
-        checkDtype( DTYPE_FLOAT32, dtp);
-        if (ia < dataDims[0])
-          fmtBuf.putBufFloat("formatRawVal", ((float[]) vdata)[ia]);
-        else fmtBuf.putBufFloat("formatRawPad", 7777);
-      }
-      else if (vdata instanceof double[]) {
-        checkDtype( DTYPE_FLOAT64, dtp);
-        if (ia < dataDims[0])
-          fmtBuf.putBufDouble("formatRawVal", ((double[]) vdata)[ia]);
-        else fmtBuf.putBufDouble("formatRawPad", 7777);
-      }
-      else if (vdata instanceof HdfGroup[]) {
-        int[] fakeDims = new int[0];
-        formatRawDataNonLinear(
-          msg,
-          dtp,              // one of DTYPE_*
-          stgFieldLen,      // used for DTYPE_STRING_FIX
-          fakeDims,         // varDims
-          fakeDims,         // chnLens, ///xxx ren to chunkDims, chnDims
-          fakeDims,         // dataDims,
-          ((HdfGroup[]) vdata)[ia],
-          cntr,             // used for the index of compound types
-          gcolAddr,         // used for DTYPE_STRING_VAR
-          gcol,             // used for DTYPE_STRING_VAR
-          fmtBuf);          // output buffer
-      }
-      else if (vdata instanceof String[]
-        || vdata instanceof Object[])
+      curIxs[curLev] = ii;
+      if (hdfFile.bugs >= 2)
+        prtf("formatRawData: call recursion. old curLev: " + curLev
+          + "  ii: " + ii);
+      formatRawData(        // recursion with curLev + 1
+        msg,
+        curLev + 1,         // index into curIxs
+        curIxs,             // current indices within current chunk
+        useLinear,
+        dtp,                // one of DTYPE_*
+        stgFieldLen,        // used for DTYPE_STRING_FIX
+        varDims,
+        chunkDims,
+        dataDims,
+        dataElementLen,
+        startIxs,
+        vdata,
+        cntr,               // used for the index of DTYPE_COMPOUND
+        gcolAddr,           // used for DTYPE_STRING_VAR
+        gcol,               // used for DTYPE_STRING_VAR
+        fmtBuf);            // output buffer
+    }
+  }
+
+  // Here curLev == rank - 1
+  // and curIxs is complete except for the last dim.
+  else {
+    if (hdfFile.bugs >= 2) {
+      prtIndent("  curIxs are complete: " + HdfUtil.formatInts( curIxs));
+    }
+
+    boolean isAllPad = false;
+    for (int ii = 0; ii < rank - 1; ii++) {
+
+      // If data dim ii is too short
+      if (curIxs[ii] >= virtDataDims[ii]
+        && virtDataDims[ii] < chunkDims[ii])
       {
-        Object stgObj = ((Object[]) vdata)[ia];
-        if (! (stgObj instanceof String))
-          throwerr("unknown stgObj type: %s", stgObj.getClass());
-        int[] fakeDims = new int[0];
-        formatRawDataNonLinear(
-          msg,
-          dtp,              // one of DTYPE_*
-          stgFieldLen,      // used for DTYPE_STRING_FIX
-          fakeDims,         // varDims
-          fakeDims,         // chnLens, ///xxx ren to chunkDims, chnDims
-          fakeDims,         // dataDims,
-          stgObj,
-          cntr,             // used for the index of compound types
-          gcolAddr,         // used for DTYPE_STRING_VAR
-          gcol,             // used for DTYPE_STRING_VAR
-          fmtBuf);          // output buffer
+        // Insure we are at the last chunk in this dim
+        if (startIxs[ii] + virtDataDims[ii] != varDims[ii])
+          throwerr("virtDataDims error");
+        isAllPad = true;
+        if (hdfFile.bugs >= 2) {
+          prtIndent("  Set isAllPad: ii: " + ii
+            + "  curIxs: " + curIxs[ii]
+            + "  virtDataDims: " + virtDataDims[ii]);
+        }
+        break;
       }
-      else throwerr("unknown type for vdata: " + vdata.getClass());
-    } // for ia
-  } // if rank == 1
+    }
 
-  else if (rank == 2) {
-    for (int ia = 0; ia < chnLens[0]; ia++) {
-      for (int ib = 0; ib < chnLens[1]; ib++) {
-        if (vdata instanceof byte[][]) {
-          checkDtype( DTYPE_SFIXED08, DTYPE_UFIXED08, dtp);
-          if (ia < dataDims[0] && ib < dataDims[1])
-            fmtBuf.putBufByte("formatRawVal",
-              0xff & ((byte[][]) vdata)[ia][ib]);
-          else fmtBuf.putBufByte("formatRawPad", 77);
+    int padLen = 0;
+    int padEleLen = dataElementLen;
+    if (isAllPad) {
+      padLen = chunkDims[rank-1];
+      if (hdfFile.bugs >= 2) prtIndent("  all padLen: " + padLen);
+    }
+    else {
+      int writeLen = virtDataDims[rank-1];
+
+      padLen = chunkDims[rank-1] - writeLen;
+      if (hdfFile.bugs >= 2) {
+        prtIndent("  writeLen: " + writeLen);
+        prtIndent("  padLen: " + padLen);
+      }
+      if (padLen > 0) {
+        // Insure we are at the last chunk in this dim
+        if (startIxs[rank-1] + virtDataDims[rank-1] != varDims[rank-1])
+          throwerr("virtDataDims mismatch");
+      }
+
+      Object vdataOb = null;
+      int linearIx = 0;
+
+      if (useLinear) {
+        // Set prods[ii] = value of 1 unit change in this dimension
+        //               = product of all following dimension lens.
+        int[] prods = new int[ rank];
+        prods[rank-1] = 1;
+        for (int ii = rank-2; ii >= 0; ii--) {
+          int remLen = Math.min(
+            chunkDims[ii+1],
+            varDims[ii+1] - startIxs[ii+1]);
+          prods[ii] = remLen * prods[ii+1];
         }
-        else if (vdata instanceof short[][]) {
-          checkDtype( DTYPE_FIXED16, dtp);
-          if (ia < dataDims[0] && ib < dataDims[1])
-            fmtBuf.putBufShort("formatRawVal",
-              ((short[][]) vdata)[ia][ib]);
-          else fmtBuf.putBufShort("formatRawPad", 7777);
+        if (hdfFile.bugs >= 2)
+          prtIndent("  prods: " + HdfUtil.formatInts( prods));
+
+        // Find linearIx
+        linearIx = 0;
+        for (int ii = 0; ii < rank - 1; ii++) {
+          linearIx += curIxs[ii] * prods[ii];
         }
-        else if (vdata instanceof int[][]) {
-          checkDtype( DTYPE_FIXED32, dtp);
-          if (ia < dataDims[0] && ib < dataDims[1])
-            fmtBuf.putBufInt("formatRawVal",
-              ((int[][]) vdata)[ia][ib]);
-          else fmtBuf.putBufInt("formatRawPad", 7777);
+        if (hdfFile.bugs >= 2)
+          prtIndent("  linearIx: %d", linearIx);
+
+        vdataOb = vdata;
+      } // if useLinear
+
+      else {
+        // Set vdataOb = vdata [curIxs[0]] [curIxs[1]] ...
+        // to the penultimate dimension.
+        // So in the case where vdata is
+        // int[][] or int[][][] or int[][][][] or ...,
+        // we will set vdataOb to be the last int[].
+        vdataOb = vdata;
+        for (int ii = 0; ii < rank - 1; ii++) {
+          if (! (vdataOb instanceof Object[])) throwerr("wrong types");
+          Object[] objVec = (Object[]) vdataOb;
+          if (curIxs[ii] >= objVec.length) throwerr("dim err");
+          vdataOb = objVec[ curIxs[ii]];
         }
-        else if (vdata instanceof float[][]) {
-          checkDtype( DTYPE_FLOAT32, dtp);
-          if (ia < dataDims[0] && ib < dataDims[1])
-            fmtBuf.putBufFloat("formatRawVal",
-              ((float[][]) vdata)[ia][ib]);
-          else fmtBuf.putBufFloat("formatRawPad", 7777);
+        linearIx = 0;
+      } // else not useLinear
+
+
+      if (vdataOb instanceof byte[]) {
+        checkDtype( DTYPE_SFIXED08, DTYPE_UFIXED08, dtp);
+        byte[] avec = (byte[]) vdataOb;
+        if (hdfFile.bugs >= 2)
+          prtIndent("formatRawData linear byte vec len: " + avec.length);
+        for (int ii = 0; ii < writeLen; ii++) {
+          fmtBuf.putBufByte("formatRawData", 0xff & avec[ linearIx + ii]);
         }
-        else if (vdata instanceof double[][]) {
-          checkDtype( DTYPE_FLOAT64, dtp);
-          if (ia < dataDims[0] && ib < dataDims[1])
-            fmtBuf.putBufDouble("formatRawVal",
-              ((double[][]) vdata)[ia][ib]);
-          else fmtBuf.putBufDouble("formatRawPad", 7777);
+      }
+      else if (vdataOb instanceof short[]) {
+        checkDtype( DTYPE_FIXED16, dtp);
+        short[] avec = (short[]) vdataOb;
+        if (hdfFile.bugs >= 2)
+          prtIndent("formatRawData linear short vec len: " + avec.length);
+        for (int ii = 0; ii < writeLen; ii++) {
+          fmtBuf.putBufShort("formatRawData", avec[ linearIx + ii]);
         }
-        else if (vdata instanceof String[][]
-          || vdata instanceof Object[][])
-        {
-          Object stgObj = ((Object[][]) vdata)[ia][ib];
-          if (! (stgObj instanceof String))
-            throwerr("unknown stgObj type: %s", stgObj.getClass());
-          int[] fakeDims = new int[0];
-          formatRawDataNonLinear(
-            msg,
-            dtp,              // one of DTYPE_*
-            stgFieldLen,      // used for DTYPE_STRING_FIX
-            fakeDims,         // varDims
-            fakeDims,         // chnLens, ///xxx ren to chunkDims, chnDims
-            fakeDims,         // dataDims,
-            stgObj,
-            cntr,             // used for the index of compound types
-            gcolAddr,         // used for DTYPE_STRING_VAR
-            gcol,             // used for DTYPE_STRING_VAR
-            fmtBuf);          // output buffer
+      }
+      else if (vdataOb instanceof int[]) {
+        checkDtype( DTYPE_FIXED32, dtp);
+        int[] avec = (int[]) vdataOb;
+        if (hdfFile.bugs >= 2)
+          prtIndent("formatRawData linear int vec len: " + avec.length);
+        for (int ii = 0; ii < writeLen; ii++) {
+          fmtBuf.putBufInt("formatRawData", avec[ linearIx + ii]);
         }
-        else throwerr("unknown type for vdata: " + vdata.getClass());
-      } // for ib
-    } // for ia
-  } // if rank == 2
+      }
+      else if (vdataOb instanceof long[]) {
+        checkDtype( DTYPE_FIXED64, dtp);
+        long[] avec = (long[]) vdataOb;
+        if (hdfFile.bugs >= 2)
+          prtIndent("formatRawData linear long vec len: " + avec.length);
+        for (int ii = 0; ii < writeLen; ii++) {
+          fmtBuf.putBufLong("formatRawData", avec[ linearIx + ii]);
+        }
+      }
+      else if (vdataOb instanceof float[]) {
+        checkDtype( DTYPE_FLOAT32, dtp);
+        float[] avec = (float[]) vdataOb;
+        if (hdfFile.bugs >= 2)
+          prtIndent("formatRawData linear float vec len: " + avec.length);
+        for (int ii = 0; ii < writeLen; ii++) {
+          fmtBuf.putBufFloat("formatRawData", avec[ linearIx + ii]);
+        }
+      }
+      else if (vdataOb instanceof double[]) {
+        checkDtype( DTYPE_FLOAT64, dtp);
+        double[] avec = (double[]) vdataOb;
+        if (hdfFile.bugs >= 2)
+          prtIndent("formatRawData linear double vec len: " + avec.length);
+        for (int ii = 0; ii < writeLen; ii++) {
+          fmtBuf.putBufDouble("formatRawData", avec[ linearIx + ii]);
+        }
+      }
 
-  else if (rank == 3) {
-    for (int ia = 0; ia < chnLens[0]; ia++) {
-      for (int ib = 0; ib < chnLens[1]; ib++) {
-        for (int ic = 0; ic < chnLens[2]; ic++) {
-          if (vdata instanceof byte[][][]) {
-            checkDtype( DTYPE_SFIXED08, DTYPE_UFIXED08, dtp);
-            if (ia < dataDims[0] && ib < dataDims[1] && ic < dataDims[2])
-              fmtBuf.putBufByte("formatRawVal",
-                0xff & ((byte[][][]) vdata)[ia][ib][ic]);
-            else fmtBuf.putBufByte("formatRawPad", 77);
+      else if ((vdataOb instanceof String[])
+        || (vdataOb instanceof Object[])
+          && (((Object[]) vdataOb)[0] instanceof String))
+      {
+        checkDtype( DTYPE_STRING_FIX, DTYPE_STRING_VAR, dtp);
+        for (Object aobj : (Object[]) vdataOb) {
+          String aval = (String) aobj;
+          if (dtp == DTYPE_STRING_FIX) {
+            byte[] bytes = HdfUtil.encodeString( aval, false, this);
+            fmtBuf.putBufBytes(
+              "formatRawData", HdfUtil.truncPadNull( bytes, stgFieldLen));
           }
-          else if (vdata instanceof short[][][]) {
-            checkDtype( DTYPE_FIXED16, dtp);
-            if (ia < dataDims[0] && ib < dataDims[1] && ic < dataDims[2])
-              fmtBuf.putBufShort("formatRawVal",
-                ((short[][][]) vdata)[ia][ib][ic]);
-            else fmtBuf.putBufShort("formatRawPad", 7777);
+          else if (dtp == DTYPE_STRING_VAR) {
+            byte[] bytes = HdfUtil.encodeString(
+              (String) aval, false, this);     // addNull = false
+            int gcolIx = gcol.putHeapItem("vlen string data", bytes);
+            fmtBuf.putBufInt("vlen len", bytes.length);
+            fmtBuf.putBufLong("vlen gcol addr", gcolAddr);
+            fmtBuf.putBufInt("vlen gcol ix", gcolIx);
+            padEleLen = 4 + 8 + 4;  // int, long, int
           }
-          else if (vdata instanceof int[][][]) {
-            checkDtype( DTYPE_FIXED32, dtp);
-            if (ia < dataDims[0] && ib < dataDims[1] && ic < dataDims[2])
-              fmtBuf.putBufInt("formatRawVal",
-                ((int[][][]) vdata)[ia][ib][ic]);
-            else fmtBuf.putBufInt("formatRawPad", 7777);
+          else throwerr("dtp mismatch");
+        }
+      }
+
+      else if (vdataOb instanceof HdfGroup[]) {
+        for (HdfGroup grp : (HdfGroup[]) vdataOb) {
+          long aval = grp.blkPosition;
+          fmtBuf.putBufLong("formatRawData", aval);
+          if (dtp == DTYPE_COMPOUND) {
+            fmtBuf.putBufInt("formatRawData ref ix", cntr.getValue());
+            cntr.increment();
           }
-          else if (vdata instanceof float[][][]) {
-            checkDtype( DTYPE_FLOAT32, dtp);
-            if (ia < dataDims[0] && ib < dataDims[1] && ic < dataDims[2])
-              fmtBuf.putBufFloat("formatRawVal",
-                ((float[][][]) vdata)[ia][ib][ic]);
-            else fmtBuf.putBufFloat("formatRawPad", 7777);
-          }
-          else if (vdata instanceof double[][][]) {
-            checkDtype( DTYPE_FLOAT64, dtp);
-            if (ia < dataDims[0] && ib < dataDims[1] && ic < dataDims[2])
-              fmtBuf.putBufDouble("formatRawVal",
-                ((double[][][]) vdata)[ia][ib][ic]);
-            else fmtBuf.putBufDouble("formatRawPad", 7777);
-          }
-          else if (vdata instanceof String[][][]
-            || vdata instanceof Object[][][])
-          {
-            Object stgObj = ((Object[][][]) vdata)[ia][ib][ic];
-            if (! (stgObj instanceof String))
-              throwerr("unknown stgObj type: %s", stgObj.getClass());
-            int[] fakeDims = new int[0];
-            formatRawDataNonLinear(
-              msg,
-              dtp,              // one of DTYPE_*
-              stgFieldLen,      // used for DTYPE_STRING_FIX
-              fakeDims,         // varDims
-              fakeDims,         // chnLens, ///xxx ren to chunkDims, chnDims
-              fakeDims,         // dataDims,
-              stgObj,
-              cntr,             // used for the index of compound types
-              gcolAddr,         // used for DTYPE_STRING_VAR
-              gcol,             // used for DTYPE_STRING_VAR
-              fmtBuf);          // output buffer
-          }
-          else throwerr("unknown type for vdata: " + vdata.getClass());
-        } // for ic
-      } // for ib
-    } // for ia
-  } // if rank == 3
+        }
+      }
 
-  else if (rank == 4) {
-    for (int ia = 0; ia < chnLens[0]; ia++) {
-      for (int ib = 0; ib < chnLens[1]; ib++) {
-        for (int ic = 0; ic < chnLens[2]; ic++) {
-          for (int id = 0; id < chnLens[3]; id++) {
-            if (vdata instanceof byte[][][][]) {
-              checkDtype( DTYPE_SFIXED08, DTYPE_UFIXED08, dtp);
-              if (ia < dataDims[0] && ib < dataDims[1] && ic < dataDims[2]
-                && id < dataDims[3])
-              {
-                fmtBuf.putBufByte("formatRawVal",
-                  0xff & ((byte[][][][]) vdata)[ia][ib][ic][id]);
-              }
-              else fmtBuf.putBufByte("formatRawPad", 77);
-            }
-            else if (vdata instanceof short[][][][]) {
-              checkDtype( DTYPE_FIXED16, dtp);
-              if (ia < dataDims[0] && ib < dataDims[1] && ic < dataDims[2]
-                && id < dataDims[3])
-              {
-                fmtBuf.putBufShort("formatRawVal",
-                  ((short[][][][]) vdata)[ia][ib][ic][id]);
-              }
-              else fmtBuf.putBufShort("formatRawPad", 7777);
-            }
-            else if (vdata instanceof int[][][][]) {
-              checkDtype( DTYPE_FIXED32, dtp);
-              if (ia < dataDims[0] && ib < dataDims[1] && ic < dataDims[2]
-                && id < dataDims[3])
-              {
-                fmtBuf.putBufInt("formatRawVal",
-                  ((int[][][][]) vdata)[ia][ib][ic][id]);
-              }
-              else fmtBuf.putBufInt("formatRawPad", 7777);
-            }
-            else if (vdata instanceof float[][][][]) {
-              checkDtype( DTYPE_FLOAT32, dtp);
-              if (ia < dataDims[0] && ib < dataDims[1] && ic < dataDims[2]
-                && id < dataDims[3])
-              {
-                fmtBuf.putBufFloat("formatRawVal",
-                  ((float[][][][]) vdata)[ia][ib][ic][id]);
-              }
-              else fmtBuf.putBufFloat("formatRawPad", 7777);
-            }
-            else if (vdata instanceof double[][][][]) {
-              checkDtype( DTYPE_FLOAT64, dtp);
-              if (ia < dataDims[0] && ib < dataDims[1] && ic < dataDims[2]
-                && id < dataDims[3])
-              {
-                fmtBuf.putBufDouble("formatRawVal",
-                  ((double[][][][]) vdata)[ia][ib][ic][id]);
-              }
-              else fmtBuf.putBufDouble("formatRawPad", 7777);
-            }
-            else if (vdata instanceof String[][][][]
-              || vdata instanceof Object[][][][])
-            {
-              Object stgObj = ((Object[][][][]) vdata)[ia][ib][ic][id];
-              if (! (stgObj instanceof String))
-                throwerr("unknown stgObj type: %s", stgObj.getClass());
-              int[] fakeDims = new int[0];
-              formatRawDataNonLinear(
-                msg,
-                dtp,              // one of DTYPE_*
-                stgFieldLen,      // used for DTYPE_STRING_FIX
-                fakeDims,         // varDims
-                fakeDims,         // chnLens, ///xxx ren to chunkDims, chnDims
-                fakeDims,         // dataDims,
-                stgObj,
-                cntr,             // used for the index of compound types
-                gcolAddr,         // used for DTYPE_STRING_VAR
-                gcol,             // used for DTYPE_STRING_VAR
-                fmtBuf);          // output buffer
-            }
-            else throwerr("unknown type for vdata: " + vdata.getClass());
-          } // for id
-        } // for ic
-      } // for ib
-    } // for ia
-  } // if rank == 4
-
-  else if (rank == 5) {
-    for (int ia = 0; ia < chnLens[0]; ia++) {
-      for (int ib = 0; ib < chnLens[1]; ib++) {
-        for (int ic = 0; ic < chnLens[2]; ic++) {
-          for (int id = 0; id < chnLens[3]; id++) {
-            for (int ie = 0; ie < chnLens[4]; ie++) {
-              if (vdata instanceof byte[][][][][]) {
-                checkDtype( DTYPE_SFIXED08, DTYPE_UFIXED08, dtp);
-                if (ia < dataDims[0] && ib < dataDims[1] && ic < dataDims[2]
-                  && id < dataDims[3] && ie < dataDims[4])
-                {
-                  fmtBuf.putBufByte("formatRawVal",
-                    0xff & ((byte[][][][][]) vdata)[ia][ib][ic][id][ie]);
-                }
-                else fmtBuf.putBufByte("formatRawPad", 77);
-              }
-              else if (vdata instanceof short[][][][][]) {
-                checkDtype( DTYPE_FIXED16, dtp);
-                if (ia < dataDims[0] && ib < dataDims[1] && ic < dataDims[2]
-                  && id < dataDims[3] && ie < dataDims[4])
-                {
-                  fmtBuf.putBufShort("formatRawVal",
-                    ((short[][][][][]) vdata)[ia][ib][ic][id][ie]);
-                }
-                else fmtBuf.putBufShort("formatRawPad", 7777);
-              }
-              else if (vdata instanceof int[][][][][]) {
-                checkDtype( DTYPE_FIXED32, dtp);
-                if (ia < dataDims[0] && ib < dataDims[1] && ic < dataDims[2]
-                  && id < dataDims[3] && ie < dataDims[4])
-                {
-                  fmtBuf.putBufInt("formatRawVal",
-                    ((int[][][][][]) vdata)[ia][ib][ic][id][ie]);
-                }
-                else fmtBuf.putBufInt("formatRawPad", 7777);
-              }
-              else if (vdata instanceof float[][][][][]) {
-                checkDtype( DTYPE_FLOAT32, dtp);
-                if (ia < dataDims[0] && ib < dataDims[1] && ic < dataDims[2]
-                  && id < dataDims[3] && ie < dataDims[4])
-                {
-                  fmtBuf.putBufFloat("formatRawVal",
-                    ((float[][][][][]) vdata)[ia][ib][ic][id][ie]);
-                }
-                else fmtBuf.putBufFloat("formatRawPad", 7777);
-              }
-              else if (vdata instanceof double[][][][][]) {
-                checkDtype( DTYPE_FLOAT64, dtp);
-                if (ia < dataDims[0] && ib < dataDims[1] && ic < dataDims[2]
-                  && id < dataDims[3] && ie < dataDims[4])
-                {
-                  fmtBuf.putBufDouble("formatRawVal",
-                    ((double[][][][][]) vdata)[ia][ib][ic][id][ie]);
-                }
-                else fmtBuf.putBufDouble("formatRawPad", 7777);
-              }
-              else if (vdata instanceof String[][][][][]
-                || vdata instanceof Object[][][][][])
-              {
-                Object stgObj = ((Object[][][][][]) vdata)[ia][ib][ic][id][ie];
-                if (! (stgObj instanceof String))
-                  throwerr("unknown stgObj type: %s", stgObj.getClass());
-                int[] fakeDims = new int[0];
-                formatRawDataNonLinear(
-                  msg,
-                  dtp,              // one of DTYPE_*
-                  stgFieldLen,      // used for DTYPE_STRING_FIX
-                  fakeDims,         // varDims
-                  fakeDims,         // chnLens, ///xxx ren to chunkDims, chnDims
-                  fakeDims,         // dataDims,
-                  stgObj,
-                  cntr,             // used for the index of compound types
-                  gcolAddr,         // used for DTYPE_STRING_VAR
-                  gcol,             // used for DTYPE_STRING_VAR
-                  fmtBuf);          // output buffer
-              }
-              else throwerr("unknown type for vdata: " + vdata.getClass());
-            } // for ie
-          } // for id
-        } // for ic
-      } // for ib
-    } // for ia
-  } // if rank == 5
+      else throwerr("unknown type: " + vdataOb.getClass());
+    } // else not isAllPad
 
 
-
-  // xxx debug
-} // end junkFormatRawDataNonLinear
-
+    // Write the pad, if any.
+    if (padLen > 0) {
 
 
+      if (dtp == DTYPE_STRING_FIX || dtp == DTYPE_STRING_VAR) {
+        byte[] bytes = new byte[0];
+        for (int ii = 0; ii < padLen; ii++) {
+          int gcolIx = gcol.putHeapItem("vlen string data", bytes);
+          fmtBuf.putBufInt("vlen len", bytes.length);
+          fmtBuf.putBufLong("vlen gcol addr", gcolAddr);
+          fmtBuf.putBufInt("vlen gcol ix", gcolIx);
+        }
+      }
+      else {
+        // Write padLen elements, each padEleLen long
+        for (int ii = 0; ii < padLen * padEleLen; ii++) {
+          fmtBuf.putBufByte("formatRawData.pad", 0x77);
+        }
+      }
+    }
 
+  } // else curIxs is complete
 
-
-
-
-
+} // end formatRawData
 
 
 
@@ -2381,7 +2028,7 @@ throws HdfException
     else if (vrow instanceof float[]) ncol = ((float[]) vrow).length;
     else if (vrow instanceof double[]) ncol = ((double[]) vrow).length;
     else if (vrow instanceof char[]) ncol = ((char[]) vrow).length;
-    else throwerr("unknown vlen type");
+    else throwerr("unknown vrow type: " + vrow.getClass());
 
     // Format numVal, global heap ID
     fmtBuf.putBufInt("vlen.ncol", ncol);

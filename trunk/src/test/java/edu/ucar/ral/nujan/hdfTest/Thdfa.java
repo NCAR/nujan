@@ -31,9 +31,10 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.SimpleTimeZone;
 
+import edu.ucar.ral.nujan.hdf.HdfException;
 import edu.ucar.ral.nujan.hdf.HdfFileWriter;
 import edu.ucar.ral.nujan.hdf.HdfGroup;
-import edu.ucar.ral.nujan.hdf.HdfException;
+import edu.ucar.ral.nujan.hdf.HdfUtil;
 
 
 /**
@@ -50,6 +51,7 @@ static void badparms( String msg) {
   prtf("Error: %s", msg);
   prtf("parms:");
   prtf("  -bugs         <int>");
+  prtf("  -useLinear    false/true");
   prtf("  -dtype        one of: fixed08 ufixed08 fixed16/32/64");
   prtf("                        float32/64");
   prtf("                        stringN vstring");
@@ -58,6 +60,7 @@ static void badparms( String msg) {
   prtf("                        reference compound");
   prtf("  -dims         <int,int,...>   or \"scalar\" if a scalar");
   prtf("  -chunks       <int,int,...>   or \"contiguous\" if contiguous");
+  prtf("  -useSmall     true/false: if true use small chunks on edges");
   prtf("  -compress     compression level: 0==none, 1 - 9");
   prtf("  -utcModTime   either yyyy-mm-dd or yyyy-mm-ddThh:mm:ss");
   prtf("                or 0, meaning use the current time");
@@ -84,11 +87,13 @@ static void runit( String[] args)
 throws HdfException
 {
   int bugs = -1;
+  boolean useLinear = false;
   int dtype = -1;
   int stgFieldLen = 0;
   int[] dims = null;
   int[] chunks = null;
   String chunkedStg = null;
+  boolean useSmall = false;
   int compressLevel = -1;
   long utcModTime = -1;
   String outFile = null;
@@ -98,6 +103,11 @@ throws HdfException
     String key = args[iarg];
     String val = args[iarg+1];
     if (key.equals("-bugs")) bugs = Integer.parseInt( val);
+    else if (key.equals("-useLinear")) {
+      if (val.equals("false")) useLinear = false;
+      else if (val.equals("true")) useLinear = true;
+      else badparms("unknown useLinear: " + val);
+    }
     else if (key.equals("-dtype")) {
       if (val.equals("sfixed08")) dtype = HdfGroup.DTYPE_SFIXED08;
       else if (val.equals("ufixed08")) dtype = HdfGroup.DTYPE_UFIXED08;
@@ -124,6 +134,11 @@ throws HdfException
     else if (key.equals("-chunks")) {
       if (val.equals("contiguous")) chunks = new int[0];
       else chunks = parseInts("chunk length", val);
+    }
+    else if (key.equals("-useSmall")) {
+      if (val.equals("false")) useSmall = false;
+      else if (val.equals("true")) useSmall = true;
+      else badparms("unknown useSmall: " + val);
     }
     else if (key.equals("-compress")) compressLevel = Integer.parseInt( val);
     else if (key.equals("-utcModTime")) {
@@ -204,7 +219,22 @@ throws HdfException
   int numVar = 2;
   HdfGroup[] testVars = new HdfGroup[ numVar];
   Object allData = GenData.genHdfData(
-    dtype, stgFieldLen, rootGroup, dims, 0);
+    useLinear,
+    dtype,
+    stgFieldLen,
+    rootGroup,
+    dims,
+    0);                       // ival origin
+  Object attrData = GenData.genHdfData(
+    false,         // useLinear: attrs never use linear, because they
+                   // take the definition from the data shape
+    dtype,
+    stgFieldLen,
+    rootGroup,
+    dims,
+    0);                       // ival origin
+  prtf("Thdfa: allData class: %s", allData.getClass());
+  prtf("Thdfa: allData:\n%s", HdfUtil.formatObject( allData));
   for (int ivar = 0; ivar < numVar; ivar++) {
     testVars[ivar] = testDefineVariable(
       compressLevel,
@@ -216,6 +246,7 @@ throws HdfException
       dims,
       chunks,
       allData,
+      attrData,
       fillValue);
   }
 
@@ -229,7 +260,7 @@ throws HdfException
       testVars[ivar].writeData(
         null,          // startIxs
         allData,
-        false);        // useLinear
+        useLinear);
     }
 
     else {             // else use chunks
@@ -238,84 +269,36 @@ throws HdfException
       while (! allDone) {
 
         // Chunks at the edge may be partially valid
-        int[] validDims = new int[rank];
-        for (int ii = 0; ii < rank; ii++) {
-          validDims[ii] = Math.min( chunks[ii], dims[ii] - startIxs[ii]);
+        int[] validDims = null;
+        if (useSmall) {
+          validDims = new int[rank];
+          for (int ii = 0; ii < rank; ii++) {
+            validDims[ii] = Math.min( chunks[ii], dims[ii] - startIxs[ii]);
+          }
+        }
+        else validDims = chunks;
+
+        int origin = 0;
+        int dprod = 1;
+        for (int ii = rank - 1; ii >= 0; ii--) {
+          origin += startIxs[ii] * dprod;
+          dprod *= 10;
         }
 
-        Object chunkData = null;
-        if (rank == 0) throwerr("Thdfa: chunking not ok for scalars");
-        if (dtype == HdfGroup.DTYPE_FLOAT32) {
-          float fillValueFloat = 0;
-          if (fillValue != null)
-            fillValueFloat = ((Float) fillValue).floatValue();
-
-          if (rank == 1) {
-            float[] vals = new float[ chunks[0]];
-            for (int ia = 0; ia < chunks[0]; ia++) {
-              float val = fillValueFloat;
-              if (ia < validDims[0])
-                val = startIxs[0] + ia;
-              vals[ia] = val;
-            }
-            chunkData = vals;
-          }
-          else if (rank == 2) {
-            float[][] vals = new float[ chunks[0]][ chunks[1]];
-            for (int ia = 0; ia < chunks[0]; ia++) {
-              for (int ib = 0; ib < chunks[1]; ib++) {
-                float val = fillValueFloat;
-                if (ia < validDims[0]
-                  && ib < validDims[1])
-                {
-                  val = 10 * (startIxs[0] + ia) + startIxs[1] + ib;
-                }
-                vals[ia][ib] = val;
-              }
-            }
-            chunkData = vals;
-          }
-          else if (rank == 3) {
-            float[][][] vals = new float[ chunks[0]][ chunks[1]][ chunks[2]];
-            for (int ia = 0; ia < chunks[0]; ia++) {
-              for (int ib = 0; ib < chunks[1]; ib++) {
-                for (int ic = 0; ic < chunks[2]; ic++) {
-                  float val = fillValueFloat;
-                  if (ia < validDims[0]
-                    && ib < validDims[1]
-                    && ic < validDims[2])
-                  {
-                    val =
-                      100 * (startIxs[0] + ia)
-                      + 10 * (startIxs[1] + ib)
-                      + startIxs[2] + ic;
-                  }
-                  vals[ia][ib][ic] = val;
-                }
-              }
-            }
-            chunkData = vals;
-          }
-
-          // Tests for chunk lens < dims not ok for higher ranks
-          else {
-            if (! testEqualInts( dims, chunks))
-              throwerr("Thdfa: chunks < dims not ok for higher ranks");
-            chunkData = allData;
-          }
-        } // if dtype == HdfGroup.DTYPE_FLOAT32
-
-        // Tests for chunk lens < dims not ok for other types
-        else {
-          if (! testEqualInts( dims, chunks))
-            throwerr("Thdfa: chunks < dims not ok for other types");
-          chunkData = allData;
-        }
+        Object chunkData = GenData.genHdfData(
+          useLinear,
+          dtype,
+          stgFieldLen,
+          rootGroup,
+          validDims,
+          origin);                       // ival origin
+        prtf("Thdfa: chunkData class: %s", chunkData.getClass());
+        prtf("Thdfa: chunkData:\n%s", HdfUtil.formatObject( chunkData));
 
         testVars[ivar].writeData(
           startIxs,
           chunkData,
-          false);      // useLinear
+          useLinear);
 
         // Increment startIxs
         for (int ii = rank - 1; ii >= 0; ii--) {
@@ -350,6 +333,7 @@ static HdfGroup testDefineVariable(
   int[] dims,             // varDims
   int[] chunks,           // chunkLens.  May be null.
   Object allData,
+  Object attrData,
   Object fillValue)
 throws HdfException
 {
@@ -371,7 +355,7 @@ throws HdfException
         String.format("testAttr%04d", ii),   // attrName
         dtype,
         stgFieldLen,
-        allData,
+        attrData,
         false);             // isVlen
     }
 
