@@ -48,7 +48,7 @@ public class GenData {
 
 public static Object genHdfData(
   boolean useLinear,
-  int dtype,
+  int dtype,                // one of HdfGroup.DTYPE_*
   int stgFieldLen,
   HdfGroup refGroup,        // group to use for references
   int[] dims,
@@ -62,50 +62,78 @@ throws HdfException
     dims,
     ival);           // origin 0.  e.g. 1000*ia + 100*ib + 10*ic + id
 
-  if (useLinear) {
-    int dprod = 1;
-    for (int dim : dims) {
-      dprod *= dim;
-    }
-
-    Object linData = null;
-    if (dtype == HdfGroup.DTYPE_FLOAT32) linData = new float[dprod];
-    else if (dtype == HdfGroup.DTYPE_STRING_VAR) linData = new String[dprod];
-    else throwerr("unsupported dtype: " + HdfGroup.dtypeNames[dtype]);
-
-    int rank = dims.length;
-    int[] curIxs = new int[rank];
-    int curLevel = 0;
-    int linIx = 0;
-    linIx = appendLinear( curLevel, curIxs, dims, vdata, linIx, linData);
-    if (linIx != dprod) throwerr("linIx mismatch");
-    vdata = linData;
-  }
+  if (useLinear) vdata = mkLinear( dtype, dims, vdata);
 
   return vdata;
 }
 
 
 
+
+
+
+
+public static Object mkLinear(
+  int dtype,
+  int[] dims,
+  Object vdata)
+throws HdfException
+{
+
+  int dprod = 1;
+  for (int dim : dims) {
+    dprod *= dim;
+  }
+
+  Object linData = null;
+  if (dtype == HdfGroup.DTYPE_UFIXED08) linData = new byte[dprod];
+  else if (dtype == HdfGroup.DTYPE_SFIXED08) linData = new byte[dprod];
+  else if (dtype == HdfGroup.DTYPE_FIXED16) linData = new short[dprod];
+  else if (dtype == HdfGroup.DTYPE_FIXED32) linData = new int[dprod];
+  else if (dtype == HdfGroup.DTYPE_FIXED64) linData = new long[dprod];
+  else if (dtype == HdfGroup.DTYPE_FLOAT32) linData = new float[dprod];
+  else if (dtype == HdfGroup.DTYPE_FLOAT64) linData = new double[dprod];
+  else if (dtype == HdfGroup.DTYPE_STRING_VAR) linData = new String[dprod];
+  else throwerr("unsupported dtype: " + HdfGroup.dtypeNames[dtype]);
+
+  int rank = dims.length;
+  int[] curIxs = new int[rank];
+  int curLevel = 0;
+  int linIx = 0;
+  linIx = appendLinear( curLevel, curIxs, vdata, linIx, linData);
+  if (linIx != dprod) throwerr("linIx mismatch");
+  return linData;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 private static int appendLinear(
   int curLevel,
   int[] curIxs,
-  int[] dims,
   Object vdata,
   int linIx,
   Object linData)
 throws HdfException
 {
-  int rank = dims.length;
+  int rank = curIxs.length;
   if (curLevel < rank - 1) {
     if (! (vdata instanceof Object[])) throwerr("wrong type");
     Object[] objVec = (Object[]) vdata;
-    for (int ii = 0; ii < dims[curLevel]; ii++) {
+    for (int ii = 0; ii < objVec.length; ii++) {
       curIxs[curLevel] = ii;
       linIx = appendLinear(                  // recursion
         curLevel + 1,
         curIxs,
-        dims,
         objVec[ii],
         linIx,
         linData);
@@ -113,10 +141,50 @@ throws HdfException
   }
 
   else {
-    if (vdata instanceof float[]) {
+    if (vdata instanceof byte[]) {
+      if (! (linData instanceof byte[])) throwerr("type mismatch");
+      byte[] vvec = (byte[]) vdata;
+      byte[] lvec = (byte[]) linData;
+      for (int ii = 0; ii < vvec.length; ii++) {
+        lvec[linIx++] = vvec[ii];
+      }
+    }
+    else if (vdata instanceof short[]) {
+      if (! (linData instanceof short[])) throwerr("type mismatch");
+      short[] vvec = (short[]) vdata;
+      short[] lvec = (short[]) linData;
+      for (int ii = 0; ii < vvec.length; ii++) {
+        lvec[linIx++] = vvec[ii];
+      }
+    }
+    else if (vdata instanceof int[]) {
+      if (! (linData instanceof int[])) throwerr("type mismatch");
+      int[] vvec = (int[]) vdata;
+      int[] lvec = (int[]) linData;
+      for (int ii = 0; ii < vvec.length; ii++) {
+        lvec[linIx++] = vvec[ii];
+      }
+    }
+    else if (vdata instanceof long[]) {
+      if (! (linData instanceof long[])) throwerr("type mismatch");
+      long[] vvec = (long[]) vdata;
+      long[] lvec = (long[]) linData;
+      for (int ii = 0; ii < vvec.length; ii++) {
+        lvec[linIx++] = vvec[ii];
+      }
+    }
+    else if (vdata instanceof float[]) {
       if (! (linData instanceof float[])) throwerr("type mismatch");
       float[] vvec = (float[]) vdata;
       float[] lvec = (float[]) linData;
+      for (int ii = 0; ii < vvec.length; ii++) {
+        lvec[linIx++] = vvec[ii];
+      }
+    }
+    else if (vdata instanceof double[]) {
+      if (! (linData instanceof double[])) throwerr("type mismatch");
+      double[] vvec = (double[]) vdata;
+      double[] lvec = (double[]) linData;
       for (int ii = 0; ii < vvec.length; ii++) {
         lvec[linIx++] = vvec[ii];
       }
@@ -154,6 +222,7 @@ throws HdfException
   Object vdata = null;
 
   if (dims.length == 0) {
+    ival = 100;                                // force scalers to be 100
     if (dtype == HdfGroup.DTYPE_SFIXED08
       || dtype == HdfGroup.DTYPE_UFIXED08)
     {
@@ -177,7 +246,7 @@ throws HdfException
     }
     else if (dtype == HdfGroup.DTYPE_STRING_VAR) {
       if (stgFieldLen != 0) throwerr("stgFieldLen != 0");
-      vdata = "" + ival + alphabet.substring( 0, ival % 4);
+      vdata = "abc";
     }
     else if (dtype == HdfGroup.DTYPE_REFERENCE
       || dtype == HdfGroup.DTYPE_COMPOUND)
@@ -185,7 +254,7 @@ throws HdfException
       vdata = refGroup;
     }
     else throwerr("unsupported dtype: " + HdfGroup.dtypeNames[dtype]);
-  }
+  } // if scalar
 
   else if (dims.length == 1
     && dtype != HdfGroup.DTYPE_REFERENCE
@@ -194,13 +263,9 @@ throws HdfException
     if (dtype == HdfGroup.DTYPE_SFIXED08
       || dtype == HdfGroup.DTYPE_UFIXED08)
     {
-      // Special case: must avoid fillValue
-      Object fillObj = genFillValue( dtype, stgFieldLen);
-      byte fillValue = ((Byte) fillObj).byteValue();
       byte[] vals = new byte[dims[0]];
       for (int ii = 0; ii < dims[0]; ii++) {
         vals[ii] = (byte) (0xff & (ival + ii));
-        if (vals[ii] == fillValue) vals[ii] = 0;
       }
       vdata = vals;
     }
@@ -251,12 +316,7 @@ throws HdfException
     {
       String[] vals = new String[dims[0]];
       for (int ii = 0; ii < dims[0]; ii++) {
-        vals[ii] = (String) genNonLinear(
-          dtype,
-          stgFieldLen,
-          refGroup,        // group to use for references
-          new int[0],      // dims
-          ival + ii);      // origin
+        vals[ii] = "stg" + (ival + ii);
       }
       vdata = vals;
     }
@@ -264,7 +324,7 @@ throws HdfException
   } // else if dims.len==1 && numeric
 
   else {
-    // Chop off the first dimension
+    // Chop off the first dimension and recurse.
     int nn = dims[0];
     int[] subDims = Arrays.copyOfRange( dims, 1, dims.length);
     Object[] objs = new Object[nn];
@@ -274,7 +334,7 @@ throws HdfException
         stgFieldLen,
         refGroup,
         subDims,
-        ival + 10 * ii);
+        10 * (ival + ii));
     }
     vdata = objs;
   }
@@ -293,14 +353,22 @@ public static Object genFillValue(
 throws HdfException
 {
   Object fillValue = null;
-  if (dtype == HdfGroup.DTYPE_SFIXED08) fillValue = new Byte( (byte) 99);
-  else if (dtype == HdfGroup.DTYPE_UFIXED08) fillValue = new Byte( (byte) 99);
-  else if (dtype == HdfGroup.DTYPE_FIXED16) fillValue = new Short( (short) 999);
-  else if (dtype == HdfGroup.DTYPE_FIXED32) fillValue = new Integer( 999);
-  else if (dtype == HdfGroup.DTYPE_FIXED64) fillValue = new Long( 999);
-  else if (dtype == HdfGroup.DTYPE_FLOAT32) fillValue = new Float( 999);
-  else if (dtype == HdfGroup.DTYPE_FLOAT64) fillValue = new Double( 999);
-  else if (dtype == HdfGroup.DTYPE_TEST_CHAR) fillValue = new Character('x');
+  if (dtype == HdfGroup.DTYPE_SFIXED08)
+    fillValue = new Byte( (byte) 255);
+  else if (dtype == HdfGroup.DTYPE_UFIXED08)
+    fillValue = new Byte( (byte) 255);
+  else if (dtype == HdfGroup.DTYPE_FIXED16)
+    fillValue = new Short( (short) -9999);
+  else if (dtype == HdfGroup.DTYPE_FIXED32)
+    fillValue = new Integer( -999999);
+  else if (dtype == HdfGroup.DTYPE_FIXED64)
+    fillValue = new Long( -999999);
+  else if (dtype == HdfGroup.DTYPE_FLOAT32)
+    fillValue = new Float( -999999);
+  else if (dtype == HdfGroup.DTYPE_FLOAT64)
+    fillValue = new Double( -999999);
+  else if (dtype == HdfGroup.DTYPE_TEST_CHAR)
+    fillValue = new Character('x');
   else if (dtype == HdfGroup.DTYPE_STRING_FIX
     || dtype == HdfGroup.DTYPE_STRING_VAR)
   {
