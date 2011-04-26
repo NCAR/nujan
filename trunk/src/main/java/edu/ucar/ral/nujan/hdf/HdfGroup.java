@@ -1565,8 +1565,7 @@ throws HdfException
   // and either virtDataDims == chunkDims or < chunkDims, as above.
 
   int[] virtDataDims = null;
-  
-  
+  boolean useLinearFull = false;   // if true, we received full linear chunk
 
   if (rank > 0) {
 
@@ -1585,6 +1584,7 @@ throws HdfException
 
       if (dataDims.length != 1) throwerr("invalid dataDims");
       if (dataDims[0] == chunkVolume) {
+        useLinearFull = true;
         virtDataDims = Arrays.copyOf( chunkDims, chunkDims.length);
       }
       else if (dataDims[0] == remVolume) {
@@ -1595,7 +1595,7 @@ throws HdfException
         }
       }
       else throwerr("wrong linear len");
-    }
+    } // if useLinear
     else {
       virtDataDims = Arrays.copyOf( dataDims, dataDims.length);
     }
@@ -1794,9 +1794,12 @@ throws HdfException
         int[] prods = new int[ rank];
         prods[rank-1] = 1;
         for (int ii = rank-2; ii >= 0; ii--) {
-          int remLen = Math.min(
-            chunkDims[ii+1],
-            varDims[ii+1] - startIxs[ii+1]);
+          int remLen = chunkDims[ii+1];
+          if (! useLinearFull) {
+            remLen = Math.min(
+              chunkDims[ii+1],
+              varDims[ii+1] - startIxs[ii+1]);
+          }
           prods[ii] = remLen * prods[ii+1];
         }
         if (hdfFile.bugs >= 2)
@@ -1834,7 +1837,7 @@ throws HdfException
         checkDtype( DTYPE_SFIXED08, DTYPE_UFIXED08, dtp);
         byte[] avec = (byte[]) vdataOb;
         if (hdfFile.bugs >= 2)
-          prtIndent("formatRawData linear byte vec len: " + avec.length);
+          prtIndent("formatRawData byte vec len: " + avec.length);
         for (int ii = 0; ii < writeLen; ii++) {
           fmtBuf.putBufByte("formatRawData", 0xff & avec[ linearIx + ii]);
         }
@@ -1843,7 +1846,7 @@ throws HdfException
         checkDtype( DTYPE_FIXED16, dtp);
         short[] avec = (short[]) vdataOb;
         if (hdfFile.bugs >= 2)
-          prtIndent("formatRawData linear short vec len: " + avec.length);
+          prtIndent("formatRawData short vec len: " + avec.length);
         for (int ii = 0; ii < writeLen; ii++) {
           fmtBuf.putBufShort("formatRawData", avec[ linearIx + ii]);
         }
@@ -1852,7 +1855,7 @@ throws HdfException
         checkDtype( DTYPE_FIXED32, dtp);
         int[] avec = (int[]) vdataOb;
         if (hdfFile.bugs >= 2)
-          prtIndent("formatRawData linear int vec len: " + avec.length);
+          prtIndent("formatRawData int vec len: " + avec.length);
         for (int ii = 0; ii < writeLen; ii++) {
           fmtBuf.putBufInt("formatRawData", avec[ linearIx + ii]);
         }
@@ -1861,7 +1864,7 @@ throws HdfException
         checkDtype( DTYPE_FIXED64, dtp);
         long[] avec = (long[]) vdataOb;
         if (hdfFile.bugs >= 2)
-          prtIndent("formatRawData linear long vec len: " + avec.length);
+          prtIndent("formatRawData long vec len: " + avec.length);
         for (int ii = 0; ii < writeLen; ii++) {
           fmtBuf.putBufLong("formatRawData", avec[ linearIx + ii]);
         }
@@ -1870,7 +1873,7 @@ throws HdfException
         checkDtype( DTYPE_FLOAT32, dtp);
         float[] avec = (float[]) vdataOb;
         if (hdfFile.bugs >= 2)
-          prtIndent("formatRawData linear float vec len: " + avec.length);
+          prtIndent("formatRawData float vec len: " + avec.length);
         for (int ii = 0; ii < writeLen; ii++) {
           fmtBuf.putBufFloat("formatRawData", avec[ linearIx + ii]);
         }
@@ -1879,7 +1882,7 @@ throws HdfException
         checkDtype( DTYPE_FLOAT64, dtp);
         double[] avec = (double[]) vdataOb;
         if (hdfFile.bugs >= 2)
-          prtIndent("formatRawData linear double vec len: " + avec.length);
+          prtIndent("formatRawData double vec len: " + avec.length);
         for (int ii = 0; ii < writeLen; ii++) {
           fmtBuf.putBufDouble("formatRawData", avec[ linearIx + ii]);
         }
@@ -1890,8 +1893,12 @@ throws HdfException
           && (((Object[]) vdataOb)[0] instanceof String))
       {
         checkDtype( DTYPE_STRING_FIX, DTYPE_STRING_VAR, dtp);
-        for (Object aobj : (Object[]) vdataOb) {
-          String aval = (String) aobj;
+        String[] avec = (String[]) vdataOb;
+        if (hdfFile.bugs >= 2)
+          prtIndent("formatRawData String vec len: " + avec.length);
+        for (int ii = 0; ii < writeLen; ii++) {
+          String aval = avec[ linearIx + ii];
+
           if (dtp == DTYPE_STRING_FIX) {
             byte[] bytes = HdfUtil.encodeString( aval, false, this);
             fmtBuf.putBufBytes(

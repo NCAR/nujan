@@ -29,6 +29,7 @@ package edu.ucar.ral.nujan.netcdfUnitTest;
 import java.util.Arrays;
 
 import java.io.File;
+import java.io.IOException;
 import junit.framework.TestCase;
 import junitx.framework.FileAssert;
 
@@ -37,7 +38,10 @@ import edu.ucar.ral.nujan.netcdf.NhException;
 import edu.ucar.ral.nujan.netcdf.NhFileWriter;
 import edu.ucar.ral.nujan.netcdf.NhGroup;
 import edu.ucar.ral.nujan.netcdf.NhVariable;
+import edu.ucar.ral.nujan.hdf.HdfException;
+import edu.ucar.ral.nujan.hdf.HdfGroup;
 import edu.ucar.ral.nujan.hdf.HdfUtil;
+import edu.ucar.ral.nujan.hdfTest.GenData;
 
 
 public class TestUnita extends TestCase {
@@ -90,8 +94,7 @@ String compLevelStg = "0,5";
 
 String useSmallStg = "false,true";
 
-//xxx String useLinearStg = "false,true";
-String useLinearStg = "false";
+String useLinearStg = "false,true";
 
 
 
@@ -147,6 +150,9 @@ static void printUsageInfo()
 }
 
 
+
+
+// Called by main, not by unit test framework.
 
 void initAll( String[] args)
 throws NhException
@@ -306,11 +312,14 @@ throws NhException
   }
   namePart += ".comp_" + compLevel;
   namePart += ".small_" + useSmall;
-  namePart += ".linear_" + useLinear;
-  namePart += ".nc";
   
-  String sourceName = sourceDir + "/" + namePart;
-  String targetName = targetDir + "/" + namePart;
+  // The sourceName always is linear_false, as both targets
+  // linear false and true must be equal to it.
+  String sourceName = sourceDir + "/" + namePart
+    + ".linear_false.nc";
+  String targetName = targetDir + "/" + namePart
+    + ".linear_" + useLinear + ".nc";
+
   if (unitBugs >= 1) {
     prtf("mkSingleTest: namePart: %s", namePart);
     prtf("mkSingleTest: sourceName: %s", sourceName);
@@ -320,6 +329,16 @@ throws NhException
   createFile( dataType, dimLens, chunkLens,
     compLevel, useSmall, useLinear, targetName);
 
+  try {
+    prtf("TestUnita: sourceName: %s",
+      new File( sourceName).getCanonicalPath());
+    prtf("TestUnita: targetName: %s",
+      new File( targetName).getCanonicalPath());
+  }
+  catch( IOException exc) {
+    exc.printStackTrace();
+    throwerr("caught: " + exc);
+  }
   if (useCheck) {
     File sourceFile = new File( sourceName);
     File targetFile = new File( targetName);
@@ -425,18 +444,56 @@ throws NhException
   // All calls to writeData occur after endDefine.
   hfile.endDefine();
 
+
+
+
+
+
+
+  int hdfType = 0;            // one of HdfGroup.DTYPE_*.
+  if (dataType == NhVariable.TP_UBYTE) hdfType = HdfGroup.DTYPE_UFIXED08;
+  else if (dataType == NhVariable.TP_SHORT) hdfType = HdfGroup.DTYPE_FIXED16;
+  else if (dataType == NhVariable.TP_INT) hdfType = HdfGroup.DTYPE_FIXED32;
+  else if (dataType == NhVariable.TP_LONG) hdfType = HdfGroup.DTYPE_FIXED64;
+  else if (dataType == NhVariable.TP_FLOAT) hdfType = HdfGroup.DTYPE_FLOAT32;
+  else if (dataType == NhVariable.TP_DOUBLE) hdfType = HdfGroup.DTYPE_FLOAT64;
+  else if (dataType == NhVariable.TP_STRING_VAR)
+    hdfType = HdfGroup.DTYPE_STRING_VAR;
+  else throwerr("unknown dataType: " + dataType);
+
   // Generate the test data
-  Object testData = generateCuboidData( dataType, dimLens);
+  Object testData = null;
+  ///testData = generateCuboidData( dataType, dimLens);
+  try {
+    testData = GenData.genHdfData(
+      false,                 // useLinear
+      hdfType,
+      0,                     // stgFieldLen
+      null,                  // HdfGroup refGroup
+      dimLens,
+      0);                    // origin
+  }
+  catch( HdfException exc) {
+    exc.printStackTrace();
+    throwerr("caught: " + exc);
+  }
 
   // Write out the data
   if (chunkLens == null) {
-    Object dataObj = testData;
-    //xxx if (useLinear) dataObj = mkLinearData( dataObj);
+    if (useLinear && rank >= 2) {
+      try {
+        testData = GenData.mkLinear( hdfType, dimLens, testData);
+      }
+      catch( HdfException exc) {
+        exc.printStackTrace();
+        throwerr("caught: " + exc);
+      }
+    }
     int[] startIxs = null;
     if (unitBugs >= 10)
-      prtf("TestUnita: contig.  dataObj: %s",
-        HdfUtil.formatObject( dataObj));
-    humidityVar.writeData( startIxs, dataObj, useLinear);
+      prtf("TestUnita: contig.  testData: %s",
+        HdfUtil.formatObject( testData));
+    humidityVar.writeData( startIxs, testData, useLinear);
   }
 
   else {
@@ -445,9 +502,27 @@ throws NhException
     boolean allDone = false;
     while (! allDone) {
 
-      dataObj = mkSubset( dimLens, chunkLens, startIxs,
+      dataObj = mkSubset(
+        0,                    // curIx
+        false,                // isAllFill
+        dataType,
+        dimLens, chunkLens, startIxs,
         useSmall, testData);
-      //xxx if (useLinear) dataObj = mkLinearData( dataObj);
+      if (useLinear && rank >= 2) {
+        int[] cdims = new int[rank];
+        for (int ii = 0; ii < rank; ii++) {
+          cdims[ii] = chunkLens[ii];
+          if (useSmall && startIxs[ii] + cdims[ii] > dimLens[ii])
+            cdims[ii] = dimLens[ii] - startIxs[ii];
+        }
+        try {
+          dataObj = GenData.mkLinear( hdfType, cdims, dataObj);
+        }
+        catch( HdfException exc) {
+          exc.printStackTrace();
+          throwerr("caught: " + exc);
+        }
+      }
 
       if (unitBugs >= 10)
         prtf("TestUnita: chunk.  startIxs: %s  dataObj: %s",
@@ -469,6 +544,44 @@ throws NhException
   hfile.close();
 
 } // end createFile
+
+
+
+
+
+
+
+
+
+
+
+
+//Object generateCuboidData(
+//  boolean useLinear,
+//  int dataType,            // NhVariable.TP_DOUBLE, etc
+//  int[] dimLens)
+//throws NhException
+//{
+//  int dtype = NhVariable.findDtype("TestUnita", dataType);
+//  int stgFieldLen = 0;     // max string len for STRING_FIX, without null term
+//  HdfGroup refGroup = null;
+//  int origin = 0;
+//
+//  Object obj = genHdfData(
+//    useLinear,
+//    dtype,
+//    stgFieldLen,
+//    refGroup,                // group to use for references
+//    dimLens,
+//    origin);                 // origin 0.  e.g. 1000*ia + 100*ib + 10*ic + id
+//
+//  return obj;
+//}
+
+
+
+
+
 
 
 
@@ -824,8 +937,133 @@ throws NhException
 
 
 
-
 Object mkSubset(
+  int curIx,
+  boolean isAllFill,
+  int dataType,
+  int[] dimLens,
+  int[] chunkLens,
+  int[] startIxs,
+  boolean useSmall,
+  Object genData)
+throws NhException
+{
+  int FILLVAL = 8888;
+  int rank = dimLens.length;
+  int resLen = chunkLens[curIx];
+  if (startIxs[curIx] + resLen > dimLens[curIx] && useSmall)
+    resLen = dimLens[curIx] - startIxs[curIx];
+  Object resObj = null;
+
+  if (curIx < rank - 1) {
+    Object[] resVec = new Object[ resLen];
+
+    for (int ii = 0; ii < resLen; ii++) {
+      Object objItem = null;
+      if (isAllFill || startIxs[curIx] + ii >= dimLens[curIx]) {
+        isAllFill = true;
+        objItem = null;
+      }
+      else objItem = ((Object[]) genData) [startIxs[curIx]+ii];
+
+      resVec[ii] = mkSubset(                   // recursion
+        curIx + 1,
+        isAllFill,
+        dataType,
+        dimLens,
+        chunkLens,
+        startIxs,
+        useSmall,
+        objItem);
+    } // for ii
+    resObj = resVec;
+  } // if curIx < rank - 1
+
+  else {               // else curIx == rank - 1
+    if (dataType == NhVariable.TP_UBYTE) {
+      byte[] res = new byte[resLen];
+      for (int ii = 0; ii < resLen; ii++) {
+        int ix = startIxs[curIx] + ii;
+        if (isAllFill || ix >= dimLens[curIx]) res[ii] = (byte) FILLVAL;
+        else res[ii] = ((byte[]) genData)[ ix];
+      }
+      resObj = res;
+    }
+    else if (dataType == NhVariable.TP_SHORT) {
+      short[] res = new short[resLen];
+      for (int ii = 0; ii < resLen; ii++) {
+        int ix = startIxs[curIx] + ii;
+        if (isAllFill || ix >= dimLens[curIx]) res[ii] = (short) FILLVAL;
+        else res[ii] = ((short[]) genData)[ ix];
+      }
+      resObj = res;
+    }
+    else if (dataType == NhVariable.TP_INT) {
+      int[] res = new int[resLen];
+      for (int ii = 0; ii < resLen; ii++) {
+        int ix = startIxs[curIx] + ii;
+        if (isAllFill || ix >= dimLens[curIx]) res[ii] = (int) FILLVAL;
+        else res[ii] = ((int[]) genData)[ ix];
+      }
+      resObj = res;
+    }
+    else if (dataType == NhVariable.TP_LONG) {
+      long[] res = new long[resLen];
+      for (int ii = 0; ii < resLen; ii++) {
+        int ix = startIxs[curIx] + ii;
+        if (isAllFill || ix >= dimLens[curIx]) res[ii] = (long) FILLVAL;
+        else res[ii] = ((long[]) genData)[ ix];
+      }
+      resObj = res;
+    }
+    else if (dataType == NhVariable.TP_FLOAT) {
+      float[] res = new float[resLen];
+      for (int ii = 0; ii < resLen; ii++) {
+        int ix = startIxs[curIx] + ii;
+        if (isAllFill || ix >= dimLens[curIx]) res[ii] = (float) FILLVAL;
+        else res[ii] = ((float[]) genData)[ ix];
+      }
+      resObj = res;
+    }
+    else if (dataType == NhVariable.TP_DOUBLE) {
+      double[] res = new double[resLen];
+      for (int ii = 0; ii < resLen; ii++) {
+        int ix = startIxs[curIx] + ii;
+        if (isAllFill || ix >= dimLens[curIx]) res[ii] = (double) FILLVAL;
+        else res[ii] = ((double[]) genData)[ ix];
+      }
+      resObj = res;
+    }
+    else if (dataType == NhVariable.TP_STRING_VAR) {
+      String[] res = new String[resLen];
+      for (int ii = 0; ii < resLen; ii++) {
+        int ix = startIxs[curIx] + ii;
+        if (isAllFill || ix >= dimLens[curIx]) res[ii] = "stg" + FILLVAL;
+        else res[ii] = ((String[]) genData)[ ix];
+      }
+      resObj = res;
+    }
+    else throwerr("unknown type: " + genData.getClass());
+  } // else curIx == rank - 1
+
+  return resObj;
+} // end mkSubset
+
+
+
+
+
+
+
+
+
+
+
+
+// Obsolete, but keep it.
+// Occasionally it's useful as validation for mkSubset, above.
+
+Object oldMkSubset(
   int[] dimLens,
   int[] chunkLens,
   int[] startIxs,
@@ -1315,125 +1553,13 @@ throws NhException
 
   else throwerr("unknown rank: " + rank);
   return dataObj;
-} // end mkSubset
+} // end oldMkSubset
 
 
 
 
 
-//Object generateLinearData(
-//  int dataType,            // NhVariable.TP_DOUBLE, etc
-//  int[] dimLens)
-//throws NhException
-//{
-//  int rank = dimLens.length;
-//  Object dataObj = null;
-//
-//  int totLen = 0;
-//  if (rank > 0) {
-//    totLen = 1;
-//    for (int ii = 0; ii < rank; ii++) {
-//      totLen *= dimLens[ii];
-//    }
-//  }
-//
-//  if (dataType == NhVariable.TP_DOUBLE) {
-//    if (rank == 0) dataObj = new Double(100);
-//    else {
-//      double[] vals = new double[totLen];
-//      if (rank == 1) {
-//        for (int ia = 0; ia < totLen; ia++) {
-//          vals[ia] = ia;
-//        }
-//      }
-//      else if (rank == 2) {
-//        for (int ia = 0; ia < dimLens[0]; ia++) {
-//          for (int ib = 0; ib < dimLens[1]; ib++) {
-//            vals[ia*dimLens[1] + ib] = 10 * ia + ib;
-//          }
-//        }
-//      }
-//      else if (rank == 3) {
-//        for (int ia = 0; ia < dimLens[0]; ia++) {
-//          for (int ib = 0; ib < dimLens[1]; ib++) {
-//            for (int ic = 0; ic < dimLens[2]; ic++) {
-//              vals[ia*dimLens[1]*dimLens[2] + ib*dimLens[2] + ic]
-//                = 100 * ia + 10 * ib + ic;
-//            }
-//          }
-//        }
-//      }
-//      else throwerr("unknown rank: %d", rank);
-//      dataObj = vals;
-//    }
-//  } // if TP_DOUBLE
-//
-//  else if (dataType == NhVariable.TP_FLOAT) {
-//    if (rank == 0) dataObj = new Float(100);
-//    else {
-//      float[] vals = new float[totLen];
-//      if (rank == 1) {
-//        for (int ia = 0; ia < totLen; ia++) {
-//          vals[ia] = ia;
-//        }
-//      }
-//      else if (rank == 2) {
-//        for (int ia = 0; ia < dimLens[0]; ia++) {
-//          for (int ib = 0; ib < dimLens[1]; ib++) {
-//            vals[ia*dimLens[1] + ib] = 10 * ia + ib;
-//          }
-//        }
-//      }
-//      else if (rank == 3) {
-//        for (int ia = 0; ia < dimLens[0]; ia++) {
-//          for (int ib = 0; ib < dimLens[1]; ib++) {
-//            for (int ic = 0; ic < dimLens[2]; ic++) {
-//              vals[ia*dimLens[1]*dimLens[2] + ib*dimLens[2] + ic]
-//                = 100 * ia + 10 * ib + ic;
-//            }
-//          }
-//        }
-//      }
-//      else throwerr("unknown rank: %d", rank);
-//      dataObj = vals;
-//    }
-//  } // if TP_FLOAT
-//
-//  else if (dataType == NhVariable.TP_INT) {
-//    if (rank == 0) dataObj = new Integer(100);
-//    else {
-//      int[] vals = new int[totLen];
-//      if (rank == 1) {
-//        for (int ia = 0; ia < totLen; ia++) {
-//          vals[ia] = ia;
-//        }
-//      }
-//      else if (rank == 2) {
-//        for (int ia = 0; ia < dimLens[0]; ia++) {
-//          for (int ib = 0; ib < dimLens[1]; ib++) {
-//            vals[ia*dimLens[1] + ib] = 10 * ia + ib;
-//          }
-//        }
-//      }
-//      else if (rank == 3) {
-//        for (int ia = 0; ia < dimLens[0]; ia++) {
-//          for (int ib = 0; ib < dimLens[1]; ib++) {
-//            for (int ic = 0; ic < dimLens[2]; ic++) {
-//              vals[ia*dimLens[1]*dimLens[2] + ib*dimLens[2] + ic]
-//                = 100 * ia + 10 * ib + ic;
-//            }
-//          }
-//        }
-//      }
-//      else throwerr("unknown rank: %d", rank);
-//      dataObj = vals;
-//    }
-//  } // if TP_INT
-//
-//  else throwerr("unknown dataType: %s", NhVariable.nhTypeNames[dataType]);
-//
-//  return dataObj;
-//} // end generateLinearData
+
 
 
 
@@ -1464,33 +1590,6 @@ throws NhException
 
 
 
-///// Returns [0][*] = dims, [1][*] = chunks.
-///
-///static int[][] oldParseIntPairs( String msg, String stg)
-///throws NhException
-///{
-///  String[] toks = stg.split(",");
-///  if (toks.length == 0) throwerr("parm \"" + msg + "\" is empty.");
-///  int[] dims = new int[toks.length];
-///  int[] chunks = new int[toks.length];
-///  for (int ii = 0; ii < toks.length; ii++) {
-///    String[] subToks = toks[ii].split("/");
-///    if (subToks.length != 2)
-///      throwerr("parm \"" + msg + "\" has invalid spec \""
-///        + toks[ii] + "\" in string \"" + stg + "\"");
-///    try { dims[ii] = Integer.parseInt( subToks[0], 10); }
-///    catch( NumberFormatException exc) {
-///      throwerr("parm \"" + msg + "\" has invalid integer in \""
-///        + toks[ii] + "\" in string \"" + stg + "\"");
-///    }
-///    try { chunks[ii] = Integer.parseInt( subToks[1], 10); }
-///    catch( NumberFormatException exc) {
-///      throwerr("parm \"" + msg + "\" has invalid integer in \""
-///        + toks[ii] + "\" in string \"" + stg + "\"");
-///    }
-///  }
-///  return new int[][] { dims, chunks};
-///}
 
 
 
