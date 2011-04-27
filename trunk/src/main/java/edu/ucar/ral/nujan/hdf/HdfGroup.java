@@ -1893,11 +1893,11 @@ throws HdfException
           && (((Object[]) vdataOb)[0] instanceof String))
       {
         checkDtype( DTYPE_STRING_FIX, DTYPE_STRING_VAR, dtp);
-        String[] avec = (String[]) vdataOb;
+        Object[] avec = (Object[]) vdataOb;
         if (hdfFile.bugs >= 2)
           prtIndent("formatRawData String vec len: " + avec.length);
         for (int ii = 0; ii < writeLen; ii++) {
-          String aval = avec[ linearIx + ii];
+          String aval = (String) avec[ linearIx + ii];
 
           if (dtp == DTYPE_STRING_FIX) {
             byte[] bytes = HdfUtil.encodeString( aval, false, this);
