@@ -519,16 +519,15 @@ throws NhException
       + "  rawData class: " + rawData.getClass());
   }
   if (rawData == null) throwerr("rawData is null");
-  Object vdata = null;
 
   if (rawData instanceof Array) {
     if (useLinear) {
       // copyTo1DJavaArray just calls cp = Array.copy(), cp.getStorage().
       //Object storObj = ((Array) rawData).copyTo1DJavaArray();
-      vdata = ((Array) rawData).getStorage();
+      rawData = ((Array) rawData).getStorage();
     }
     else {
-      vdata = ((Array) rawData).copyToNDJavaArray();
+      rawData = ((Array) rawData).copyToNDJavaArray();
     }
   }
 
@@ -541,10 +540,10 @@ throws NhException
   // Internally in HDF5, the array is represented as a
   // 3 x 4 array of DTYPE_STRING_FIX, with each string having stgFieldLen=1.
 
-  else if (nhType == TP_CHAR) {
+  Object vdata = null;
+  if (nhType == TP_CHAR) {
     vdata = convertCharsToStrings( dimLens, rawData, nhFile.bugs);
   }
-
   else {
     vdata = rawData;
   }

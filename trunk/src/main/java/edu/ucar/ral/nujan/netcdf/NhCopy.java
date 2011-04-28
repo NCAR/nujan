@@ -24,7 +24,7 @@
 // OTHER DEALINGS IN THE SOFTWARE.
 
 
-package edu.ucar.ral.nujan.netcdfTest;
+package edu.ucar.ral.nujan.netcdf;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -45,6 +45,16 @@ import edu.ucar.ral.nujan.netcdf.NhFileWriter;
 import edu.ucar.ral.nujan.netcdf.NhGroup;
 import edu.ucar.ral.nujan.netcdf.NhVariable;
 
+
+
+// Future:
+// To implement chunkLens with useLinear:
+//   In copyData, in each of the sections like
+//     else if (dimLens.length == 2 or 3 or ...)
+//   Use something like:
+//     float[] linVec = new float[ product of dimLens];
+//     copy chunkVals[*][*] to linVec
+//     writeData( LinVec)
 
 class FieldSpec {
   String name;
@@ -97,7 +107,7 @@ public static void main( String[] args) {
 
 
 
-static void badparms( String msg) {
+static void badparms( int bugs, String msg) {
   prtf("Error: " + msg);
   prtf("Parms:");
   prtf("  -bugs       debug level.  Default is 0.");
@@ -117,6 +127,10 @@ static void badparms( String msg) {
   prtf("                  or omitted.");
   prtf("                Note: this feature is for testing only,");
   prtf("                works on float vars having 1 <= rank <= 4.");
+  if (bugs > 1) {
+    prtf("");
+    prtf("  -useLinear  use linear mode (not with chunks)");
+  }
   prtf("");
   prtf("Example:");
   prtf("java -cp tdcls:netcdfAll-4.2.jar testpk.NhCopy"
@@ -143,28 +157,31 @@ throws NhException
   int iarg = 0;
   while (iarg < args.length) {
     String key = args[iarg++];
-    if (iarg >= args.length) badparms("no value for the last key");
+    if (iarg >= args.length) badparms( bugs, "no value for the last key");
     String val = args[iarg++];
     if (key.equals("-bugs")) bugs = parseInt( "-bugs", val);
     else if (key.equals("-compress")) {
       compressionLevel = parseInt( "-compress", val);
       if (compressionLevel < 0 || compressionLevel > 9)
-        badparms("invalid compress: " + compressionLevel);
+        badparms( bugs, "invalid compress: " + compressionLevel);
     }
     else if (key.equals("-inFile")) inFile = val;
     else if (key.equals("-outFile")) outFile = val;
 
     else if (key.equals("-field")) {
       String[] toks = val.split(":");
-      if (toks.length < 2) badparms("invalid -field spec");
       String name = toks[0];
-      int iscale;
-      double mfact;
-      if (toks[1].equals("none")) {
+      int iscale = -9999;
+      double mfact = 0;
+      if (toks.length == 0) badparms( bugs, "invalid -field spec");
+      else if (toks.length == 1
+        || toks.length == 2 && toks[1].equals("none"))
+      {
         iscale = -9999;
         mfact = 0;
       }
       else {
+        if (toks.length < 2) badparms( bugs, "invalid -field spec");
         iscale = parseInt( "scale", toks[1]);
         mfact = 1;
         if (iscale < 0) {
@@ -188,22 +205,24 @@ throws NhException
       logDir = val;
       statTag = "stats";
     }
-    else if (key.equals("-testValLinear")) {
-      if (val.equals("false")) useLinear = false;
-      else if (val.equals("true")) useLinear = true;
-      else badparms("unknown parm for -testValLinear: \"" + val + "\"");
-    }
+    else if (key.equals("-useLinear"))
+      useLinear = parseBoolean("-useBoolean", val);
     else if (key.equals("-testValNdArray")) {
       copyNd = parseInt( "testValNdArray", val);
     }
 
-    else badparms("unknown parm: \"" + key + "\"");
+    else badparms( bugs, "unknown parm: \"" + key + "\"");
   }
-  if (compressionLevel < 0) badparms("parm not specified: -compress");
-  if (inFile == null) badparms("parm not specified: -inFile");
-  if (outFile == null) badparms("parm not specified: -outFile");
+  if (compressionLevel < 0) badparms( bugs, "parm not specified: -compress");
+  if (inFile == null) badparms( bugs, "parm not specified: -inFile");
+  if (outFile == null) badparms( bugs, "parm not specified: -outFile");
 
   FieldSpec[] fieldSpecs = fieldList.toArray( new FieldSpec[0]);
+  for (FieldSpec fspec : fieldSpecs) {
+    if (useLinear && fspec.chunkLens != null)
+      throwerr("Sorry, useLinear with chunkLens not yet implemented.");
+      // To implement useLinear with chunkLens:  See doc at top.
+  }
 
   if (bugs >= 1) {
     prtf("copyIt: compress: %d", compressionLevel);
@@ -215,6 +234,8 @@ throws NhException
         String tmsg = "none";
         if (fspec.iscale != -9999) tmsg = "" + fspec.iscale;
         prtf("copyIt: field: \"" + fspec.name + "\"  iscale: " + tmsg);
+        if (fspec.chunkLens != null)
+          prtf("  chunkLens: " + formatInts( fspec.chunkLens));
       }
     }
   }
@@ -248,7 +269,7 @@ throws NhException
   }
   catch( Exception exc) {
     exc.printStackTrace();
-    badparms("const: caught: " + exc);
+    badparms( bugs, "const: caught: " + exc);
   }
 
   boolean allOk = true;
@@ -987,10 +1008,8 @@ throws NhException
     ///prtf("decodeArray: arr: %s", arr);
 
     prtf("  decodeArray: getElementType: %s", arr.getElementType());
-    prtf("    getRank: %d", rank);
-    for (int ii = 0; ii < rank; ii++) {
-      prtf("    shape[%d]: %s", ii, shape[ii]);
-    }
+    prtf("    rank: %d", rank);
+    prtf("    shape: %s", formatInts( shape));
     if (rank == 1) {
       for (int ii = 0; ii < shape[0]; ii++) {
         Object obj = arr.getObject( ii);
@@ -1065,6 +1084,7 @@ throws NhException
       stgs[ia] = (String) arr.getObject( index);
     }
     resObj = stgs;
+    if (useLinear) resObj = arr.getStorage();
   }
   else if (rank == 2) {
     String[][] stgs = new String[shape[0]][shape[1]];
@@ -1076,6 +1096,7 @@ throws NhException
       }
     }
     resObj = stgs;
+    if (useLinear) resObj = arr.getStorage();
   }
   else if (rank == 3) {
     String[][][] stgs = new String[shape[0]][shape[1]][shape[2]];
@@ -1179,6 +1200,30 @@ throws NhException
   }
   return ival;
 }
+
+
+
+
+static boolean parseBoolean( String msg, String stg)
+throws NhException
+{
+  boolean bval = false;
+  if (stg.equals("false") || stg.equals("no")) bval = false;
+  else if (stg.equals("true") || stg.equals("yes")) bval = true;
+  else throwerr("bad format for parm %s.  value: \"%s\"", msg, stg);
+  return bval;
+}
+
+
+
+static String formatInts( int[] ivals) {
+  String res = "";
+  for (int ival : ivals) {
+    res += " " + ival;
+  }
+  return res;
+}
+
 
 
 
