@@ -29,8 +29,12 @@ package edu.ucar.ral.nujan.hdf;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.Charset;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
+import java.util.SimpleTimeZone;
 import java.util.regex.Pattern;
 
 
@@ -500,6 +504,44 @@ throws HdfException
   return bytes;
 }
 
+
+
+
+
+
+public static long parseUtcTime( String stg)
+throws HdfException
+{
+  long utcTime = 0;
+  if (stg.equals("0")) utcTime = 0;
+  else {
+    SimpleDateFormat utcSdf = null;
+    if (stg.length() == 10)                         // yyyy-mm-dd
+      utcSdf = new SimpleDateFormat("yyyy-MM-dd");
+    else if (stg.length() == 19)                    // yyyy-MM-ddTHH:mm:ss
+      utcSdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+    else throwerr("invalid -utcModTime: \"" + stg + "\"");
+
+    utcSdf.setTimeZone( new SimpleTimeZone( 0, "UTC"));
+    Date dt = null;
+    try { dt = utcSdf.parse( stg); }
+    catch( ParseException exc) {
+      throwerr("invalid -utcModTime: \"" + stg + "\"");
+    }
+    utcTime = dt.getTime();
+  }
+  return utcTime;
+}
+
+
+
+
+public static String formatUtcTime( long tval) {
+  SimpleDateFormat utcSdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+  utcSdf.setTimeZone( new SimpleTimeZone( 0, "UTC"));
+  String stg = utcSdf.format( tval);
+  return stg;
+}
 
 
 

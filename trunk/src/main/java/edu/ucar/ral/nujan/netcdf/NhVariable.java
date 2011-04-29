@@ -521,10 +521,17 @@ throws NhException
   if (rawData == null) throwerr("rawData is null");
 
   if (rawData instanceof Array) {
-    if (useLinear) {
+    Array arr = (Array) rawData;
+    if (arr.getRank() == 0) {
+      // Wow, what a hack.
+      if (arr.getSize() != 1) throwerr("unknown array size");
+      Object copy1d = arr.copyTo1DJavaArray();
+      rawData = java.lang.reflect.Array.get( copy1d, 0);
+    }
+    else if (useLinear) {
       // copyTo1DJavaArray just calls cp = Array.copy(), cp.getStorage().
       //Object storObj = ((Array) rawData).copyTo1DJavaArray();
-      rawData = ((Array) rawData).getStorage();
+      rawData = arr.getStorage();
     }
     else {
       rawData = ((Array) rawData).copyToNDJavaArray();

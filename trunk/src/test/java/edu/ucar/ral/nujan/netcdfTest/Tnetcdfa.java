@@ -26,14 +26,11 @@
 
 package edu.ucar.ral.nujan.netcdfTest;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.Arrays;
-import java.util.Date;
-import java.util.SimpleTimeZone;
 import ucar.ma2.ArrayFloat;
 
 
+import edu.ucar.ral.nujan.hdf.HdfException;
 import edu.ucar.ral.nujan.hdf.HdfUtil;
 import edu.ucar.ral.nujan.netcdf.NhDimension;
 import edu.ucar.ral.nujan.netcdf.NhException;
@@ -123,22 +120,12 @@ throws NhException
     }
     else if (key.equals("-compress")) compressLevel = Integer.parseInt( val);
     else if (key.equals("-utcModTime")) {
-      if (val.equals("0")) utcModTime = 0;
-      else {
-        SimpleDateFormat utcSdf = null;
-        if (val.length() == 10)      // yyyy-mm-dd
-          utcSdf = new SimpleDateFormat("yyyy-MM-dd");
-        else if (val.length() == 19)      // yyyy-MM-ddTHH:mm:ss
-          utcSdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
-        else badparms("invalid -utcModTime: \"" + val + "\"");
-
-        utcSdf.setTimeZone( new SimpleTimeZone( 0, "UTC"));
-        Date dt = null;
-        try { dt = utcSdf.parse( val); }
-        catch( ParseException exc) {
-          badparms("invalid -utcModTime: \"" + val + "\"");
-        }
-        utcModTime = dt.getTime();
+      try {
+        utcModTime = HdfUtil.parseUtcTime( val);
+      }
+      catch( HdfException exc) {
+        exc.printStackTrace();
+        badparms("invalid -utcModTime: \"" + val + "\"");
       }
     }
     else if (key.equals("-useLinear"))
@@ -173,9 +160,8 @@ throws NhException
   prtf("Tnetcdfa: chunks: %s", formatInts( chunks));
   prtf("Tnetcdfa: compress: %d", compressLevel);
 
-  SimpleDateFormat utcSdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
-  utcSdf.setTimeZone( new SimpleTimeZone( 0, "UTC"));
-  prtf("Tnetcdfa: utcModTime: %d  %s", utcModTime, utcSdf.format( utcModTime));
+  prtf("Tnetcdfa: utcModTime: %d  %s", utcModTime,
+    HdfUtil.formatUtcTime( utcModTime));
 
   prtf("Tnetcdfa: useLinear: %s", useLinear);
   prtf("Tnetcdfa: useArray: %s", useArray);
