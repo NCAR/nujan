@@ -39,6 +39,8 @@ import ucar.nc2.Group;
 import ucar.nc2.NetcdfFile;
 import ucar.nc2.Variable;
 
+import edu.ucar.ral.nujan.hdf.HdfException;
+import edu.ucar.ral.nujan.hdf.HdfUtil;
 import edu.ucar.ral.nujan.netcdf.NhDimension;
 import edu.ucar.ral.nujan.netcdf.NhException;
 import edu.ucar.ral.nujan.netcdf.NhFileWriter;
@@ -90,8 +92,6 @@ class FieldSpec {
 public class NhCopy {
 
 
-static boolean useLinear = false;        // for performance testing only
-static int copyNd = 0;                   // for performance testing only
 
 public static void main( String[] args) {
   try {
@@ -129,7 +129,11 @@ static void badparms( int bugs, String msg) {
   prtf("                works on float vars having 1 <= rank <= 4.");
   if (bugs > 1) {
     prtf("");
-    prtf("  -useLinear  use linear mode (not with chunks)");
+    prtf("  -utcModTime  0: now, or yyyy-mm-dd or yyyy-mm-ddThh:mm:ss");
+    prtf("  -useLinear   use linear mode (not with chunks)");
+    prtf("  -useArray    pass netcdf Array to writeData (not with chunks)");
+    prtf("  -copyNd <int>   Test amount of memory used when we make copyNd");
+    prtf("                  copies of the netcdf Array.");
   }
   prtf("");
   prtf("Example:");
@@ -154,6 +158,12 @@ throws NhException
   String inFile = null;
   String outFile = null;
   ArrayList<FieldSpec> fieldList = new ArrayList<FieldSpec>();
+
+  long utcModTime = 0;
+  boolean useLinear = false;        // for performance testing only
+  boolean useArray = false;         // for performance testing only
+  int copyNd = 0;                   // for performance testing only
+
   int iarg = 0;
   while (iarg < args.length) {
     String key = args[iarg++];
@@ -205,8 +215,21 @@ throws NhException
       logDir = val;
       statTag = "stats";
     }
+
+    else if (key.equals("-utcModTime")) {
+      try {
+        utcModTime = HdfUtil.parseUtcTime( val);
+      }
+      catch( HdfException exc) {
+        exc.printStackTrace();
+        badparms( bugs, "invalid -utcModTime: \"" + val + "\"");
+      }
+    }
+
     else if (key.equals("-useLinear"))
       useLinear = parseBoolean("-useBoolean", val);
+    else if (key.equals("-useArray"))
+      useArray = parseBoolean("-useBoolean", val);
     else if (key.equals("-testValNdArray")) {
       copyNd = parseInt( "testValNdArray", val);
     }
@@ -219,9 +242,13 @@ throws NhException
 
   FieldSpec[] fieldSpecs = fieldList.toArray( new FieldSpec[0]);
   for (FieldSpec fspec : fieldSpecs) {
-    if (useLinear && fspec.chunkLens != null)
-      throwerr("Sorry, useLinear with chunkLens not yet implemented.");
+    if (fspec.chunkLens != null) {
       // To implement useLinear with chunkLens:  See doc at top.
+      if (useLinear)
+        throwerr("Sorry, useLinear with chunkLens not yet implemented.");
+      if (useArray)
+        throwerr("Sorry, useArray with chunkLens not yet implemented.");
+    }
   }
 
   if (bugs >= 1) {
@@ -249,7 +276,7 @@ throws NhException
       NhFileWriter.OPT_OVERWRITE,
       bugs,          // Netcdf debug level
       bugs,          // HDF5 debug level
-      0,             // utcModTime: use current time.
+      utcModTime,
       logDir,
       statTag);
 
@@ -257,11 +284,13 @@ throws NhException
     NhGroup outGroup = outCdf.getRootGroup();
 
     // pass 1: define vars
-    copyGroup( 1, fieldSpecs, compressionLevel, inGroup, outGroup, bugs);
+    copyGroup( 1, fieldSpecs, compressionLevel, inGroup, outGroup,
+      useLinear, useArray, copyNd, bugs);
     outCdf.endDefine();
 
     // pass 2: copy data
-    copyGroup( 2, fieldSpecs, compressionLevel, inGroup, outGroup, bugs);
+    copyGroup( 2, fieldSpecs, compressionLevel, inGroup, outGroup,
+      useLinear, useArray, copyNd, bugs);
     inCdf.close();
     inCdf = null;
     outCdf.close();
@@ -293,13 +322,16 @@ static void copyGroup(
   int compressionLevel,      // 0: no compression;  9: max compression
   Group inGroup,
   NhGroup outGroup,
+  boolean useLinear,
+  boolean useArray,
+  int copyNd,
   int bugs)
 throws NhException
 {
   if (bugs >= 1) prtf("copyGroup: pass: %d  inGroup: %s", pass, inGroup);
   if (pass == 1) {
     for (Attribute attr : inGroup.getAttributes()) {
-      copyAttribute( attr, outGroup.getName(), outGroup, bugs);
+      copyAttribute( attr, outGroup.getName(), outGroup, useLinear, bugs);
     }
     for (Dimension dim : inGroup.getDimensions()) {
       outGroup.addDimension(
@@ -322,8 +354,10 @@ throws NhException
       }
       else {
         if (pass == 1)
-          copyVarDef( fspec, compressionLevel, var, outGroup, bugs);
-        else copyData( fspec, var, outGroup, bugs);
+          copyVarDef( fspec, compressionLevel, var, outGroup,
+            useLinear, bugs);
+        else copyData( fspec, var, outGroup,
+          useLinear, useArray, copyNd, bugs);
       }
     }
   }
@@ -333,7 +367,8 @@ throws NhException
     if (pass == 1) outSub = outGroup.addGroup( inSub.getShortName());
     else outSub = outGroup.findSubGroup( inSub.getShortName());
 
-    copyGroup( pass, fieldSpecs, compressionLevel, inSub, outSub, bugs);
+    copyGroup( pass, fieldSpecs, compressionLevel, inSub, outSub,
+      useLinear, useArray, copyNd, bugs);
   }
   
 } // end copyGroup
@@ -367,6 +402,7 @@ static void copyVarDef(
   int compressionLevel,      // 0: no compression;  9: max compression
   Variable inVar,
   NhGroup outGroup,
+  boolean useLinear,
   int bugs)
 throws NhException
 {
@@ -426,7 +462,7 @@ throws NhException
   Object fillValue = null;
   Attribute fillAttr = inVar.findAttribute("_FillValue");
   if (fillAttr != null) {
-    fillValue = getAttrValue( fillAttr, bugs);
+    fillValue = getAttrValue( fillAttr, useLinear, bugs);
 
     // Unfortunately NetCDF stores type "char" as HDF5 strings of length 1,
     // but returns a fill value as a Byte or byte[].
@@ -530,7 +566,7 @@ throws NhException
 
   // Copy attributes
   for (Attribute attr : inVar.getAttributes()) {
-    copyAttribute( attr, outVar.getName(), outVar, bugs);
+    copyAttribute( attr, outVar.getName(), outVar, useLinear, bugs);
   }
 
 } // end copyVarDef
@@ -582,6 +618,7 @@ static void copyAttribute(
   Attribute attr,
   String outName,    // name of outObj, for error msgs
   Object outObj,     // outObj is either NhGroup or NhVariable
+  boolean useLinear,
   int bugs)
 throws NhException
 {
@@ -664,7 +701,7 @@ throws NhException
     else throwerr("unknown type for attribute \"%s\".  Type: %s",
       atName, tp);
 
-    Object attrValue = getAttrValue( attr, bugs);
+    Object attrValue = getAttrValue( attr, useLinear, bugs);
 
     if (outObj instanceof NhGroup) {
       NhGroup outGrp = (NhGroup) outObj;
@@ -694,6 +731,9 @@ static void copyData(
   FieldSpec fspec,               // may be null
   Variable inVar,
   NhGroup outGroup,
+  boolean useLinear,
+  boolean useArray,
+  int copyNd,
   int bugs)
 throws NhException
 {
@@ -716,14 +756,16 @@ throws NhException
     exc.printStackTrace();
     throwerr("caught: " + exc);
   }
-  Object[] ndarrs = null;                  // for performance testing only
-  if (copyNd > 0) {
+
+  // Test amount of memory used when we make copyNd copies of arr.
+  if (copyNd > 0) {                 // for performance testing only
     Runtime.getRuntime().gc();
     long mema = Runtime.getRuntime().freeMemory();
-    ndarrs = new Object[copyNd];
+    Object[] ndarrs = new Object[copyNd];
     for (int ii = 0; ii < copyNd; ii++) {
       ndarrs[ii] = arr.copyToNDJavaArray();
     }
+    Runtime.getRuntime().gc();
     long memb = Runtime.getRuntime().freeMemory();
     prtf("copyNd: %d  deltaFreeMem: %d", copyNd, memb - mema);
   }
@@ -796,7 +838,7 @@ throws NhException
     }
   } // if bugs >= 0
 
-  Object rawData = decodeArray( arr, bugs);
+  Object rawData = decodeArray( arr, useLinear, bugs);
 
   int[] strts = null;      // startIxs for chunks
   if (inVar.getRank() > 0) strts = new int[ inVar.getRank()];
@@ -953,7 +995,8 @@ throws NhException
   } // if chunkLens were specified
 
   else {   // else no chunkLens
-    nhVar.writeData( strts, rawData, useLinear);
+    if (useArray) nhVar.writeData( strts, arr, useLinear);
+    else nhVar.writeData( strts, rawData, useLinear);
   }
 } // end copyData
 
@@ -962,7 +1005,10 @@ throws NhException
 
 
 
-static Object getAttrValue( Attribute attr, int bugs)
+static Object getAttrValue(
+  Attribute attr,
+  boolean useLinear,
+  int bugs)
 throws NhException
 {
   if (bugs >= 1) prtf("getAttrValue: attr: %s", attr);
@@ -984,7 +1030,7 @@ throws NhException
   }
   else {                    // else not String
     Array arr = attr.getValues();
-    attrValue = decodeArray( arr, bugs);
+    attrValue = decodeArray( arr, useLinear, bugs);
   }
   if (bugs >= 1) prtf("  getAttrValue: return attrValue: %s  cls: %s",
     attrValue, attrValue.getClass());
@@ -994,9 +1040,14 @@ throws NhException
 
 
 
+
+
 // Do special handling of scalars, string arrays.
 
-static Object decodeArray( Array arr, int bugs)
+static Object decodeArray(
+  Array arr,
+  boolean useLinear,
+  int bugs)
 throws NhException
 {
   if (bugs >= 1) {
@@ -1034,7 +1085,7 @@ throws NhException
 
   // Special case for Strings.
   if (eleType == "".getClass()) {        // if Strings
-    resObj = decodeStringArray( arr, bugs);
+    resObj = decodeStringArray( arr, useLinear, bugs);
   }
 
   // Special case for scalar data of primitives.
@@ -1064,7 +1115,10 @@ throws NhException
 
 
 
-static Object decodeStringArray( Array arr, int bugs)
+static Object decodeStringArray(
+  Array arr,
+  boolean useLinear,
+  int bugs)
 throws NhException
 {
   Class eleType = arr.getElementType();
@@ -1077,6 +1131,9 @@ throws NhException
 
   Index index = arr.getIndex();
   if (rank == 0) resObj = arr.getObject( 0);
+  else if (useLinear) {
+    resObj = arr.getStorage();
+  }
   else if (rank == 1) {
     String[] stgs = new String[shape[0]];
     for (int ia = 0; ia < shape[0]; ia++) {
@@ -1084,7 +1141,6 @@ throws NhException
       stgs[ia] = (String) arr.getObject( index);
     }
     resObj = stgs;
-    if (useLinear) resObj = arr.getStorage();
   }
   else if (rank == 2) {
     String[][] stgs = new String[shape[0]][shape[1]];
@@ -1096,7 +1152,6 @@ throws NhException
       }
     }
     resObj = stgs;
-    if (useLinear) resObj = arr.getStorage();
   }
   else if (rank == 3) {
     String[][][] stgs = new String[shape[0]][shape[1]][shape[2]];
