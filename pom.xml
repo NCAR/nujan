@@ -11,17 +11,17 @@
     <groupId>edu.ucar.ral</groupId>
     <artifactId>nujan</artifactId>
     <packaging>bundle</packaging>
-    <version>1.2-SNAPSHOT</version>
+    <version>1.2-RELEASE</version>
     <name>Pure Java NetCDF 4/HDF 5 writing library</name>
     <url>http://wiki.ucar.edu/display/NNEWD</url>
 
     <ciManagement>
-        <system>hudson</system>
-        <url>http://nnew-build:8080/hudson/job/Nujan/</url>
+        <system>jenkins</system>
+        <url>http://nnew-build:8080/jenkins/job/Nujan/</url>
     </ciManagement>
     <!--
-         ciManagement> <system>hudson</system>
-         <url>http://${ncar.build.host}:8080/hudson</url> </ciManagement -->
+         ciManagement> <system>jenkins</system>
+         <url>http://${ncar.build.host}:8080/jenkins</url> </ciManagement -->
 
     <scm>
         <connection>scm:svn:http://svn.wx.ll.mit.edu/svn/nc4writer/trunk</connection>
