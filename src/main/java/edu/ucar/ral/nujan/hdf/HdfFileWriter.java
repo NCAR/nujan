@@ -69,7 +69,7 @@ public class HdfFileWriter extends BaseBlk {
 
 
 
-static String softwareVersion = "0.9.1";
+static String softwareVersion = "0.9.2";
 
 /**
  * Bit flag for optFlag: allow overwrite of an existing file.
