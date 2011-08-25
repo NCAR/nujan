@@ -28,6 +28,8 @@ package edu.ucar.ral.nujan.netcdf;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 
 import ucar.ma2.Array;
 import ucar.ma2.DataType;
@@ -59,19 +61,61 @@ import edu.ucar.ral.nujan.netcdf.NhVariable;
 //     writeData( LinVec)
 
 class FieldSpec {
-  String name;
-  int iscale;
-  double mfact;
-  boolean isFound;
-  int[] chunkLens;
 
-  FieldSpec( String name, int iscale, double mfact) {
-    this.name = name;
-    this.iscale = iscale;
-    this.mfact = mfact;
-    this.isFound = false;
-    this.chunkLens = null;
-  }
+boolean isSpec;           // true if user specified it
+String name;
+int iscale;
+boolean useDiff;
+double mfact;
+boolean isFound;
+int[] chunkLens;
+
+// The following fields are filled by getStatistics.
+int numEle;
+double minVal;
+double maxVal;
+double sumVal;
+double maxRoundDelta;
+
+// The following fields are filled in elsewhere.
+int nhPackType;
+double offset;
+int packFillValue;
+Object origFillValueObj;
+
+
+FieldSpec(
+  boolean isSpec,
+  String name,
+  int iscale,
+  boolean useDiff,
+  double mfact)
+{
+  this.isSpec = isSpec;
+  this.name = name;
+  this.iscale = iscale;
+  this.useDiff = useDiff;
+  this.mfact = mfact;
+  this.isFound = false;
+  this.chunkLens = null;
+}
+
+public String toString() {
+  String res = "name: " + name + "\n"
+    + "  isSpec: " + isSpec + "\n"
+    + "  iscale: " + iscale + "\n"
+    + "  useDiff: " + useDiff + "\n"
+    + "  mfact: " + mfact + "\n"
+    + "  numEle: " + numEle + "\n"
+    + "  minVal: " + minVal + "\n"
+    + "  maxVal: " + maxVal + "\n"
+    + "  nhPackType: " + NhVariable.nhTypeNames[nhPackType] + "\n"
+    + "  offset: " + offset + "\n"
+    + "  packFillValue: " + packFillValue + "\n"
+    + "  origFillValueObj: " + origFillValueObj + "\n";
+  return res;
+}
+
 } // end class FieldSpec
 
 
@@ -92,6 +136,7 @@ class FieldSpec {
 public class NhCopy {
 
 
+final static int SCALE_MISSING = -999999;
 
 public static void main( String[] args) {
   try {
@@ -115,14 +160,19 @@ static void badparms( int bugs, String msg) {
   prtf("  -inFile     input file name.");
   prtf("  -outFile    output file name.");
   prtf("");
-  prtf("  -field      name:rounding.");
+  prtf("  -field      name");
   prtf("              or");
-  prtf("              name:rounding:chunkLen,chunkLen,... (one len per dim).");
+  prtf("              name:iscale.");
+  prtf("              or");
+  prtf("              name:iscale:chunkLen,chunkLen,... (one len per dim).");
   prtf("              The -field arg may be repeated.");
   prtf("                name: fully qualified field name.");
-  prtf("                rounding: \"none\" or use rounding, like grib2:");
-  prtf("                  mfact = 10^rounding");
-  prtf("                  val = ((int) (mfact * val)) / mfact");
+  prtf("                iscale: \"none\" or int scaling value, like grib2:");
+  prtf("                  iscale == num digits to right of dec point.");
+  prtf("                  mfact = 10^iscale");
+  prtf("                  encodedVal = (int) (mfact * trueVal)");
+  prtf("                  If iscale is followed by \"d\", like \"2d\",");
+  prtf("                  we use spatial differencing.");
   prtf("                chunkLens: The chunkLen for each dimension,");
   prtf("                  or omitted.");
   prtf("                Note: this feature is for testing only,");
@@ -132,8 +182,6 @@ static void badparms( int bugs, String msg) {
     prtf("  -utcModTime  0: now, or yyyy-mm-dd or yyyy-mm-ddThh:mm:ss");
     prtf("  -useLinear   use linear mode (not with chunks)");
     prtf("  -useArray    pass netcdf Array to writeData (not with chunks)");
-    prtf("  -copyNd <int>   Test amount of memory used when we make copyNd");
-    prtf("                  copies of the netcdf Array.");
   }
   prtf("");
   prtf("Example:");
@@ -157,12 +205,12 @@ throws NhException
   int compressionLevel = -1;
   String inFile = null;
   String outFile = null;
-  ArrayList<FieldSpec> fieldList = new ArrayList<FieldSpec>();
+  int numFieldSpec = 0;
+  HashMap<String,FieldSpec> fieldMap = new HashMap<String,FieldSpec>();
 
   long utcModTime = 0;
   boolean useLinear = false;        // for performance testing only
   boolean useArray = false;         // for performance testing only
-  int copyNd = 0;                   // for performance testing only
 
   int iarg = 0;
   while (iarg < args.length) {
@@ -179,19 +227,26 @@ throws NhException
     else if (key.equals("-outFile")) outFile = val;
 
     else if (key.equals("-field")) {
+      numFieldSpec++;
       String[] toks = val.split(":");
       String name = toks[0];
-      int iscale = -9999;
+      int iscale = SCALE_MISSING;
+      boolean useDiff = false;
       double mfact = 0;
       if (toks.length == 0) badparms( bugs, "invalid -field spec");
       else if (toks.length == 1
         || toks.length == 2 && toks[1].equals("none"))
       {
-        iscale = -9999;
+        iscale = SCALE_MISSING;
+        useDiff = false;
         mfact = 0;
       }
       else {
         if (toks.length < 2) badparms( bugs, "invalid -field spec");
+        if (toks[1].endsWith("d")) {
+          toks[1] = toks[1].substring( 0, toks[1].length() - 1);
+          useDiff = true;
+        }
         iscale = parseInt( "scale", toks[1]);
         mfact = 1;
         if (iscale < 0) {
@@ -201,8 +256,8 @@ throws NhException
           for (int ii = 0; ii < iscale; ii++) mfact *= 10;
         }
       }
-      FieldSpec fspec = new FieldSpec( name, iscale, mfact);
-      fieldList.add( fspec);
+      FieldSpec fspec = new FieldSpec( true, name, iscale, useDiff, mfact);
+      fieldMap.put( name, fspec);
       if (toks.length > 2) {      // get chunkLens
         fspec.chunkLens = new int[ toks.length - 2];
         for (int ii = 0; ii < fspec.chunkLens.length; ii++) {
@@ -227,12 +282,9 @@ throws NhException
     }
 
     else if (key.equals("-useLinear"))
-      useLinear = parseBoolean("-useBoolean", val);
+      useLinear = parseBoolean("-useLinear", val);
     else if (key.equals("-useArray"))
-      useArray = parseBoolean("-useBoolean", val);
-    else if (key.equals("-testValNdArray")) {
-      copyNd = parseInt( "testValNdArray", val);
-    }
+      useArray = parseBoolean("-useArray", val);
 
     else badparms( bugs, "unknown parm: \"" + key + "\"");
   }
@@ -240,8 +292,7 @@ throws NhException
   if (inFile == null) badparms( bugs, "parm not specified: -inFile");
   if (outFile == null) badparms( bugs, "parm not specified: -outFile");
 
-  FieldSpec[] fieldSpecs = fieldList.toArray( new FieldSpec[0]);
-  for (FieldSpec fspec : fieldSpecs) {
+  for (FieldSpec fspec : fieldMap.values()) {
     if (fspec.chunkLens != null) {
       // To implement useLinear with chunkLens:  See doc at top.
       if (useLinear)
@@ -249,17 +300,22 @@ throws NhException
       if (useArray)
         throwerr("Sorry, useArray with chunkLens not yet implemented.");
     }
+    if (fspec.iscale != SCALE_MISSING && ! useLinear)
+      throwerr("Sorry, scaling requires useLinear.");
   }
 
   if (bugs >= 1) {
     prtf("copyIt: compress: %d", compressionLevel);
     prtf("copyIt: inFile: \"%s\"", inFile);
     prtf("copyIt: outFile: \"%s\"", outFile);
-    if (fieldSpecs.length == 0) prtf("copyIt: fields: (all)");
+    if (numFieldSpec == 0) prtf("copyIt: fields: (all)");
     else {
-      for (FieldSpec fspec : fieldSpecs) {
+      String[] keys = fieldMap.keySet().toArray( new String[0]);
+      Arrays.sort( keys);
+      for (String key : keys) {
+        FieldSpec fspec = fieldMap.get( key);
         String tmsg = "none";
-        if (fspec.iscale != -9999) tmsg = "" + fspec.iscale;
+        if (fspec.iscale != SCALE_MISSING) tmsg = "" + fspec.iscale;
         prtf("copyIt: field: \"" + fspec.name + "\"  iscale: " + tmsg);
         if (fspec.chunkLens != null)
           prtf("  chunkLens: " + formatInts( fspec.chunkLens));
@@ -284,13 +340,13 @@ throws NhException
     NhGroup outGroup = outCdf.getRootGroup();
 
     // pass 1: define vars
-    copyGroup( 1, fieldSpecs, compressionLevel, inGroup, outGroup,
-      useLinear, useArray, copyNd, bugs);
+    copyGroup( 1, numFieldSpec, fieldMap, compressionLevel,
+      inGroup, outGroup, useLinear, useArray, bugs);
     outCdf.endDefine();
 
     // pass 2: copy data
-    copyGroup( 2, fieldSpecs, compressionLevel, inGroup, outGroup,
-      useLinear, useArray, copyNd, bugs);
+    copyGroup( 2, numFieldSpec, fieldMap, compressionLevel,
+      inGroup, outGroup, useLinear, useArray, bugs);
     inCdf.close();
     inCdf = null;
     outCdf.close();
@@ -302,7 +358,10 @@ throws NhException
   }
 
   boolean allOk = true;
-  for (FieldSpec fspec : fieldSpecs) {
+  String[] keys = fieldMap.keySet().toArray( new String[0]);
+  Arrays.sort( keys);
+  for (String key : keys) {
+    FieldSpec fspec = fieldMap.get( key);
     if (! fspec.isFound) {
       allOk = false;
       prtf("Error: field not found: \"" + fspec.name + "\"");
@@ -318,13 +377,13 @@ throws NhException
 
 static void copyGroup(
   int pass,                  // 1: define vars;  2: copy data
-  FieldSpec[] fieldSpecs,    // if len==0, use all fields
+  int numFieldSpec,
+  HashMap<String,FieldSpec> fieldMap,
   int compressionLevel,      // 0: no compression;  9: max compression
   Group inGroup,
   NhGroup outGroup,
   boolean useLinear,
   boolean useArray,
-  int copyNd,
   int bugs)
 throws NhException
 {
@@ -344,11 +403,16 @@ throws NhException
     if (bugs >= 2) prtf("NhCopy.copyGroup: pass: "
       + pass + "  var: " + var.getName());
 
-    FieldSpec fspec = findFieldSpec( fieldSpecs, var.getName());
-    if (fspec != null) fspec.isFound = true;
+    FieldSpec fspec = fieldMap.get( var.getName());
+    if (fspec == null) {
+      fspec = new FieldSpec(
+        false, var.getName(), SCALE_MISSING, false, 0);  // isSpec=false
+      fieldMap.put( var.getName(), fspec);
+    }
+    fspec.isFound = true;
     // Only process the field if it is in fieldSpecs,
     // or if no fieldSpecs were given.
-    if (fieldSpecs.length == 0 || fspec != null) {
+    if (numFieldSpec == 0 || fspec.isSpec) {
       if (var.getDataType() == DataType.STRUCTURE) {
         if (pass == 1) prtf("Warning: skipping structure: " + var);
       }
@@ -357,7 +421,7 @@ throws NhException
           copyVarDef( fspec, compressionLevel, var, outGroup,
             useLinear, bugs);
         else copyData( fspec, var, outGroup,
-          useLinear, useArray, copyNd, bugs);
+          useLinear, useArray, bugs);
       }
     }
   }
@@ -367,29 +431,11 @@ throws NhException
     if (pass == 1) outSub = outGroup.addGroup( inSub.getShortName());
     else outSub = outGroup.findSubGroup( inSub.getShortName());
 
-    copyGroup( pass, fieldSpecs, compressionLevel, inSub, outSub,
-      useLinear, useArray, copyNd, bugs);
+    copyGroup( pass, numFieldSpec, fieldMap, compressionLevel,
+      inSub, outSub, useLinear, useArray, bugs);
   }
   
 } // end copyGroup
-
-
-
-
-
-static FieldSpec findFieldSpec(
-  FieldSpec[] fieldSpecs,
-  String name)
-{
-  FieldSpec fspec = null;
-  for (FieldSpec tspec : fieldSpecs) {
-    if (tspec.name.equals( name)) {
-      fspec = tspec;
-      break;
-    }
-  }
-  return fspec;
-}
 
 
 
@@ -436,6 +482,41 @@ throws NhException
   else throwerr("unknown type \"%s\" for variable \"%s\"",
     tp, inVar.getName());
 
+  //xxx
+  if (fspec.iscale != SCALE_MISSING) {
+    if (tp != DataType.FLOAT && tp != DataType.DOUBLE
+      && tp != DataType.BYTE && tp != DataType.INT
+      && tp != DataType.LONG && tp != DataType.SHORT)
+      throwerr("cannot scale a non-numeric type");
+    Array arr = null;
+    try { arr = inVar.read(); }
+    catch( IOException exc) {
+      exc.printStackTrace();
+      throwerr("caught: " + exc);
+    }
+    getStatistics( tp, arr, fspec);
+    double range = (fspec.maxVal - fspec.minVal) * fspec.mfact;
+    if (range < 250) {
+      fspec.nhPackType = NhVariable.TP_SBYTE;
+      fspec.offset = fspec.minVal + 125;
+      fspec.packFillValue = -126;
+    }
+    else if (range < 64000) {
+      fspec.nhPackType = NhVariable.TP_SHORT;
+      fspec.offset = fspec.minVal + 32000;
+      fspec.packFillValue = -32001;
+    }
+    else if (range < 4294000000.0) {
+      fspec.nhPackType = NhVariable.TP_INT;
+      fspec.offset = fspec.minVal + 2147000000;
+      fspec.packFillValue = -2147000001;
+    }
+    else {       // range is too big to be packed
+      fspec.iscale = SCALE_MISSING;
+    }
+    prtf("copyVarDef: fspec: " + fspec);
+  }
+
   ///String tmsg = "NhCopy.copyVarDef: " + inVar.getNameAndDimensions();
   ///tmsg += " [";
   ///for (int ii = 0; ii < inVar.getRank(); ii++) {
@@ -459,10 +540,11 @@ throws NhException
   }
 
   // Get the fill value, if specified
-  Object fillValue = null;
+  fspec.origFillValueObj = null;
   Attribute fillAttr = inVar.findAttribute("_FillValue");
   if (fillAttr != null) {
-    fillValue = getAttrValue( fillAttr, useLinear, bugs);
+    //xxx
+    Object fillValue = getAttrValue( fillAttr, useLinear, bugs);
 
     // Unfortunately NetCDF stores type "char" as HDF5 strings of length 1,
     // but returns a fill value as a Byte or byte[].
@@ -533,12 +615,14 @@ throws NhException
       if (fillValue instanceof Object[])
         throwerr("invalid fillValue for inVar: " + inVar);
     }
+
+    fspec.origFillValueObj = fillValue;
   }
 
 
   int[] useChunkLens = null;
   if (nhDims.length > 0) {
-    if (fspec != null && fspec.chunkLens != null) {
+    if (fspec.chunkLens != null) {
       if (nhDims.length == 0)
         throwerr("cannot spec chunkLens for scaler.  inVar: " + inVar);
       if (fspec.chunkLens.length != nhDims.length)
@@ -556,17 +640,66 @@ throws NhException
 
   int compress = compressionLevel;
   if (nhDims.length == 0) compress = 0;        // cannot compress a scalar
+  int tmpType = nhType;
+  Object tmpFill = fspec.origFillValueObj;
+  if (fspec.iscale != SCALE_MISSING) {
+    tmpType = fspec.nhPackType;
+    if (fspec.nhPackType == NhVariable.TP_SBYTE)
+      tmpFill = new Byte( (byte) fspec.packFillValue);
+    else if (fspec.nhPackType == NhVariable.TP_SHORT)
+      tmpFill = new Short( (short) fspec.packFillValue);
+    else if (fspec.nhPackType == NhVariable.TP_INT)
+      tmpFill = new Integer( (int) fspec.packFillValue);
+    else throwerr("unknown nhPackType");
+  }
   NhVariable outVar = outGroup.addVariable(
     inVar.getShortName(),
-    nhType,
+    tmpType,
     nhDims,
     useChunkLens,
-    fillValue,
+    tmpFill,
     compress);
+
+  //xxx
+  if (fspec.iscale != SCALE_MISSING) {
+    outVar.addAttribute(        // _Scale
+      "_Scale",
+      NhVariable.TP_FLOAT,
+      (float) (1 / fspec.mfact));
+    outVar.addAttribute(        // scale_factor
+      "scale_factor",
+      NhVariable.TP_FLOAT,
+      (float) (1 / fspec.mfact));
+    outVar.addAttribute(        // _Offset
+      "_Offset",
+      NhVariable.TP_FLOAT,
+      (float) fspec.offset);
+    outVar.addAttribute(        // add_offset
+      "add_offset",
+      NhVariable.TP_FLOAT,
+      (float) fspec.offset);
+    outVar.addAttribute(        // _FillValue
+      "_FillValue",
+      tmpType,
+      tmpFill);
+  }
 
   // Copy attributes
   for (Attribute attr : inVar.getAttributes()) {
-    copyAttribute( attr, outVar.getName(), outVar, useLinear, bugs);
+    // Don't copy scale/offset attrs if we set them above
+    if (fspec.iscale != SCALE_MISSING
+      && (attr.getName().equals("_Scale")
+        || attr.getName().equals("scale_factor")
+        || attr.getName().equals("_Offset")
+        || attr.getName().equals("add_offset")
+        || attr.getName().equals("_FillValue")))
+    {
+      if (bugs >= 0) prtf("attribute changed for scaling: %s/%s",
+        inVar.getName(), attr.getName());
+    }
+    else {
+      copyAttribute( attr, outVar.getName(), outVar, useLinear, bugs);
+    }
   }
 
 } // end copyVarDef
@@ -728,12 +861,11 @@ throws NhException
 
 
 static void copyData(
-  FieldSpec fspec,               // may be null
+  FieldSpec fspec,
   Variable inVar,
   NhGroup outGroup,
   boolean useLinear,
   boolean useArray,
-  int copyNd,
   int bugs)
 throws NhException
 {
@@ -757,21 +889,10 @@ throws NhException
     throwerr("caught: " + exc);
   }
 
-  // Test amount of memory used when we make copyNd copies of arr.
-  if (copyNd > 0) {                 // for performance testing only
-    Runtime.getRuntime().gc();
-    long mema = Runtime.getRuntime().freeMemory();
-    Object[] ndarrs = new Object[copyNd];
-    for (int ii = 0; ii < copyNd; ii++) {
-      ndarrs[ii] = arr.copyToNDJavaArray();
-    }
-    Runtime.getRuntime().gc();
-    long memb = Runtime.getRuntime().freeMemory();
-    prtf("copyNd: %d  deltaFreeMem: %d", copyNd, memb - mema);
-  }
-
   // Print helpful info: min, max
   if (bugs >= 0) {
+    if (fspec.numEle == 0) getStatistics( inVar.getDataType(), arr, fspec);
+
     String tmsg = "  variable: \"" + inVar.getName() + "\"";
 
     tmsg += " (";
@@ -792,213 +913,375 @@ throws NhException
     DataType tp = inVar.getDataType();
     tmsg += "  type: " + tp;
 
-    if (fspec == null || fspec.iscale == -9999) tmsg += "  iscale: none";
+    if (fspec.iscale == SCALE_MISSING)
+      tmsg += "  iscale: none";
     else tmsg += "  iscale: " + fspec.iscale;
 
-    if (tp == DataType.FLOAT || tp == DataType.DOUBLE) {
-      double minVal = Double.MAX_VALUE;
-      double maxVal = Double.MIN_VALUE;
-      double total = 0;
-      for (int ii = 0; ii < arr.getSize(); ii++) {
-        double vv = arr.getDouble(ii);
-        if (vv < minVal) minVal = vv;
-        if (vv > maxVal) maxVal = vv;
-        total += vv;
-        if (fspec != null && fspec.iscale != -9999) {
-          double roundVal = ((int) (fspec.mfact * vv)) / fspec.mfact;
-          arr.setDouble( ii, roundVal);
-        }
-      }
-      prtf( tmsg + "  min: %g  max: %g  avg: %g",
-        minVal, maxVal, total / (double) arr.getSize());
-    } // if some type of float
-
-    else if (tp == DataType.BYTE || tp == DataType.INT
-     || tp == DataType.LONG || tp == DataType.SHORT)
+    if (tp == DataType.FLOAT || tp == DataType.DOUBLE
+      || tp == DataType.BYTE || tp == DataType.INT
+      || tp == DataType.LONG || tp == DataType.SHORT)
     {
-      long minVal = Long.MAX_VALUE;
-      long maxVal = Long.MIN_VALUE;
-      long total = 0;
-      for (int ii = 0; ii < arr.getSize(); ii++) {
-        long vv = arr.getLong(ii);
-        if (vv < minVal) minVal = vv;
-        if (vv > maxVal) maxVal = vv;
-        total += vv;
-        if (fspec != null && fspec.iscale != -9999) {
-          double roundVal = ((int) (fspec.mfact * vv)) / fspec.mfact;
-          arr.setLong( ii, (long) roundVal);
-        }
-      }
-      prtf( tmsg + "  min: %d  max: %d  avg: %g",
-        minVal, maxVal, total / (double) arr.getSize());
-    } // if some type of integer
-
-    else {
-      prtf(  tmsg);
+      tmsg += String.format("  min: %g  max: %g  avg: %g",
+      fspec.minVal, fspec.maxVal, fspec.sumVal / (double) fspec.numEle);
     }
+    prtf( tmsg);
   } // if bugs >= 0
 
   Object rawData = decodeArray( arr, useLinear, bugs);
 
   int[] strts = null;      // startIxs for chunks
   if (inVar.getRank() > 0) strts = new int[ inVar.getRank()];
-  if (fspec != null && fspec.chunkLens != null) {
 
-    // Get dimLens so we can check chunkLens
-    NhDimension[] nhDims = getNhDims( inVar, outGroup);
-    int[] dimLens = new int[nhDims.length];
-    for (int ii = 0; ii < dimLens.length; ii++) {
-      dimLens[ii] = nhDims[ii].getLength();
+  if (fspec.iscale != SCALE_MISSING) {
+    //xxx
+    int[] ivals = null;
+
+    if (! useLinear) throwerr("useScaling requires useLinear");
+    if (inVar.getDataType() == DataType.BYTE) {
+      byte[] vals = (byte[]) rawData;
+      int vlen = vals.length;
+      ivals = new int[ vlen];
+      for (int ii = 0; ii < vlen; ii++) {
+        int vv = vals[ii];
+        if (fspec.origFillValueObj != null
+          && vv == ((Byte) fspec.origFillValueObj).byteValue())
+        {
+          ivals[ii] = fspec.packFillValue;
+        }
+        else {
+          if (fspec.useDiff && ii > 0) vv = vals[ii] - vals[ii-1];
+          ivals[ii] = (int) Math.round( (vv - fspec.offset) * fspec.mfact);
+        }
+      }
     }
 
-    int[] clens = fspec.chunkLens;
-    if (dimLens.length == 1) {
-      if (! (rawData instanceof float[]))
-        throwerr("wrong type for rawData: " + rawData.getClass());
-      float[] fvals = (float[]) rawData;
-      float[] chunkVals = new float[clens[0]];
-      for (strts[0] = 0; strts[0] < dimLens[0]; strts[0] += clens[0]) {
+    else if (inVar.getDataType() == DataType.SHORT) {
+      short[] vals = (short[]) rawData;
+      int vlen = vals.length;
+      ivals = new int[ vlen];
+      for (int ii = 0; ii < vlen; ii++) {
+        int vv = vals[ii];
+        if (fspec.origFillValueObj != null
+          && vv == ((Short) fspec.origFillValueObj).shortValue())
+        {
+          ivals[ii] = fspec.packFillValue;
+        }
+        else {
+          if (fspec.useDiff && ii > 0) vv = vals[ii] - vals[ii-1];
+          ivals[ii] = (int) Math.round( (vv - fspec.offset) * fspec.mfact);
+        }
+      }
+    }
+
+    else if (inVar.getDataType() == DataType.INT) {
+      int[] vals = (int[]) rawData;
+      int vlen = vals.length;
+      ivals = new int[ vlen];
+      for (int ii = 0; ii < vlen; ii++) {
+        int vv = vals[ii];
+        if (fspec.origFillValueObj != null
+          && vv == ((Integer) fspec.origFillValueObj).intValue())
+          ivals[ii] = fspec.packFillValue;
+        else {
+          if (fspec.useDiff && ii > 0) vv = vals[ii] - vals[ii-1];
+          ivals[ii] = (int) Math.round( (vv - fspec.offset) * fspec.mfact);
+        }
+      }
+    }
+
+    else if (inVar.getDataType() == DataType.FLOAT) {
+      float[] vals = (float[]) rawData;
+      int vlen = vals.length;
+      ivals = new int[ vlen];
+      for (int ii = 0; ii < vlen; ii++) {
+        float vv = vals[ii];
+        if (Float.isNaN( vv)
+          || fspec.origFillValueObj != null
+            && vv == ((Float) fspec.origFillValueObj).floatValue())
+        {
+          ivals[ii] = fspec.packFillValue;
+        }
+        else {
+          if (fspec.useDiff && ii > 0) vv = vals[ii] - vals[ii-1];
+          ivals[ii] = (int) Math.round( (vv - fspec.offset) * fspec.mfact);
+        }
+      }
+    }
+
+    else if (inVar.getDataType() == DataType.DOUBLE) {
+      double[] vals = (double[]) rawData;
+      int vlen = vals.length;
+      ivals = new int[ vlen];
+      for (int ii = 0; ii < vlen; ii++) {
+        double vv = vals[ii];
+        if (Double.isNaN(vv)
+          || fspec.origFillValueObj != null
+            && vv == ((Double) fspec.origFillValueObj).doubleValue())
+        {
+          ivals[ii] = fspec.packFillValue;
+        }
+        else {
+          if (fspec.useDiff && ii > 0) vv = vals[ii] - vals[ii-1];
+          ivals[ii] = (int) Math.round( (vv - fspec.offset) * fspec.mfact);
+        }
+      }
+    }
+
+    else throwerr("unknown type for nhVar: " + nhVar);
+
+
+
+    // Convert the ints in ivals to shorts or whatever
+
+    Object finalData = null;
+    int vlen = ivals.length;
+    if (fspec.nhPackType == NhVariable.TP_SBYTE) {
+      byte[] vals = new byte[ vlen];
+      for (int ii = 0; ii < vlen; ii++) {
+        vals[ii] = (byte) ivals[ii];
+      }
+      finalData = vals;
+    }
+    else if (fspec.nhPackType == NhVariable.TP_SHORT) {
+      short[] vals = new short[ vlen];
+      for (int ii = 0; ii < vlen; ii++) {
+        vals[ii] = (short) ivals[ii];
+      }
+      finalData = vals;
+    }
+    else if (fspec.nhPackType == NhVariable.TP_INT) {
+      int[] vals = new int[ vlen];
+      for (int ii = 0; ii < vlen; ii++) {
+        vals[ii] = (int) ivals[ii];
+      }
+      finalData = vals;
+    }
+    else if (fspec.nhPackType == NhVariable.TP_FLOAT) {
+      int[] vals = new int[ vlen];
+      for (int ii = 0; ii < vlen; ii++) {
+        vals[ii] = (int) ivals[ii];
+      }
+      finalData = vals;
+    }
+    else throwerr("unknown nhPackType");
+
+    nhVar.writeData( strts, finalData, useLinear);
+
+  } // if useScaling
+
+  else if (fspec.chunkLens != null) {
+    copyDataChunked(
+      fspec,
+      rawData,
+      inVar,
+      nhVar,
+      outGroup,
+      bugs);
+  }
+
+  else if (useArray) nhVar.writeData( strts, arr, useLinear);
+
+  else nhVar.writeData( strts, rawData, useLinear);
+
+} // end copyData
+
+
+
+
+static void copyDataChunked(
+  FieldSpec fspec,
+  Object rawData,
+  Variable inVar,
+  NhVariable nhVar,
+  NhGroup outGroup,
+  int bugs)
+throws NhException
+{
+  int[] strts = null;      // startIxs for chunks
+  if (inVar.getRank() > 0) strts = new int[ inVar.getRank()];
+
+  // Get dimLens so we can check chunkLens
+  NhDimension[] nhDims = getNhDims( inVar, outGroup);
+  int[] dimLens = new int[nhDims.length];
+  for (int ii = 0; ii < dimLens.length; ii++) {
+    dimLens[ii] = nhDims[ii].getLength();
+  }
+
+  int[] clens = fspec.chunkLens;
+  if (dimLens.length == 1) {
+    if (! (rawData instanceof float[]))
+      throwerr("wrong type for rawData: " + rawData.getClass());
+    float[] fvals = (float[]) rawData;
+    float[] chunkVals = new float[clens[0]];
+    for (strts[0] = 0; strts[0] < dimLens[0]; strts[0] += clens[0]) {
+
+      int lima = Math.min( clens[0], dimLens[0] - strts[0]);
+      for (int ia = 0; ia < lima; ia++) {
+        chunkVals[ia] = fvals[strts[0]+ia];
+      }
+      nhVar.writeData( strts, chunkVals, false);  // useLinear = false
+    }
+  } // if rank == 1
+
+  else if (dimLens.length == 2) {
+    if (! (rawData instanceof float[][]))
+      throwerr("wrong type for rawData: " + rawData.getClass());
+    float[][] fvals = (float[][]) rawData;
+    float[][] chunkVals = new float[clens[0]][clens[1]];
+    for (strts[0] = 0; strts[0] < dimLens[0]; strts[0] += clens[0]) {
+      for (strts[1] = 0; strts[1] < dimLens[1]; strts[1] += clens[1]) {
 
         int lima = Math.min( clens[0], dimLens[0] - strts[0]);
+        int limb = Math.min( clens[1], dimLens[1] - strts[1]);
         for (int ia = 0; ia < lima; ia++) {
-          chunkVals[ia] = fvals[strts[0]+ia];
-        }
+          for (int ib = 0; ib < limb; ib++) {
+            chunkVals[ia][ib] = fvals[strts[0]+ia] [strts[1]+ib];
+          }
+        } // for ia
         nhVar.writeData( strts, chunkVals, false);  // useLinear = false
-      }
-    } // if rank == 1
+      } // for strts[1]
+    } // for strts[0]
+  } // if rank == 2
 
-    else if (dimLens.length == 2) {
-      if (! (rawData instanceof float[][]))
-        throwerr("wrong type for rawData: " + rawData.getClass());
-      float[][] fvals = (float[][]) rawData;
-      float[][] chunkVals = new float[clens[0]][clens[1]];
-      for (strts[0] = 0; strts[0] < dimLens[0]; strts[0] += clens[0]) {
-        for (strts[1] = 0; strts[1] < dimLens[1]; strts[1] += clens[1]) {
+  else if (dimLens.length == 3) {
+    if (! (rawData instanceof float[][][]))
+      throwerr("wrong type for rawData: " + rawData.getClass());
+    float[][][] fvals = (float[][][]) rawData;
+    float[][][] chunkVals = new float[clens[0]][clens[1]][clens[2]];
+    for (strts[0] = 0; strts[0] < dimLens[0]; strts[0] += clens[0]) {
+      for (strts[1] = 0; strts[1] < dimLens[1]; strts[1] += clens[1]) {
+        for (strts[2] = 0; strts[2] < dimLens[2]; strts[2] += clens[2]) {
 
           int lima = Math.min( clens[0], dimLens[0] - strts[0]);
           int limb = Math.min( clens[1], dimLens[1] - strts[1]);
+          int limc = Math.min( clens[2], dimLens[2] - strts[2]);
           for (int ia = 0; ia < lima; ia++) {
             for (int ib = 0; ib < limb; ib++) {
-              chunkVals[ia][ib] = fvals[strts[0]+ia] [strts[1]+ib];
+              for (int ic = 0; ic < limc; ic++) {
+                chunkVals[ia][ib][ic]
+                  = fvals[strts[0]+ia]
+                    [strts[1]+ib]
+                    [strts[2]+ic];
+              }
             }
           } // for ia
           nhVar.writeData( strts, chunkVals, false);  // useLinear = false
-        } // for strts[1]
-      } // for strts[0]
-    } // if rank == 2
+        } // for strts[2]
+      } // for strts[1]
+    } // for strts[0]
+  } // if rank == 3
 
-    else if (dimLens.length == 3) {
-      if (! (rawData instanceof float[][][]))
-        throwerr("wrong type for rawData: " + rawData.getClass());
-      float[][][] fvals = (float[][][]) rawData;
-      float[][][] chunkVals = new float[clens[0]][clens[1]][clens[2]];
-      for (strts[0] = 0; strts[0] < dimLens[0]; strts[0] += clens[0]) {
-        for (strts[1] = 0; strts[1] < dimLens[1]; strts[1] += clens[1]) {
-          for (strts[2] = 0; strts[2] < dimLens[2]; strts[2] += clens[2]) {
+  else if (dimLens.length == 4) {
+    if (! (rawData instanceof float[][][][]))
+      throwerr("wrong type for rawData: " + rawData.getClass());
+    float[][][][] fvals = (float[][][][]) rawData;
+    float[][][][] chunkVals
+      = new float[clens[0]][clens[1]][clens[2]][clens[3]];
+    for (strts[0] = 0; strts[0] < dimLens[0]; strts[0] += clens[0]) {
+      for (strts[1] = 0; strts[1] < dimLens[1]; strts[1] += clens[1]) {
+        for (strts[2] = 0; strts[2] < dimLens[2]; strts[2] += clens[2]) {
+          for (strts[3] = 0; strts[3] < dimLens[3]; strts[3] += clens[3]) {
 
             int lima = Math.min( clens[0], dimLens[0] - strts[0]);
             int limb = Math.min( clens[1], dimLens[1] - strts[1]);
             int limc = Math.min( clens[2], dimLens[2] - strts[2]);
+            int limd = Math.min( clens[3], dimLens[3] - strts[3]);
             for (int ia = 0; ia < lima; ia++) {
               for (int ib = 0; ib < limb; ib++) {
                 for (int ic = 0; ic < limc; ic++) {
-                  chunkVals[ia][ib][ic]
-                    = fvals[strts[0]+ia]
-                      [strts[1]+ib]
-                      [strts[2]+ic];
+                  for (int id = 0; id < limd; id++) {
+                    chunkVals[ia][ib][ic][id]
+                      = fvals[strts[0]+ia]
+                        [strts[1]+ib]
+                        [strts[2]+ic]
+                        [strts[3]+id];
+                  }
                 }
               }
             } // for ia
             nhVar.writeData( strts, chunkVals, false);  // useLinear = false
-          } // for strts[2]
-        } // for strts[1]
-      } // for strts[0]
-    } // if rank == 3
+          } // for strts[3]
+        } // for strts[2]
+      } // for strts[1]
+    } // for strts[0]
+  } // if rank == 4
 
-    else if (dimLens.length == 4) {
-      if (! (rawData instanceof float[][][][]))
-        throwerr("wrong type for rawData: " + rawData.getClass());
-      float[][][][] fvals = (float[][][][]) rawData;
-      float[][][][] chunkVals
-        = new float[clens[0]][clens[1]][clens[2]][clens[3]];
-      for (strts[0] = 0; strts[0] < dimLens[0]; strts[0] += clens[0]) {
-        for (strts[1] = 0; strts[1] < dimLens[1]; strts[1] += clens[1]) {
-          for (strts[2] = 0; strts[2] < dimLens[2]; strts[2] += clens[2]) {
-            for (strts[3] = 0; strts[3] < dimLens[3]; strts[3] += clens[3]) {
+  else if (dimLens.length == 5) {
+    if (! (rawData instanceof float[][][][][]))
+      throwerr("wrong type for rawData: " + rawData.getClass());
+    float[][][][][] fvals = (float[][][][][]) rawData;
+    float[][][][][] chunkVals
+      = new float[clens[0]][clens[1]][clens[2]][clens[3]][clens[4]];
+    for (strts[0] = 0; strts[0] < dimLens[0]; strts[0] += clens[0]) {
+      for (strts[1] = 0; strts[1] < dimLens[1]; strts[1] += clens[1]) {
+        for (strts[2] = 0; strts[2] < dimLens[2]; strts[2] += clens[2]) {
+          for (strts[3] = 0; strts[3] < dimLens[3]; strts[3] += clens[3]) {
+            for (strts[4] = 0; strts[4] < dimLens[4]; strts[4] += clens[4]) {
 
               int lima = Math.min( clens[0], dimLens[0] - strts[0]);
               int limb = Math.min( clens[1], dimLens[1] - strts[1]);
               int limc = Math.min( clens[2], dimLens[2] - strts[2]);
               int limd = Math.min( clens[3], dimLens[3] - strts[3]);
+              int lime = Math.min( clens[4], dimLens[4] - strts[4]);
               for (int ia = 0; ia < lima; ia++) {
                 for (int ib = 0; ib < limb; ib++) {
                   for (int ic = 0; ic < limc; ic++) {
                     for (int id = 0; id < limd; id++) {
-                      chunkVals[ia][ib][ic][id]
-                        = fvals[strts[0]+ia]
-                          [strts[1]+ib]
-                          [strts[2]+ic]
-                          [strts[3]+id];
+                      for (int ie = 0; ie < lime; ie++) {
+                        chunkVals[ia][ib][ic][id][ie]
+                          = fvals[strts[0]+ia]
+                            [strts[1]+ib]
+                            [strts[2]+ic]
+                            [strts[3]+id]
+                            [strts[4]+ie];
+                      }
                     }
                   }
                 }
               } // for ia
-              nhVar.writeData( strts, chunkVals, false);  // useLinear = false
-            } // for strts[3]
-          } // for strts[2]
-        } // for strts[1]
-      } // for strts[0]
-    } // if rank == 4
+              nhVar.writeData( strts, chunkVals, false); // useLinear = false
+            } // for strts[4]
+          } // for strts[3]
+        } // for strts[2]
+      } // for strts[1]
+    } // for strts[0]
+  } // if rank == 5
+  else throwerr("higher dims not supported yet");
 
-    else if (dimLens.length == 5) {
-      if (! (rawData instanceof float[][][][][]))
-        throwerr("wrong type for rawData: " + rawData.getClass());
-      float[][][][][] fvals = (float[][][][][]) rawData;
-      float[][][][][] chunkVals
-        = new float[clens[0]][clens[1]][clens[2]][clens[3]][clens[4]];
-      for (strts[0] = 0; strts[0] < dimLens[0]; strts[0] += clens[0]) {
-        for (strts[1] = 0; strts[1] < dimLens[1]; strts[1] += clens[1]) {
-          for (strts[2] = 0; strts[2] < dimLens[2]; strts[2] += clens[2]) {
-            for (strts[3] = 0; strts[3] < dimLens[3]; strts[3] += clens[3]) {
-              for (strts[4] = 0; strts[4] < dimLens[4]; strts[4] += clens[4]) {
+} // end copyDataChunked
 
-                int lima = Math.min( clens[0], dimLens[0] - strts[0]);
-                int limb = Math.min( clens[1], dimLens[1] - strts[1]);
-                int limc = Math.min( clens[2], dimLens[2] - strts[2]);
-                int limd = Math.min( clens[3], dimLens[3] - strts[3]);
-                int lime = Math.min( clens[4], dimLens[4] - strts[4]);
-                for (int ia = 0; ia < lima; ia++) {
-                  for (int ib = 0; ib < limb; ib++) {
-                    for (int ic = 0; ic < limc; ic++) {
-                      for (int id = 0; id < limd; id++) {
-                        for (int ie = 0; ie < lime; ie++) {
-                          chunkVals[ia][ib][ic][id][ie]
-                            = fvals[strts[0]+ia]
-                              [strts[1]+ib]
-                              [strts[2]+ic]
-                              [strts[3]+id]
-                              [strts[4]+ie];
-                        }
-                      }
-                    }
-                  }
-                } // for ia
-                nhVar.writeData( strts, chunkVals, false); // useLinear = false
-              } // for strts[4]
-            } // for strts[3]
-          } // for strts[2]
-        } // for strts[1]
-      } // for strts[0]
-    } // if rank == 5
-    else throwerr("higher dims not supported yet");
 
-  } // if chunkLens were specified
 
-  else {   // else no chunkLens
-    if (useArray) nhVar.writeData( strts, arr, useLinear);
-    else nhVar.writeData( strts, rawData, useLinear);
-  }
-} // end copyData
+
+
+static void getStatistics(
+  DataType tp,
+  Array arr,
+  FieldSpec fspec)
+{
+  fspec.numEle = 0;
+  fspec.sumVal = 0;
+  fspec.minVal = Double.MAX_VALUE;
+  fspec.maxVal = Double.MIN_VALUE;
+  fspec.maxRoundDelta = 0;
+
+  if (tp == DataType.FLOAT || tp == DataType.DOUBLE
+    || tp == DataType.BYTE || tp == DataType.INT
+    || tp == DataType.LONG || tp == DataType.SHORT)
+  {
+    for (int ii = 0; ii < arr.getSize(); ii++) {
+      fspec.numEle++;
+      double vv = arr.getDouble(ii);
+      if (vv < fspec.minVal) fspec.minVal = vv;
+      if (vv > fspec.maxVal) fspec.maxVal = vv;
+      fspec.sumVal += vv;
+      double roundDelta = Math.abs( vv - Math.round( vv));
+      if (roundDelta > fspec.maxRoundDelta)
+        fspec.maxRoundDelta = roundDelta;
+    }
+  } // if some type of numeric
+} // end getStatistics
+
 
 
 
@@ -1104,7 +1387,7 @@ throws NhException
   }
 
   else {
-    if (useLinear) resObj = arr.getStorage();
+    if (useLinear) resObj = arr.copyTo1DJavaArray();
     else resObj = arr.copyToNDJavaArray();
   }
   return resObj;
@@ -1132,7 +1415,7 @@ throws NhException
   Index index = arr.getIndex();
   if (rank == 0) resObj = arr.getObject( 0);
   else if (useLinear) {
-    resObj = arr.getStorage();
+    resObj = arr.copyTo1DJavaArray();
   }
   else if (rank == 1) {
     String[] stgs = new String[shape[0]];

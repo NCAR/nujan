@@ -615,7 +615,7 @@ throws HdfException
   if (isVariable) throwerr("cannot add a group to a variable");
   if (findSubItem( subName) != null)
     throwerr("Duplicate subgroup.  The group \"%s\" already contains"
-      + "  a subgroup or variable named \"%s\"",
+      + " a subgroup or variable named \"%s\"",
       groupName, subName);
 
   HdfGroup subGroup = new HdfGroup( subName, this, hdfFile);
@@ -685,7 +685,7 @@ throws HdfException
   if (isVariable) throwerr("cannot add a variable to a variable");
   if (findSubItem( varName) != null)
     throwerr("Duplicate subgroup.  The group \"%s\" already contains"
-      + "  a subgroup or variable named \"%s\"",
+      + " a subgroup or variable named \"%s\"",
       groupName, varName);
   long statTimea = hdfFile.printStat( 0, "grp.addVariable.entry",
     "varName: " + varName
@@ -778,7 +778,7 @@ throws HdfException
 
   if (findAttribute( attrName) != null)
     throwerr("Duplicate attribute.  The group \"%s\" already contains"
-      + "  an attribute named \"%s\"",
+      + " an attribute named \"%s\"",
       getPath(), attrName);
 
   // If attrType==DTYPE_STRING_FIX and stgFieldLen==0,

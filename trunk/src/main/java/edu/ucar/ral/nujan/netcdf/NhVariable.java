@@ -530,8 +530,7 @@ throws NhException
     }
     else if (useLinear) {
       // copyTo1DJavaArray just calls cp = Array.copy(), cp.getStorage().
-      //Object storObj = ((Array) rawData).copyTo1DJavaArray();
-      rawData = arr.getStorage();
+      rawData = arr.copyTo1DJavaArray();
     }
     else {
       rawData = ((Array) rawData).copyToNDJavaArray();
