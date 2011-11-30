@@ -340,6 +340,7 @@ throws IOException, HdfException
     if (compressionLevel > 0) {
       deflater.finish();
       writeCompressedOutput();
+      deflater.end();
     }
     else {
       bbuf.flip();
