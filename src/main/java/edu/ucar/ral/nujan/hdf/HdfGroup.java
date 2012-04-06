@@ -1396,6 +1396,10 @@ throws HdfException
   //   6-7: reserved
 
   int lenMask;
+  //if (prevChunk0Len <= Byte.MAX_VALUE) lenMask = 0;
+  //else if (prevChunk0Len <= Short.MAX_VALUE) lenMask = 1;
+  //else if (prevChunk0Len <= Integer.MAX_VALUE) lenMask = 2;
+  //else lenMask = 3;
   if (prevChunk0Len <= 255) lenMask = 0;
   else if (prevChunk0Len <= 65535) lenMask = 1;
   else if (prevChunk0Len <= 4294967295L) lenMask = 2;
