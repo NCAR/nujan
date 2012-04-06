@@ -433,8 +433,6 @@ void putBufShort(
 throws HdfException
 {
   expandBuf( 2);
-  if (value < Short.MIN_VALUE || value > Short.MAX_VALUE)
-    throwerr("putBufShort: invalid value: " + value);
   if (hdfFile.bugs >= 5) printValue( 2, name, new Short( (short) value));
   bbuf.putShort( (short) value);
 }

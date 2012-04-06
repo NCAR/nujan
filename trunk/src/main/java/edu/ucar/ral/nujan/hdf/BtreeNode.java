@@ -57,7 +57,7 @@ ArrayList<byte[]> keyList;
 
 int compressionLevel;
 
-final int signa = 'T';
+final int signa = 'T';       // "TREE"
 final int signb = 'R';
 final int signc = 'E';
 final int signd = 'E';
@@ -206,7 +206,7 @@ throws HdfException
   int numChunk = hdfGroup.hdfChunks.length;
   if (numChunk > hdfFile.maxNumBtreeKid) hdfFile.maxNumBtreeKid = numChunk;
 
-  fmtBuf.putBufByte("BtreeNode: signa", signa);
+  fmtBuf.putBufByte("BtreeNode: signa", signa);       // "TREE"
   fmtBuf.putBufByte("BtreeNode: signb", signb);
   fmtBuf.putBufByte("BtreeNode: signc", signc);
   fmtBuf.putBufByte("BtreeNode: signd", signd);

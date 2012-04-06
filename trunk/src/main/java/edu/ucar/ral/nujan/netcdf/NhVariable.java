@@ -410,7 +410,7 @@ public boolean attributeExists(
  * <p>
  *
  * @param attrName The name of the new attribute.
- * @param atType The type of the new variable: one of NhVariable.TP_*.
+ * @param atType The type of the new attribute: one of NhVariable.TP_*.
  * @param attrValue The value of the new attribute.
  */
 
