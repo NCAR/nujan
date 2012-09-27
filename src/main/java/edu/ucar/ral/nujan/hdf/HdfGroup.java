@@ -687,6 +687,8 @@ throws HdfException
     throwerr("Duplicate subgroup.  The group \"%s\" already contains"
       + " a subgroup or variable named \"%s\"",
       groupName, varName);
+  if ((varDims == null || varDims.length == 0) && specChunkDims != null)
+    throwerr("scalar variable must have specChunkDims == null");
   long statTimea = hdfFile.printStat( 0, "grp.addVariable.entry",
     "varName: " + varName
     + "  dtype: " + dtypeNames[dtype]
@@ -1010,6 +1012,8 @@ void writeDataSub(
   boolean useLinear)
 throws HdfException, IOException
 {
+  if (varRank == 0 && startIxs != null)
+    throwerr("scalar variable must have startIxs == null");
   hdfFile.outChannel.position( HdfUtil.alignLong( 8, hdfFile.eofAddr));
 
   if (hdfFile.bugs >= 1) {

@@ -519,6 +519,8 @@ throws NhException
       + "  rawData class: " + rawData.getClass());
   }
   if (rawData == null) throwerr("rawData is null");
+  if (rank == 0 && startIxs != null)
+    throwerr("scalar variable must have startIxs == null");
 
   if (rawData instanceof Array) {
     Array arr = (Array) rawData;

@@ -390,6 +390,8 @@ throws NhException
   }
 
   checkName( varName, "variable in group \"" + groupName + "\"");
+  if ((nhDims == null || nhDims.length == 0) && chunkLens != null)
+    throwerr("scalar variable must have chunkLens == null");
 
   // Netcdf doesn't support fill values for Strings or scalars.
   if (fillValue != null) {
