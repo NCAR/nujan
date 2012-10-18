@@ -31,11 +31,21 @@ package edu.ucar.ral.nujan.hdf;
 // xxx indent recursions more
 
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.ArrayList;
+
+/***************** START COMMENT OUT useWavelet *******************
+import edu.ucar.ral.waveletCompression.BugSpec;
+import edu.ucar.ral.waveletCompression.CmpException;
+import edu.ucar.ral.waveletCompression.Cutil;
+import edu.ucar.ral.waveletCompression.PerfSummary;
+import edu.ucar.ral.waveletCompression.PipelineDoubleLong;
+import edu.ucar.ral.waveletCompression.PipelineFloatInt;
+***************** END COMMENT OUT useWavelet *******************/
 
 
 /**
@@ -1174,32 +1184,124 @@ throws HdfException, IOException
   }
 
   else {                   // else not DTYPE_STRING_VAR
+
     chunk.chunkDataAddr = HdfUtil.alignLong( 8, hdfFile.eofAddr);
     hdfFile.outChannel.position( chunk.chunkDataAddr);
 
-    if (hdfFile.bugs >= 2)
-      prtf("writeDataSub: call formatRawData for numeric data");
-    int[] curIxs = new int[varRank];
-    formatRawData(
-      "groupName: " + groupName,
-      0,               // curLev
-      curIxs,
-      useLinear,
-      dtype,
-      stgFieldLen,
-      varDims,
-      chunkDims,
-      dataDims,
-      dataElementLen,
-      startIxs,
-      vdata,
-      new HdfModInt(0),    // cntr for DTYPE_COMPOUND
-      -1,                  // gcolAddr for DTYPE_STRING_VAR
-      null,                // gcol for DTYPE_STRING_VAR
-      outbuf);
+    /***************** START COMMENT OUT useWavelet *******************
+    boolean useWavelet = false;
+    if (useWavelet
+      && (dataDtype == HdfGroup.DTYPE_FLOAT32
+        || dataDtype == HdfGroup.DTYPE_FLOAT64))
+    {
+      // Set missingValues = contents of attribute "_FillValue"
+
+      float[] floatMissingValues = null;
+      double[] doubleMissingValues = null;
+
+      for (MsgBase msg : hdrMsgList) {
+        if (msg instanceof MsgAttribute) {
+          MsgAttribute attrMsg = (MsgAttribute) msg;
+          if (attrMsg.attrName != null
+            && attrMsg.attrName.equals("_FillValue"))
+          {
+            if (attrMsg.attrType == HdfGroup.DTYPE_FLOAT32) {
+              Object attrVal = attrMsg.attrValue;
+              if (! (attrVal instanceof Float)) throwerr("type mismatch");
+              floatMissingValues = new float[] {
+                ((Float) attrVal).floatValue() };
+            }
+            else if (attrMsg.attrType == HdfGroup.DTYPE_FLOAT64) {
+              Object attrVal = attrMsg.attrValue;
+              if (! (attrVal instanceof Double)) throwerr("type mismatch");
+              doubleMissingValues = new double[] {
+                ((Double) attrVal).doubleValue() };
+            }
+            else throwerr("unknown type");
+            break;
+          } // if attrName == "_FillValue"
+        } // if msg instanceof MsgAttribute
+      } // for msg
+
+      ByteArrayOutputStream outStm = new ByteArrayOutputStream();
+      PerfSummary perfSum = new PerfSummary( groupName, groupName);
+      BugSpec bugSpec = new BugSpec();
+      bugSpec.pipeline = 0;
+      bugSpec.scanner = 0;
+      bugSpec.predictor = 0;
+      bugSpec.wavelet = 0;
+      bugSpec.huffstd = 0;
+      double maxAbsErr = 1.e-3;  // xxx constant
+
+      try {
+        if (dataDtype == DTYPE_FLOAT32) {
+          if (hdfFile.bugs >= 2)
+            prtf("writeDataSub: call PipelineFloatInt.encode.  missVals: %s",
+              Cutil.formatFloats( floatMissingValues));
+          PipelineFloatInt.encode(              // encode
+            bugSpec,
+            groupName, groupName,               // inFile, fieldName for msgs
+            floatMissingValues,
+            maxAbsErr,
+            vdata,                              // input object
+            outStm,                             // output stream
+            perfSum);                           // output statistics
+        }
+        else if (dataDtype == DTYPE_FLOAT64) {
+          if (hdfFile.bugs >= 2)
+            prtf("writeDataSub: call PipelineDoubleLong.encode.  missVals: %s",
+              Cutil.formatDoubles( doubleMissingValues));
+          PipelineDoubleLong.encode(            // encode
+            bugSpec,
+            groupName, groupName,               // inFile, fieldName for msgs
+            doubleMissingValues,
+            maxAbsErr,
+            vdata,                              // input object
+            outStm,                             // output stream
+            perfSum);                           // output statistics
+        }
+        else throwerr("unknown class");
+      }
+      catch( CmpException exc) {
+        exc.printStackTrace();
+        throwerr("caught: %s", exc);
+      }
+
+      outStm.close();
+      byte[] bytes = outStm.toByteArray();
+      outbuf.putBufBytes("writeDataSub: wavelet comp", bytes);
+    } // if useWavelet and dataDtype is FLOAT32 or FLOAT64
+
+    else {
+    ***************** END COMMENT OUT useWavelet *******************/
+
+      if (hdfFile.bugs >= 2)
+        prtf("writeDataSub: call formatRawData for numeric data");
+      int[] curIxs = new int[varRank];
+      formatRawData(
+        "groupName: " + groupName,
+        0,               // curLev
+        curIxs,
+        useLinear,
+        dtype,
+        stgFieldLen,
+        varDims,
+        chunkDims,
+        dataDims,
+        dataElementLen,
+        startIxs,
+        vdata,
+        new HdfModInt(0),    // cntr for DTYPE_COMPOUND
+        -1,                  // gcolAddr for DTYPE_STRING_VAR
+        null,                // gcol for DTYPE_STRING_VAR
+        outbuf);
+    /***************** START COMMENT OUT useWavelet *******************
+    } // else not useWavelet
+    ***************** END COMMENT OUT useWavelet *******************/
 
     outbuf.flush();        // write remaining data to outChannel
-  }
+
+  } // else not DTYPE_STRING_VAR
 
   // Set chunk.chunkDataSize.
   // For non-compressed numeric data we could use something like ...
