@@ -658,7 +658,8 @@ throws NhException
     nhDims,
     useChunkLens,
     tmpFill,
-    compress);
+    compress,
+    0);                // maxAbsErr: if > 0, useWavelet
 
   //xxx
   if (fspec.iscale != SCALE_MISSING) {

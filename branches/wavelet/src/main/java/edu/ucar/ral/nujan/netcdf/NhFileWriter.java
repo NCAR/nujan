@@ -325,7 +325,8 @@ throws NhException
             new int[] {dim.dimLen},    // varDims
             null,                      // chunkDims
             new Float(0),              // fillValue
-            0);                        // compressionLevel
+            0,                         // compressionLevel
+            0);                        // maxAbsErr: not useWavelet
 
           // netcdf-4.0.1/libsrc4/nc4hdf.c:
           //   #define DIM_WITHOUT_VARIABLE \

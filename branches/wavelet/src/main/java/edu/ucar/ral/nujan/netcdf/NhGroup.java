@@ -365,7 +365,8 @@ public NhVariable addVariable(
   NhDimension[] nhDims,
   int[] chunkLens,
   Object fillValue,
-  int compressionLevel)      // 0: no compression;  9: max compression
+  int compressionLevel,      // 0: no compression;  9: max compression
+  double maxAbsErr)          // if > 0, useWavelet
 throws NhException
 {
   if (nhFile.bugs >= 1) {
@@ -410,6 +411,7 @@ throws NhException
     chunkLens,
     fillValue,
     compressionLevel,
+    maxAbsErr,
     this,
     nhFile);
   variableList.add( nhVar);

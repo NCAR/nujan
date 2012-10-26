@@ -26,11 +26,20 @@
 
 package edu.ucar.ral.nujan.hdf;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
+import java.util.Arrays;
 import java.util.zip.Deflater;
+
+import edu.ucar.ral.waveletCompression.BugSpec;
+import edu.ucar.ral.waveletCompression.CmpException;
+import edu.ucar.ral.waveletCompression.Cutil;
+import edu.ucar.ral.waveletCompression.PerfSummary;
+import edu.ucar.ral.waveletCompression.PipelineDoubleLong;
+import edu.ucar.ral.waveletCompression.PipelineFloatInt;
 
 
 /**
@@ -45,6 +54,12 @@ class HBuffer {
  * Approx len of write to channel
  */
 static final int BLEN = 10000;
+
+
+/**
+ * Normally -1.  When useWavelet, wdType = dataType = DTYPE_*.
+ */
+int wdType;
 
 
 /**
@@ -74,6 +89,13 @@ private ByteBuffer bbuf;
 Deflater deflater;
 
 
+float[] waveletFloats = null;
+
+double[] waveletDoubles = null;
+
+int waveletNumVal = 0;
+
+
 
 /**
  * Creates a write-only buffer on top of an open output FileChannel,
@@ -86,11 +108,14 @@ Deflater deflater;
  */
 
 HBuffer(
+  int wdType,                     // normally -1.  If useWavelet,
+                                  //   wdType = dataType = DTYPE_*
   FileChannel outChannel,         // if null, just builds internal bbuf.
   int compressionLevel,
   HdfFileWriter hdfFile)
 throws HdfException
 {
+  this.wdType = wdType;
   this.outChannel = outChannel;
   this.compressionLevel = compressionLevel;
   this.hdfFile = hdfFile;
@@ -107,7 +132,17 @@ throws HdfException
       outChannel == null ? "no" : "yes",
       compressionLevel);
   }
+
+  if (wdType >= 0) {       // if useWavelet
+    if (wdType == HdfGroup.DTYPE_FLOAT32) waveletFloats = new float[0];
+    else if (wdType == HdfGroup.DTYPE_FLOAT64) waveletDoubles = new double[0];
+    else throwerr("invalid wdType");
+  }
 }
+
+
+
+
 
 
 
@@ -330,12 +365,70 @@ throws IOException, HdfException
  * Writes bbuf to outChannel, compressing if need be.
  */
 
-void flush()
+void flush(
+  double maxAbsErr,                  // normally 0; used for useWavelet
+  String groupName,
+  float[] floatMissingValues,        // normally null; used for useWavelet
+  double[] doubleMissingValues)      // normally null; used for useWavelet
 throws IOException, HdfException
 {
   if (outChannel == null) throwerr("cannot flush null channel");
   if (hdfFile.bugs >= 5)
     prtf("flush.entry: outChannel.pos: %d", outChannel.position());
+
+  if (wdType >= 0) {       // if useWavelet
+    if (bbuf.position() != 0) throwerr("bbuf not empty");
+
+    ByteArrayOutputStream outStm = new ByteArrayOutputStream();
+    PerfSummary perfSum = new PerfSummary( groupName, groupName);
+    BugSpec bugSpec = new BugSpec();
+    bugSpec.pipeline = 0;
+    bugSpec.scanner = 0;
+    bugSpec.predictor = 0;
+    bugSpec.wavelet = 0;
+    bugSpec.huffstd = 0;
+
+    try {
+      if (wdType == HdfGroup.DTYPE_FLOAT32) {
+        if (hdfFile.bugs >= 2)
+          prtf("writeDataSub: call PipelineFloatInt.encode.  missVals: %s",
+            Cutil.formatFloats( floatMissingValues));
+        PipelineFloatInt.encode(              // encode
+          bugSpec,
+          groupName, groupName,               // inFile, fieldName for msgs
+          floatMissingValues,
+          maxAbsErr,
+          waveletFloats,                      // input object
+          outStm,                             // output stream
+          perfSum);                           // output statistics
+      }
+      else if (wdType == HdfGroup.DTYPE_FLOAT64) {
+        if (hdfFile.bugs >= 2)
+          prtf("writeDataSub: call PipelineDoubleLong.encode.  missVals: %s",
+            Cutil.formatDoubles( doubleMissingValues));
+        PipelineDoubleLong.encode(            // encode
+          bugSpec,
+          groupName, groupName,               // inFile, fieldName for msgs
+          doubleMissingValues,
+          maxAbsErr,
+          waveletDoubles,                     // input object
+          outStm,                             // output stream
+          perfSum);                           // output statistics
+      }
+      else throwerr("unknown class");
+    }
+    catch( CmpException exc) {
+      exc.printStackTrace();
+      throwerr("caught: %s", exc);
+    }
+
+    outStm.close();
+    byte[] bytes = outStm.toByteArray();
+
+    putBufBytes( groupName, bytes);
+
+  } // if wdType >= 0 (if useWavelet)
+
   try {
     if (compressionLevel > 0) {
       deflater.finish();
@@ -483,9 +576,21 @@ void putBufFloat(
   float value)
 throws HdfException
 {
-  expandBuf( 4);
-  if (hdfFile.bugs >= 5) printValue( 4, name, new Float(value));
-  bbuf.putFloat( value);
+  if (wdType >= 0) {                   // if useWavelet
+    if (bbuf.position() != 0) throwerr("mixed types");
+    if (waveletDoubles != null) throwerr("mixed float types");
+    if (waveletFloats == null) waveletFloats = new float[0];
+    int walloc = waveletFloats.length;
+    if (waveletNumVal + 1 >= walloc) {
+      waveletFloats = Arrays.copyOf( waveletFloats, 2 * walloc + 10);
+    }
+    waveletFloats[waveletNumVal++] = value;
+  }
+  else {
+    expandBuf( 4);
+    if (hdfFile.bugs >= 5) printValue( 4, name, new Float(value));
+    bbuf.putFloat( value);
+  }
 }
 
 
@@ -500,9 +605,21 @@ void putBufDouble(
   double value)
 throws HdfException
 {
-  expandBuf( 8);
-  if (hdfFile.bugs >= 5) printValue( 8, name, new Double(value));
-  bbuf.putDouble( value);
+  if (wdType >= 0) {                   // if useWavelet
+    if (bbuf.position() != 0) throwerr("mixed types");
+    if (waveletFloats != null) throwerr("mixed float types");
+    if (waveletDoubles == null) waveletDoubles = new double[0];
+    int walloc = waveletDoubles.length;
+    if (waveletNumVal + 1 >= walloc) {
+      waveletDoubles = Arrays.copyOf( waveletDoubles, 2 * walloc + 10);
+    }
+    waveletDoubles[waveletNumVal++] = value;
+  }
+  else {
+    expandBuf( 8);
+    if (hdfFile.bugs >= 5) printValue( 8, name, new Double(value));
+    bbuf.putDouble( value);
+  }
 }
 
 

@@ -175,6 +175,7 @@ NhVariable(
   int[] chunkLens,
   Object fillValue,
   int compressionLevel,      // 0: no compression;  9: max compression
+  double maxAbsErr,          // if > 0, useWavelet
   NhGroup parentGroup,
   NhFileWriter nhFile)
 throws NhException
@@ -296,7 +297,8 @@ throws NhException
       dimLens,              // dimension lengths
       chunkLens,
       hdfFillValue,
-      compressionLevel);
+      compressionLevel,
+      maxAbsErr);
   }
   catch( HdfException exc) {
     exc.printStackTrace();

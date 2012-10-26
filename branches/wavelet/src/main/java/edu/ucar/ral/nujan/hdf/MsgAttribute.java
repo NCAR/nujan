@@ -369,7 +369,7 @@ throws HdfException
   else if (msgDataType.dtype == HdfGroup.DTYPE_STRING_VAR) {
     // Vlen: format the globalHeap references to hdfFile.bbuf
     int compressionLevel = 0;      // cannot compress heap objects
-    HBuffer refBuf = new HBuffer( null, compressionLevel, hdfFile);
+    HBuffer refBuf = new HBuffer( -1, null, compressionLevel, hdfFile);
     int[] curIxs = new int[dataVarDims.length];
     if (hdfFile.bugs >= 2)
       prtf("MsgAttribute: call formatRawData for string data");
@@ -377,6 +377,7 @@ throws HdfException
       "attrName: " + attrName,
       0,                   // curLev
       curIxs,
+      -1,                  // wdType for useWavelet
       false,               // useLinear
       attrType,
       stgFieldLen,
@@ -402,6 +403,7 @@ throws HdfException
       "attrName: " + attrName,
       0,                   // curLev
       curIxs,
+      -1,                  // wdType for useWavelet
       false,               // useLinear
       attrType,
       stgFieldLen,
