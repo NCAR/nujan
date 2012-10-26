@@ -1,0 +1,209 @@
+
+<html>
+<head>
+<title> Nujan: Pure Java NetCDF4 and HDF5 writer </title>
+<style type="text/css">
+  table {
+    background-color: #e0e0ff;
+  }
+</style>
+</head>
+<body>
+<h2> Nujan: Pure Java NetCDF4 and HDF5 writer </h2>
+
+Nujan is an open source pure Java software system for writing files
+in NetCDF4 and HDF5 formats.  The acronyms are:
+
+<table align="center">
+  <tr><th align="right"> Nujan </th>
+  <td> &nbsp;&nbsp;&nbsp; </td>
+  <td> NNEW/UCAR Java Authoring of NetCDF4/HDF5 </td>
+  <td> &nbsp;&nbsp;&nbsp; </td>
+  <td> <a href="http://www.ral.ucar.edu/~steves/nujan.html">www.ral.ucar.edu/~steves/nujan.html</a>
+  </td></tr>
+
+  <tr><th align="right"> NNEW       </th>
+  <td> &nbsp;&nbsp;&nbsp; </td>
+  <td> NextGen Network Enabled Weather </td>
+  <td> &nbsp;&nbsp;&nbsp; </td>
+  <td> <a href="http://www.ral.ucar.edu/projects/nnew/">www.ral.ucar.edu/projects/nnew</a>
+  </td></tr>
+
+  <tr><th align="right"> UCAR       </th>
+  <td> &nbsp;&nbsp;&nbsp; </td>
+  <td> University Corporation for Atmospheric Research </td>
+  <td> &nbsp;&nbsp;&nbsp; </td>
+  <td> <a href="http://www.ucar.edu">www.ucar.edu</a>
+  </td></tr>
+
+  <tr><th align="right"> NetCDF     </th>
+  <td> &nbsp;&nbsp;&nbsp; </td>
+  <td> Network Common Data Form </td>
+  <td> &nbsp;&nbsp;&nbsp; </td>
+  <td> <a href="http://www.unidata.ucar.edu/">www.unidata.ucar.edu</a>
+  </td></tr>
+
+  <tr><th align="right"> HDF        </th>
+  <td> &nbsp;&nbsp;&nbsp; </td>
+  <td> Hierarchical Data Format </td>
+  <td> &nbsp;&nbsp;&nbsp; </td>
+  <td> <a href="http://www.hdfgroup.org/">www.hdfgroup.org</a>
+  </td></tr>
+</table>
+
+
+
+<p>
+NetCDF is a file format primarily used for meteorological and
+oceanographic data.  The NetCDF4 format is built on top
+of a subset of HDF5.  The NetCDF format is maintained by
+<a href="http://www.unidata.ucar.edu/">
+Unidata</a>.  Unidata's C, C++, and Fortran implementations
+of NetCDF are available at
+<a href="http://www.unidata.ucar.edu/software/netcdf/">
+Unidata NetCDF</a>,
+and the Unidata Java reader for NetCDF is available at
+<a href="http://www.unidata.ucar.edu/software/netcdf-java/">
+Unidata NetCDF Java</a>.
+
+<p>
+HDF5 is a file format primarily
+used for gridded scientific and engineering data.  The HDF5
+format is maintained by the
+<a href="http://www.hdfgroup.org/">
+HDF Group</a>, which currently has C, C++, and Fortran APIs
+for HDF5 files.
+The HDF group also supports a Java JNI (Java
+Native Interface) to their C code.  While the JNI interface does support
+most of the native HDF5 features, it can be a problem to
+integrate with other Java packages.  Hence the origins
+of Nujan.
+
+
+<!-- -->
+<h2>Download </h2>
+<a href="http://www.ral.ucar.edu/~steves/nujan-1.1-SNAPSHOT.jar"> Nujan 1.1 jar </a><br>
+<a href="http://www.ral.ucar.edu/~steves/nujan-1.1-SNAPSHOT-javadoc.jar"> Nujan 1.1 javaDoc </a><br>
+<a href="http://www.ral.ucar.edu/~steves/nujan-1.1-SNAPSHOT-src.zip"> Nujan 1.1 source </a><br>
+<!-- -->
+
+
+<h2>Supported features in Nujan </h2>
+
+Nujan supports most of the
+commonly used features of NetCDF4 and HDF5.
+The primary differences between the Nujan writer and other
+NetCDF or HDF5 writers are:
+<ul>
+  <li> Nujan is pure Java, and does not depend on any C code.
+     So Nujan does not use the JNI (Java Native Interface).
+  <li> The Nujan writer only writes new files.  It does not
+    update existing files.
+</ul>
+
+<p>
+<h2>Detailed feature list for NetCDF3, NetCDF4, and Nujan:
+("y" is yes, "-" is no)</h2>
+<p>
+
+<table align="center">
+<tr><th> Feature </th><th> NetCDF3<br>(C,Java) </th><th> NetCDF4<br>(C) </th><th> Nujan<br>(Java) </th></tr>
+  <tr><th> Primitive types<br> (may have any number<br> of dimensions): </th><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td></tr>
+  <tr><td> char                        </td><td> y      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> byte                        </td><td> y      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> short                       </td><td> y      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> int                         </td><td> y      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> float                       </td><td> y      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> double                      </td><td> y      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> int64                       </td><td> -      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> unsigned_byte               </td><td> -      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> unsigned_short              </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> unsigned_int                </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> unsigned_int64              </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> string                      </td><td> -      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> &nbsp;                      </td><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td></tr>
+  <tr><th> User defined types:         </th><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td></tr>
+  <tr><td> Enum                        </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> Opaque                      </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> Compound                    </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> VariableLength              </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> &nbsp;                      </td><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td></tr>
+  <tr><th> Miscellaneous features:     </th><td> &nbsp; </td><td> &nbsp; </td><td> &nbsp; </td></tr>
+  <tr><td> Subgroups                   </td><td> -      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> One unlimited dim           </td><td> y      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> Multiple unlimited dims     </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> Partial writing             </td><td> y      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> Compression using gzip      </td><td> -      </td><td> y      </td><td> y      </td></tr>
+  <tr><td> Other compression methods   </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> Arbitrary filters           </td><td> -      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> Modify existing files       </td><td> y      </td><td> y      </td><td> -      </td></tr>
+  <tr><td> Modify after endDefine()    </td><td> y      </td><td> y      </td><td> -      </td></tr>
+</table>
+
+<p>
+For notes on the NetCDF4 data model see:<br>
+<a href="http://www.unidata.ucar.edu/software/netcdf/docs/faq.html#fv18">
+  http://www.unidata.ucar.edu/software/netcdf/docs/faq.html#fv18></a>
+<br>
+<a href="http://www.unidata.ucar.edu/netcdf/workshops/2009/netcdf4/Nc4DataModel.html">
+  http://www.unidata.ucar.edu/netcdf/workshops/2009/netcdf4/Nc4DataModel.html</a><br>
+
+
+<h2>Notes on Nujan Restrictions </h2>
+
+<dl>
+
+  <dt><b> Variables over 2 GB total size </b></dt>
+  <dd>
+  Nujan does not support a single variable having a data size
+  exceeding 2 GB.  However the total file size <b>can</b> exceed 2 GB.
+  </dd>
+
+  <dt><b> Other compression methods </b></dt>
+  <dd>
+  Nujan supports the gzip compression method, but does not
+  support szip.
+  </dd>
+
+  <dt><b> Arbitrary filters </b></dt>
+  <dd>
+  Nujan does not support processing filters other
+  than gzip compression.  For example, Nujan does not
+  support checksum filters or custom compression filters.
+  </dd>
+
+  <dt><b> Modify existing files </b></dt>
+  <dd>
+  Nujan cannot modify existing files; it can only create
+  new files.
+  </dd>
+
+  <dt><b> Modify after endDefine() </b></dt>
+  <dd>
+  After the client calls endDefine(), Nujan cannot modify
+  the definitions of groups, variables, or attributes.
+  </dd>
+
+</dl>
+
+
+<h2> Contact </h2>
+
+For further information, contact Steve Sullivan at
+<table align="center">
+<tr><td> &nbsp;&nbsp;&nbsp; </td><td> steves </td><td> &nbsp; </td></tr>
+<tr><td> &nbsp;&nbsp;&nbsp; </td><td> @ </td><td> &nbsp; </td></tr>
+<tr><td> &nbsp;&nbsp;&nbsp; </td><td> ucar </td><td> &nbsp; </td></tr>
+<tr><td> &nbsp;&nbsp;&nbsp; </td><td> . </td><td> &nbsp; </td></tr>
+<tr><td> &nbsp;&nbsp;&nbsp; </td><td> edu </td><td> &nbsp; </td></tr>
+</table>
+<pre>
+
+</pre>
+<hr>
+<pre>
+
+</pre>
+
+</body>
+</html>
