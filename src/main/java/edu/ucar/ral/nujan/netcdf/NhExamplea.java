@@ -127,7 +127,8 @@ throws NhException
     nhDims,                     // varDims
     chunkLens,                  // chunk lengths
     fillValue,
-    compressLevel);
+    compressLevel,
+    0);                         // maxAbsErr: if > 0, useWavelet
   prtln("humidity: " + humidity);
 
   // Add an attribute to the variable.
@@ -144,7 +145,8 @@ throws NhException
     nhDims,                     // varDims
     chunkLens,                  // chunk lengths
     fillValue,
-    compressLevel);
+    compressLevel,
+    0);                         // maxAbsErr: if > 0, useWavelet
   prtln("temperature: " + temperature);
 
   // End the definition stage.

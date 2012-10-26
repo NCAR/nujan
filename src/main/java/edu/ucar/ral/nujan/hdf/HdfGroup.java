@@ -27,25 +27,15 @@
 package edu.ucar.ral.nujan.hdf;
 
 
-// xxx fix indenting zzz
+// xxx fix indenting
 // xxx indent recursions more
 
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.ArrayList;
-
-/***************** START COMMENT OUT useWavelet *******************
-import edu.ucar.ral.waveletCompression.BugSpec;
-import edu.ucar.ral.waveletCompression.CmpException;
-import edu.ucar.ral.waveletCompression.Cutil;
-import edu.ucar.ral.waveletCompression.PerfSummary;
-import edu.ucar.ral.waveletCompression.PipelineDoubleLong;
-import edu.ucar.ral.waveletCompression.PipelineFloatInt;
-***************** END COMMENT OUT useWavelet *******************/
 
 
 /**
@@ -248,6 +238,7 @@ HdfChunk[] hdfChunks;
 
 int linkCreationOrder = 0;
 
+double maxAbsErr;             // if > 0, useWavelet
 
 
 
@@ -372,6 +363,7 @@ throws HdfException
  *
  * @param compressionLevel Zip compression level:
  *        0 is uncompressed; 1 - 9 are increasing compression.
+ * @param maxAbsErr Max absolute error for useWavelet; otherwise 0.
  * @param hdfFile The global owning HdfFileWriter.
  */
 
@@ -394,6 +386,7 @@ HdfGroup(
                              // Float, Double, String, etc.
   int compressionLevel,      // Zip compression level: 0==Uncompressed;
                              // 1 - 9 are increasing compression.
+  double maxAbsErr,          // if > 0, useWavelet
   HdfFileWriter hdfFile)
 throws HdfException
 {
@@ -404,6 +397,7 @@ throws HdfException
   this.dtype = dtype;
   this.stgFieldLen = stgFieldLen;
   this.compressionLevel = compressionLevel;
+  this.maxAbsErr = maxAbsErr;
 
   if (hdfFile.bugs >= 1) {
     prtf("HdfGroup: new dataset at path: \"" + getPath() + "\""
@@ -674,6 +668,7 @@ throws HdfException
  *
  * @param compressionLevel Zip compression level:
  *        0==Uncompressed; 1 - 9 are increasing compression.
+ * @param maxAbsErr Max absolute error for useWavelet; otherwise 0.
  */
 
 public HdfGroup addVariable(
@@ -687,7 +682,8 @@ public HdfGroup addVariable(
   int[] varDims,             // dimension lengths
   int[] specChunkDims,
   Object fillValue,          // fill value or null
-  int compressionLevel)
+  int compressionLevel,
+  double maxAbsErr)          // if > 0, useWavelet
 throws HdfException
 {
   if (hdfFile.fileStatus != HdfFileWriter.ST_DEFINING)
@@ -724,6 +720,7 @@ throws HdfException
     specChunkDims,
     fillValue,
     compressionLevel,
+    maxAbsErr,
     hdfFile);
 
   addSubGroup( var);
@@ -1114,7 +1111,12 @@ throws HdfException, IOException
       getPath(), HdfUtil.formatInts( chunk.chunkStartIxs));
 
   // As outbuf fills, it gets written to outChannel.
-  HBuffer outbuf = new HBuffer( hdfFile.outChannel, compressionLevel, hdfFile);
+  int wdType = -1;
+  if (maxAbsErr > 0                // if useWavelet
+    && (dataDtype == DTYPE_FLOAT32 || dataDtype == DTYPE_FLOAT64))
+    wdType = dataDtype;
+  HBuffer outbuf = new HBuffer(
+    wdType, hdfFile.outChannel, compressionLevel, hdfFile);
 
   if (dtype == HdfGroup.DTYPE_VLEN)
     throwerr("DTYPE_VLEN datasets are not supported");
@@ -1143,7 +1145,7 @@ throws HdfException, IOException
     //       list of references.
 
     GlobalHeap gcol = new GlobalHeap( hdfFile);
-    HBuffer refBuf = new HBuffer( null, compressionLevel, hdfFile);
+    HBuffer refBuf = new HBuffer( -1, null, compressionLevel, hdfFile);
     long gcolAddr = hdfFile.outChannel.position();
 
     if (hdfFile.bugs >= 2)
@@ -1153,6 +1155,7 @@ throws HdfException, IOException
       "groupName: " + groupName,
       0,               // curLev
       curIxs,
+      -1,              // wdType for useWavelet
       useLinear,
       dtype,
       0,               // stgFieldLen for DTYPE_STRING_FIX
@@ -1173,8 +1176,8 @@ throws HdfException, IOException
     }
 
     // Write gcol to outChannel
-    gcol.formatBuf( 0, outbuf);       // formatPass = 0
-    outbuf.flush();                   // write remaining data to outChannel
+    gcol.formatBuf( 0, outbuf);           // formatPass = 0
+    outbuf.flush( 0, null, null, null);   // write remaining data to outChannel
 
     // Save addr; write refBuf to outChannel
     chunk.chunkDataAddr = HdfUtil.alignLong( 8, hdfFile.outChannel.position());
@@ -1188,16 +1191,14 @@ throws HdfException, IOException
     chunk.chunkDataAddr = HdfUtil.alignLong( 8, hdfFile.eofAddr);
     hdfFile.outChannel.position( chunk.chunkDataAddr);
 
-    /***************** START COMMENT OUT useWavelet *******************
-    boolean useWavelet = false;
-    if (useWavelet
+    float[] floatMissingValues = null;
+    double[] doubleMissingValues = null;
+
+    if (maxAbsErr > 0                // if useWavelet
       && (dataDtype == HdfGroup.DTYPE_FLOAT32
         || dataDtype == HdfGroup.DTYPE_FLOAT64))
     {
       // Set missingValues = contents of attribute "_FillValue"
-
-      float[] floatMissingValues = null;
-      double[] doubleMissingValues = null;
 
       for (MsgBase msg : hdrMsgList) {
         if (msg instanceof MsgAttribute) {
@@ -1222,84 +1223,32 @@ throws HdfException, IOException
           } // if attrName == "_FillValue"
         } // if msg instanceof MsgAttribute
       } // for msg
+    } // if useWavelet
 
-      ByteArrayOutputStream outStm = new ByteArrayOutputStream();
-      PerfSummary perfSum = new PerfSummary( groupName, groupName);
-      BugSpec bugSpec = new BugSpec();
-      bugSpec.pipeline = 0;
-      bugSpec.scanner = 0;
-      bugSpec.predictor = 0;
-      bugSpec.wavelet = 0;
-      bugSpec.huffstd = 0;
-      double maxAbsErr = 1.e-3;  // xxx constant
+    if (hdfFile.bugs >= 2)
+      prtf("writeDataSub: call formatRawData for numeric data");
+    int[] curIxs = new int[varRank];
+    formatRawData(
+      "groupName: " + groupName,
+      0,               // curLev
+      curIxs,
+      wdType,          // normally -1; else has dataType for useWavelet
+      useLinear,
+      dtype,
+      stgFieldLen,
+      varDims,
+      chunkDims,
+      dataDims,
+      dataElementLen,
+      startIxs,
+      vdata,
+      new HdfModInt(0),    // cntr for DTYPE_COMPOUND
+      -1,                  // gcolAddr for DTYPE_STRING_VAR
+      null,                // gcol for DTYPE_STRING_VAR
+      outbuf);
 
-      try {
-        if (dataDtype == DTYPE_FLOAT32) {
-          if (hdfFile.bugs >= 2)
-            prtf("writeDataSub: call PipelineFloatInt.encode.  missVals: %s",
-              Cutil.formatFloats( floatMissingValues));
-          PipelineFloatInt.encode(              // encode
-            bugSpec,
-            groupName, groupName,               // inFile, fieldName for msgs
-            floatMissingValues,
-            maxAbsErr,
-            vdata,                              // input object
-            outStm,                             // output stream
-            perfSum);                           // output statistics
-        }
-        else if (dataDtype == DTYPE_FLOAT64) {
-          if (hdfFile.bugs >= 2)
-            prtf("writeDataSub: call PipelineDoubleLong.encode.  missVals: %s",
-              Cutil.formatDoubles( doubleMissingValues));
-          PipelineDoubleLong.encode(            // encode
-            bugSpec,
-            groupName, groupName,               // inFile, fieldName for msgs
-            doubleMissingValues,
-            maxAbsErr,
-            vdata,                              // input object
-            outStm,                             // output stream
-            perfSum);                           // output statistics
-        }
-        else throwerr("unknown class");
-      }
-      catch( CmpException exc) {
-        exc.printStackTrace();
-        throwerr("caught: %s", exc);
-      }
-
-      outStm.close();
-      byte[] bytes = outStm.toByteArray();
-      outbuf.putBufBytes("writeDataSub: wavelet comp", bytes);
-    } // if useWavelet and dataDtype is FLOAT32 or FLOAT64
-
-    else {
-    ***************** END COMMENT OUT useWavelet *******************/
-
-      if (hdfFile.bugs >= 2)
-        prtf("writeDataSub: call formatRawData for numeric data");
-      int[] curIxs = new int[varRank];
-      formatRawData(
-        "groupName: " + groupName,
-        0,               // curLev
-        curIxs,
-        useLinear,
-        dtype,
-        stgFieldLen,
-        varDims,
-        chunkDims,
-        dataDims,
-        dataElementLen,
-        startIxs,
-        vdata,
-        new HdfModInt(0),    // cntr for DTYPE_COMPOUND
-        -1,                  // gcolAddr for DTYPE_STRING_VAR
-        null,                // gcol for DTYPE_STRING_VAR
-        outbuf);
-    /***************** START COMMENT OUT useWavelet *******************
-    } // else not useWavelet
-    ***************** END COMMENT OUT useWavelet *******************/
-
-    outbuf.flush();        // write remaining data to outChannel
+    outbuf.flush(          // write remaining data to outChannel
+      maxAbsErr, groupName, floatMissingValues, doubleMissingValues);
 
   } // else not DTYPE_STRING_VAR
 
@@ -1445,6 +1394,7 @@ throws HdfException
   // The second layout is for real and uses fmtBuf.
 
   HBuffer tempHbuf = new HBuffer(
+    -1,                   // wdType
     null,                 // outChannel
     0,                    // compressionLevel
     hdfFile);
@@ -1569,6 +1519,8 @@ throws HdfException
 
 
 
+
+
 /**
  * Formats a regular array of raw data.  Not a ragged (VLEN) array.
  * Called by writeDataSub and MsgAttribute.formatMsgCore.
@@ -1603,6 +1555,8 @@ void formatRawData(
   String msg,
   int curLev,             // index into curIxs
   int[] curIxs,           // current indices within current chunk
+  int wdType,             // normally -1.  If useWavelet,
+                          //   wdType = dataType = DTYPE_*
   boolean useLinear,
   int dtp,                // one of DTYPE_*
   int stgFieldLen,        // used for DTYPE_STRING_FIX
@@ -1832,6 +1786,7 @@ throws HdfException
         msg,
         curLev + 1,         // index into curIxs
         curIxs,             // current indices within current chunk
+        -1,                 // wdType for useWavelet
         useLinear,
         dtp,                // one of DTYPE_*
         stgFieldLen,        // used for DTYPE_STRING_FIX
@@ -2056,9 +2011,24 @@ throws HdfException
         }
       }
       else {
-        // Write padLen elements, each padEleLen long
-        for (int ii = 0; ii < padLen * padEleLen; ii++) {
-          fmtBuf.putBufByte("formatRawData.pad", 0x77);
+        if (wdType >= 0) {             // if useWavelet
+          if (dtp == DTYPE_FLOAT32) {
+            for (int ii = 0; ii < padLen; ii++) {
+              fmtBuf.putBufFloat("formatRawData.pad", 0);
+            }
+          }
+          else if (dtp == DTYPE_FLOAT64) {
+            for (int ii = 0; ii < padLen; ii++) {
+              fmtBuf.putBufDouble("formatRawData.pad", 0);
+            }
+          }
+          else throwerr("invalid wdType");
+        }
+        else {   // else not useWavelet
+          // Write padLen elements, each padEleLen long
+          for (int ii = 0; ii < padLen * padEleLen; ii++) {
+            fmtBuf.putBufByte("formatRawData.pad", 0x77);
+          }
         }
       }
     }

@@ -81,7 +81,8 @@ throws Exception
     dims,                         // dimension lengths
     specChunkDims,                // chunk lengths
     new Double(-999999),          // fill value or null
-    0);                           // compression: 0 is none, 9 is max
+    0,                            // compression: 0 is none, 9 is max
+    0);                           // maxAbsErr: if > 0, useWavelet
   prtln("humidity: " + humidity);
 
   // Add an attribute to the variable.
@@ -98,7 +99,8 @@ throws Exception
     dims,                         // dimension lengths
     specChunkDims,                // chunk lengths
     new Double(-999999),          // fill value or null
-    0);                           // compression: 0 is none, 9 is max
+    0,                            // compression: 0 is none, 9 is max
+    0);                           // maxAbsErr: if > 0, useWavelet
   prtln("temperature: " + temperature);
 
   // End the definition stage.

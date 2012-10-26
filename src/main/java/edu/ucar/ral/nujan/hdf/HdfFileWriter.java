@@ -451,6 +451,7 @@ throws HdfException
   // Format metadata to buffer, pass 1 of 2  (pass 2 is in close)
   mainGlobalHeap = new GlobalHeap( this);
   mainBuf = new HBuffer(
+    -1,           // wdType
     null,         // outChannel
     0,            // compressionLevel
     this);
