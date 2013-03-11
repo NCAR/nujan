@@ -86,6 +86,9 @@
         <!-- Other properties -->
         <ncar.build.host>crash</ncar.build.host>
         <repository.host>repo.wx.ll.mit.edu</repository.host>
+
+        <maven.assembly.plugin.version>2.2</maven.assembly.plugin.version>
+
     </properties>
 
     <!-- ================================================ -->
@@ -446,6 +449,27 @@
                 </executions>
             </plugin>
 
+          <plugin>
+           <groupId>org.apache.maven.plugins</groupId>
+           <artifactId>maven-assembly-plugin</artifactId>
+           <version>${maven.assembly.plugin.version}</version>
+           <executions>
+             <execution>
+               <id>unix-bin2</id>
+               <phase>package</phase>
+               <goals>
+                 <goal>single</goal>
+               </goals>
+               <configuration>
+                 <descriptors>
+                   <descriptor>src/main/descriptors/sourceCode.xml</descriptor>
+                 </descriptors>
+                 <finalName>nujan-${project.version}-source</finalName>
+                 <tarLongFileMode>gnu</tarLongFileMode>
+               </configuration>
+             </execution>
+           </executions>
+         </plugin>
         </plugins>
 
     </build>
