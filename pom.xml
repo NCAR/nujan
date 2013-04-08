@@ -78,10 +78,7 @@
         <maven-resources-plugin.version>2.3</maven-resources-plugin.version>
         <taglist-maven-plugin.version>2.4</taglist-maven-plugin.version>
         <testng.version>5.8</testng.version>
-        <ucar.netcdf-api.version>4.1.20100227.0121-ralfix.1</ucar.netcdf-api.version>
-        <!-- Date obtained from README in netcdf-4.1.jar -->
-        <ucar.unidata-common.version>4.1.20100227.0121</ucar.unidata-common.version>
-        <ucar.unidata-grib.version>8.0</ucar.unidata-grib.version>
+        <ucar.netcdf-api.version>4.3</ucar.netcdf-api.version>
 
         <!-- Other properties -->
         <ncar.build.host>crash</ncar.build.host>
@@ -146,22 +143,6 @@
                 <groupId>commons-httpclient</groupId>
                 <artifactId>commons-httpclient</artifactId>
                 <version>${commons-httpclient.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>edu.ucar.unidata</groupId>
-                <artifactId>unidata-grib</artifactId>
-                <version>${ucar.unidata-grib.version}</version>
-                <type>jar</type>
-                <!-- or should this be bundle? -->
-            </dependency>
-
-            <dependency>
-                <groupId>edu.ucar.unidata</groupId>
-                <artifactId>unidata-common</artifactId>
-                <version>${ucar.unidata-common.version}</version>
-                <type>jar</type>
-                <!-- or should this be bundle? -->
             </dependency>
 
             <dependency>
@@ -235,16 +216,6 @@
             <artifactId>netcdf-api</artifactId>
         </dependency>
 
-        <dependency>
-            <groupId>edu.ucar.unidata</groupId>
-            <artifactId>unidata-common</artifactId>
-        </dependency>
-        
-        <dependency>
-            <groupId>edu.ucar.unidata</groupId>
-            <artifactId>unidata-grib</artifactId>
-        </dependency>
-        
         <dependency>
             <groupId>jj2000.j2k</groupId>
             <artifactId>jpeg2000</artifactId>
