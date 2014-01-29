@@ -218,10 +218,11 @@
             <artifactId>netcdf-api</artifactId>
         </dependency>
 
-        <dependency>
+        <!-- Commented out - does not seem to be needed for Nujan anymore -->
+        <!--dependency>
             <groupId>jj2000.j2k</groupId>
             <artifactId>jpeg2000</artifactId>
-        </dependency>
+        </dependency-->
 
         <dependency>
             <groupId>commons-codec</groupId>
