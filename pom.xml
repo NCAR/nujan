@@ -570,12 +570,10 @@
     -->
     <distributionManagement>
 
-      <distributionManagement>
         <repository>
           <id>RAL-repo</id>
           <url>http://nnew.rap.ucar.edu/maven2/repo</url>
         </repository>
-      </distributionManagement>
 
         <site>
             <id>sites</id>
