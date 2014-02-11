@@ -80,7 +80,6 @@
 
         <!-- Other properties -->
         <ncar.build.host>crash</ncar.build.host>
-        <repository.host>repo.wx.ll.mit.edu</repository.host>
 
         <maven.assembly.plugin.version>2.2</maven.assembly.plugin.version>
 
@@ -96,24 +95,6 @@
             <id>central</id>
             <name>Central Maven Repo</name>
             <url>http://repo1.maven.org/maven2</url>
-        </repository>
-
-        <repository>
-                  <id>nnew-repositories</id>
-                  <name>External release artifacts for NNEW</name>
-                  <url>http://repo.wx.ll.mit.edu/content/groups/nnew-repositories</url>
-                  <releases><enabled>true</enabled></releases>
-                  <snapshots><enabled>true</enabled></snapshots>
-        </repository>
-
-
-        <repository>
-            <id>Apache snapshots</id>
-            <name>Apache snapshots</name>
-            <url>https://repository.apache.org/content/repositories/snapshots</url>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
         </repository>
 
     </repositories>
@@ -569,8 +550,8 @@
     <distributionManagement>
 
         <repository>
-          <id>RAL-repo</id>
-          <url>http://nnew.rap.ucar.edu/maven2/repo</url>
+          <id>RAL-local-releases</id>
+          <url>http://nnew.rap.ucar.edu/maven2/libs-releases-local</url>
         </repository>
 
         <site>
