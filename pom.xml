@@ -24,8 +24,8 @@
          <url>http://${ncar.build.host}:8080/jenkins</url> </ciManagement -->
 
     <scm>
-        <connection>scm:svn:http://svn.wx.ll.mit.edu/svn/nc4writer/trunk</connection>
-        <developerConnection>scm:svn:http://svn.wx.ll.mit.edu/svn/nc4writer/trunk</developerConnection>
+        <connection>scm:svn:https://proxy.subversion.ucar.edu/nc4writer/trunk</connection>
+        <developerConnection>scm:svn:https://proxy.subversion.ucar.edu/nc4writer/trunk</developerConnection>
     </scm>
 
     <issueManagement>
