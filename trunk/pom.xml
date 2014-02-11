@@ -564,23 +564,18 @@
     </reporting>
 
     <!--
-    These settings deploy to the Lincoln Labs repository, which requires that credentials be present
-    for this repository in ~/.m2/settings.xml.  To deploy a release to nexus repo:
+    These settings deploy to the RAL repository, which requires that credentials be present
+    for this repository in ~/.m2/settings.xml.  To deploy a release to repo:
       mvn deploy -DrepositoryId=snapshots -Durl=http://repo.wx.ll.mit.edu/content/repositories/snapshots
     -->
     <distributionManagement>
 
-        <!-- archiva-managed deployment -->
+      <distributionManagement>
         <repository>
-            <id>releases</id>
-            <name>Lincoln Labs Release Repository</name>
-            <url>dav:http://${repository.host}/content/repositories/releases</url>
+          <id>RAL-repo</id>
+          <url>http://nnew.rap.ucar.edu/maven2/repo</url>
         </repository>
-        <snapshotRepository>
-            <id>snapshots</id>
-            <name>Lincoln Labs Snapshot Repository</name>
-            <url>dav:http://${repository.host}/content/repositories/snapshots</url>
-        </snapshotRepository>
+      </distributionManagement>
 
         <site>
             <id>sites</id>
