@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0     http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
     <organization>
@@ -9,7 +9,7 @@
     <groupId>edu.ucar.ral</groupId>
     <artifactId>nujan</artifactId>
     <packaging>bundle</packaging>
-    <version>1.4.3</version>
+    <version>1.4.4-SNAPSHOT</version>
     <name>Pure Java NetCDF 4/HDF 5 writing library</name>
     <url>http://wiki.ucar.edu/display/NNEWD</url>
 
@@ -22,8 +22,8 @@
          <url>http://${ncar.build.host}:8080/jenkins</url> </ciManagement -->
 
     <scm>
-        <connection>scm:svn:https://proxy.subversion.ucar.edu/nc4writer/tags/nujan-1.4.3</connection>
-        <developerConnection>scm:svn:https://proxy.subversion.ucar.edu/nc4writer/tags/nujan-1.4.3</developerConnection>
+        <connection>scm:svn:https://proxy.subversion.ucar.edu/nc4writer/trunk</connection>
+        <developerConnection>scm:svn:https://proxy.subversion.ucar.edu/nc4writer/trunk</developerConnection>
     </scm>
 
     <issueManagement>
