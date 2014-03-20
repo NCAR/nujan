@@ -308,11 +308,6 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <!--
-                             Don't run the wcsri-monitoring "mbeans" tests, because they
-                             require ServiceMix to be running:
-                         -->
-                    <excludedGroups>mbeans,aop</excludedGroups>
-                    <!--
                              Uncomment the following two lines for multi-threaded test
                              execution
                          -->
