@@ -9,7 +9,7 @@
     <groupId>edu.ucar.ral</groupId>
     <artifactId>nujan</artifactId>
     <packaging>bundle</packaging>
-    <version>1.4.4</version>
+    <version>1.4.5-SNAPSHOT</version>
     <name>Pure Java NetCDF 4/HDF 5 writing library</name>
     <url>http://wiki.ucar.edu/display/NNEWD</url>
 
@@ -22,8 +22,8 @@
          <url>http://${ncar.build.host}:8080/jenkins</url> </ciManagement -->
 
     <scm>
-        <connection>scm:svn:https://proxy.subversion.ucar.edu/nc4writer/tags/nujan-1.4.4</connection>
-        <developerConnection>scm:svn:https://proxy.subversion.ucar.edu/nc4writer/tags/nujan-1.4.4</developerConnection>
+        <connection>scm:svn:https://proxy.subversion.ucar.edu/nc4writer/trunk</connection>
+        <developerConnection>scm:svn:https://proxy.subversion.ucar.edu/nc4writer/trunk</developerConnection>
     </scm>
 
     <issueManagement>
