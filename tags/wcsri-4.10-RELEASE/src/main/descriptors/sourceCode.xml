@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assembly>
+  <id>nujan</id>
+  <!-- intentionally left blank -> http://jira.codehaus.org/browse/MASSEMBLY-301 -->
+  <formats>
+    <format>tar.gz</format>
+    <format>zip</format>
+  </formats>
+
+  <fileSets>
+    <fileSet>
+      <directory>${project.basedir}</directory>
+      <includes>
+        <include>pom.xml</include>
+      </includes>
+      <useDefaultExcludes>true</useDefaultExcludes>
+    </fileSet>
+    <fileSet>
+      <!-- TODO: use expresssions instead: ${project.build.sourceDirectory}, etc -->
+      <directory>${project.basedir}/src</directory>
+      <useDefaultExcludes>true</useDefaultExcludes>
+      <excludes>
+        <exclude>**/test/**</exclude>
+      </excludes>
+    </fileSet>
+  </fileSets>
+
+</assembly>
+
