@@ -73,6 +73,11 @@
             <url>http://repo1.maven.org/maven2</url>
         </repository>
 
+        <repository>
+            <id>unidata-releases</id>
+            <url>http://artifacts.unidata.ucar.edu/content/repositories/unidata-releases</url>
+        </repository>
+
     </repositories>
 
     <pluginRepositories>
