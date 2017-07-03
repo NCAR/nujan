@@ -14,39 +14,23 @@
     <url>http://wiki.ucar.edu/display/NNEWD</url>
 
     <ciManagement>
-        <system>jenkins</system>
-        <url>http://nnew-build:8080/jenkins/job/Nujan/</url>
     </ciManagement>
-    <!--
-         ciManagement> <system>jenkins</system>
-         <url>http://${ncar.build.host}:8080/jenkins</url> </ciManagement -->
 
     <scm>
-        <connection>scm:svn:https://proxy.subversion.ucar.edu/nc4writer/trunk</connection>
-        <developerConnection>scm:svn:https://proxy.subversion.ucar.edu/nc4writer/trunk</developerConnection>
     </scm>
 
     <issueManagement>
-        <system>jira</system>
-        <url>http://sdg.rap.ucar.edu/jira/browse/NNEW</url>
     </issueManagement>
 
     <licenses>
         <license>
             <name>Modified MIT License</name>
-            <url>https://wiki.ucar.edu/display/NNEWD/NNEW+Code+License</url>
+            <url>LICENSE.txt</url>
             <distribution>repo</distribution>
-            <comments>Modified MIT License tailored for the NNEW labs, including UCAR/NCAR, M.I.T.
-                Lincoln Laboratory, and NOAA GSD. NOAA cannot copyright because of the Freedom of
-                Information Act </comments>
         </license>
     </licenses>
 
     <mailingLists>
-        <mailingList>
-            <name>Dev Team</name>
-            <post>ncar-nnew-dev@rap.ucar.edu</post>
-        </mailingList>
     </mailingLists>
 
     <properties>
@@ -62,24 +46,16 @@
         <findbugs-maven-plugin.version>2.3.1</findbugs-maven-plugin.version>
         <javancss-maven-plugin.version>2.0</javancss-maven-plugin.version>
         <jdepend-maven-plugin.version>2.0-beta-2</jdepend-maven-plugin.version>
-        <jdom.version>1.1</jdom.version>
-        <jpeg2000.version>20081017</jpeg2000.version>
 
+        <ucar.netcdf-api.version>4.6.8</ucar.netcdf-api.version>
         <junit.version>4.4</junit.version>
         <junit-addons.version>1.4</junit-addons.version>
 
-        <log4j.version>1.2.15</log4j.version>
-        <slf4j.version>1.5.10</slf4j.version>
         <maven-bundle-plugin.version>2.0.1</maven-bundle-plugin.version>
         <maven-pax-plugin.version>1.4</maven-pax-plugin.version>
         <maven.release.plugin.version>2.0</maven.release.plugin.version>
         <maven-resources-plugin.version>2.3</maven-resources-plugin.version>
         <taglist-maven-plugin.version>2.4</taglist-maven-plugin.version>
-        <testng.version>5.8</testng.version>
-        <ucar.netcdf-api.version>4.3.22-fileleak-fix</ucar.netcdf-api.version>
-
-        <!-- Other properties -->
-        <ncar.build.host>crash</ncar.build.host>
 
         <maven.assembly.plugin.version>2.2</maven.assembly.plugin.version>
 
@@ -100,143 +76,49 @@
     </repositories>
 
     <pluginRepositories>
-
-        <pluginRepository>
-            <id>fuse.plugins</id>
-            <url>http://repo.fusesource.com/maven2</url>
-        </pluginRepository>
-
     </pluginRepositories>
 
-    <dependencyManagement>
-
-        <dependencies>
-
-            <dependency>
-                <groupId>commons-codec</groupId>
-                <artifactId>commons-codec</artifactId>
-                <version>${commons-codec.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>commons-httpclient</groupId>
-                <artifactId>commons-httpclient</artifactId>
-                <version>${commons-httpclient.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>jj2000.j2k</groupId>
-                <artifactId>jpeg2000</artifactId>
-                <version>${jpeg2000.version}</version>
-                <type>jar</type>
-            </dependency>
-
-            <dependency>
-                <groupId>edu.ucar.unidata</groupId>
-                <artifactId>netcdf-api</artifactId>
-                <version>${ucar.netcdf-api.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>junit</groupId>
-                <artifactId>junit</artifactId>
-                <version>${junit.version}</version>
-                <scope>test</scope>
-            </dependency>
-
-            <dependency>
-                <groupId>junit-addons</groupId>
-                <artifactId>junit-addons</artifactId>
-                <version>${junit-addons.version}</version>
-                <scope>test</scope>
-            </dependency>
-
-
-            <dependency>
-                <groupId>org.apache.log4j</groupId>
-                <artifactId>com.springsource.org.apache.log4j</artifactId>
-                <version>${log4j.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.jdom</groupId>
-                <artifactId>jdom</artifactId>
-                <version>${jdom.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.slf4j</groupId>
-                <artifactId>slf4j-api</artifactId>
-                <version>${slf4j.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>org.slf4j</groupId>
-                <artifactId>slf4j-log4j12</artifactId>
-                <version>${slf4j.version}</version>
-            </dependency>
-
-            <!-- test scoped dependencies -->
-
-            <dependency>
-                <groupId>org.testng</groupId>
-                <artifactId>testng</artifactId>
-                <version>${testng.version}</version>
-                <scope>test</scope>
-                <classifier>jdk15</classifier>
-            </dependency>
-
-        </dependencies>
-
-    </dependencyManagement>
-
     <dependencies>
-        
-        <dependency>
-            <groupId>edu.ucar.unidata</groupId>
-            <artifactId>netcdf-api</artifactId>
-        </dependency>
-
-        <!-- Commented out - does not seem to be needed for Nujan anymore -->
-        <!--dependency>
-            <groupId>jj2000.j2k</groupId>
-            <artifactId>jpeg2000</artifactId>
-        </dependency-->
 
         <dependency>
             <groupId>commons-codec</groupId>
             <artifactId>commons-codec</artifactId>
+            <version>${commons-codec.version}</version>
         </dependency>
 
         <dependency>
             <groupId>commons-httpclient</groupId>
             <artifactId>commons-httpclient</artifactId>
-        </dependency>
-
-        <!-- Testing dependencies -->
-        <dependency>
-           <groupId>junit</groupId>
-           <artifactId>junit</artifactId>
+            <version>${commons-httpclient.version}</version>
         </dependency>
 
         <dependency>
-           <groupId>junit-addons</groupId>
-           <artifactId>junit-addons</artifactId>
+            <groupId>edu.ucar</groupId>
+            <artifactId>cdm</artifactId>
+            <version>${ucar.netcdf-api.version}</version>
         </dependency>
 
-        
+        <!-- test scoped dependencies -->
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>junit-addons</groupId>
+            <artifactId>junit-addons</artifactId>
+            <version>${junit-addons.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+
     </dependencies>
 
 
     <build>
-        <!-- for webdav-based deployment to archiva -->
-        <extensions>
-            <extension>
-                <groupId>org.apache.maven.wagon</groupId>
-                <artifactId>wagon-webdav</artifactId>
-                <version>1.0-beta-2</version>
-            </extension>
-        </extensions>
 
         <pluginManagement>
 
@@ -536,25 +418,5 @@
         </plugins>
 
     </reporting>
-
-    <!--
-    These settings deploy to the RAL repository, which requires that credentials be present
-    for this repository in ~/.m2/settings.xml.  To deploy a release to repo:
-      mvn deploy -DrepositoryId=snapshots -Durl=http://repo.wx.ll.mit.edu/content/repositories/snapshots
-    -->
-    <distributionManagement>
-
-        <repository>
-          <id>RAL-local-releases</id>
-          <url>http://nnew.rap.ucar.edu/maven2/libs-releases-local</url>
-        </repository>
-
-        <site>
-            <id>sites</id>
-            <name>${name}</name>
-            <url>file://${sites.path}</url>
-        </site>
-
-    </distributionManagement>
 
 </project>
